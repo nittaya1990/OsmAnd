@@ -4,13 +4,13 @@ import android.view.View;
 
 import androidx.annotation.NonNull;
 
-import net.osmand.plus.settings.backend.OsmandPreference;
+import net.osmand.plus.settings.backend.preferences.OsmandPreference;
 import net.osmand.plus.mapcontextmenu.MenuBuilder.CollapseExpandListener;
 
 public class CollapsableView {
 
-	private View contentView;
-	private MenuBuilder menuBuilder;
+	private final View contentView;
+	private final MenuBuilder menuBuilder;
 
 	private OsmandPreference<Boolean> collapsedPref;
 	private CollapseExpandListener collapseExpandListener;
@@ -50,8 +50,8 @@ public class CollapsableView {
 		if (collapseExpandListener != null) {
 			collapseExpandListener.onCollapseExpand(collapsed);
 		}
-		if (menuBuilder != null && menuBuilder.getCollapseExpandListener() != null) {
-			menuBuilder.getCollapseExpandListener().onCollapseExpand(collapsed);
+		if (menuBuilder != null) {
+			menuBuilder.notifyCollapseExpand(collapsed);
 		}
 	}
 

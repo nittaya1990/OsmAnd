@@ -5,7 +5,7 @@ import android.os.AsyncTask;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import net.osmand.AndroidUtils;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.settings.backend.backup.items.SettingsItem;
 
@@ -48,7 +48,8 @@ public class FileSettingsHelper extends SettingsHelper {
 
 	public interface SettingsExportListener {
 		void onSettingsExportFinished(@NonNull File file, boolean succeed);
-		void onSettingsExportProgressUpdate(int value);
+		default void onSettingsExportProgressUpdate(int value) {
+		}
 	}
 
 	public FileSettingsHelper(@NonNull OsmandApplication app) {

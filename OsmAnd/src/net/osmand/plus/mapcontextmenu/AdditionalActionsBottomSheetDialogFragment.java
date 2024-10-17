@@ -19,12 +19,12 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ContextMenuAdapter;
-import net.osmand.plus.ContextMenuItem;
+import net.osmand.plus.widgets.ctxmenu.ContextMenuAdapter;
+import net.osmand.plus.widgets.ctxmenu.data.ContextMenuItem;
 import net.osmand.plus.R;
 import net.osmand.plus.base.BottomSheetDialogFragment;
 import net.osmand.plus.helpers.AndroidUiHelper;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.plus.widgets.tools.ExtendedBottomSheetBehavior;
 import net.osmand.plus.widgets.tools.ExtendedBottomSheetBehavior.BottomSheetCallback;
 
@@ -53,7 +53,7 @@ public class AdditionalActionsBottomSheetDialogFragment extends BottomSheetDialo
 		Activity activity = requireActivity();
 		nightMode = requiredMyApplication().getDaynightHelper().isNightModeForMapControls();
 		portrait = AndroidUiHelper.isOrientationPortrait(activity);
-		final int themeRes = nightMode ? R.style.OsmandDarkTheme : R.style.OsmandLightTheme;
+		int themeRes = nightMode ? R.style.OsmandDarkTheme : R.style.OsmandLightTheme;
 		availableScreenH = AndroidUtils.getScreenHeight(activity) - AndroidUtils.getStatusBarHeight(activity);
 		if (portrait) {
 			availableScreenH -= AndroidUtils.getNavBarHeight(activity);
@@ -67,7 +67,7 @@ public class AdditionalActionsBottomSheetDialogFragment extends BottomSheetDialo
 		updateBackground(false);
 		cancelRowBgView.setBackgroundResource(getCancelRowBgResId());
 		mainView.findViewById(R.id.divider).setBackgroundResource(nightMode
-				? R.color.route_info_bottom_view_bg_dark : R.color.ctx_menu_buttons_divider_light);
+				? R.color.card_and_list_background_dark : R.color.divider_color_light);
 
 		View.OnClickListener dismissOnClickListener = new View.OnClickListener() {
 			@Override
@@ -83,14 +83,14 @@ public class AdditionalActionsBottomSheetDialogFragment extends BottomSheetDialo
 			@Override
 			public void onClick(View view) {
 				if (listener != null) {
-					listener.onItemClick((int) view.getTag());
+					listener.onItemClick(view, (int) view.getTag());
 				}
 				dismiss();
 			}
 		};
 
 		if (adapter != null) {
-			LinearLayout itemsLinearLayout = (LinearLayout) mainView.findViewById(R.id.context_menu_items_container);
+			LinearLayout itemsLinearLayout = mainView.findViewById(R.id.context_menu_items_container);
 			LinearLayout row = (LinearLayout) View.inflate(context, R.layout.grid_menu_row, null);
 			int itemsAdded = 0;
 			for (int i = 0; i < adapter.length(); i++) {
@@ -119,7 +119,7 @@ public class AdditionalActionsBottomSheetDialogFragment extends BottomSheetDialo
 			}
 		}
 
-		final ExtendedBottomSheetBehavior behavior = ExtendedBottomSheetBehavior.from(scrollView);
+		ExtendedBottomSheetBehavior behavior = ExtendedBottomSheetBehavior.from(scrollView);
 		behavior.setBottomSheetCallback(new BottomSheetCallback() {
 			@Override
 			public void onStateChanged(@NonNull View bottomSheet, int newState) {
@@ -153,11 +153,12 @@ public class AdditionalActionsBottomSheetDialogFragment extends BottomSheetDialo
 	public void onStart() {
 		super.onStart();
 		if (!portrait) {
-			final Window window = getDialog().getWindow();
-			WindowManager.LayoutParams params = window.getAttributes();
-			params.width = getResources().getDimensionPixelSize(R.dimen.landscape_bottom_sheet_dialog_fragment_width)
-					+ AndroidUtils.dpToPx(getContext(), 16); // 8 dp is shadow width on each side
-			window.setAttributes(params);
+			Window window = requireDialog().getWindow();
+			if (window != null){
+				WindowManager.LayoutParams params = window.getAttributes();
+				params.width = getResources().getDisplayMetrics().widthPixels / 2;
+				window.setAttributes(params);
+			}
 		}
 	}
 
@@ -176,7 +177,7 @@ public class AdditionalActionsBottomSheetDialogFragment extends BottomSheetDialo
 
 	private int getCancelRowBgResId() {
 		if (portrait) {
-			return nightMode ? R.color.list_background_color_dark : R.color.route_info_bottom_view_bg_light;
+			return nightMode ? R.color.list_background_color_dark : R.color.activity_background_color_light;
 		}
 		return nightMode ? R.drawable.bg_additional_menu_sides_dark : R.drawable.bg_additional_menu_sides_light;
 	}
@@ -189,7 +190,7 @@ public class AdditionalActionsBottomSheetDialogFragment extends BottomSheetDialo
 		int bgResId;
 		if (portrait) {
 			bgResId = expanded && expandedToFullScreen()
-					? (nightMode ? R.color.list_background_color_dark : R.color.route_info_bottom_view_bg_light)
+					? (nightMode ? R.color.list_background_color_dark : R.color.activity_background_color_light)
 					: (nightMode ? R.drawable.bg_additional_menu_dark : R.drawable.bg_additional_menu_light);
 		} else {
 			bgResId = expanded && expandedToFullScreen()
@@ -209,6 +210,6 @@ public class AdditionalActionsBottomSheetDialogFragment extends BottomSheetDialo
 	}
 
 	public interface ContextMenuItemClickListener {
-		void onItemClick(int position);
+		void onItemClick(View view, int position);
 	}
 }

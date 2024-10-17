@@ -8,23 +8,25 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.content.ContextCompat;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceViewHolder;
 import androidx.preference.SwitchPreferenceCompat;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.settings.enums.DrivingRegion;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.dialogs.SpeedCamerasBottomSheet;
 import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 
 
-import static net.osmand.plus.UiUtilities.CompoundButtonType.TOOLBAR;
+import static net.osmand.plus.utils.UiUtilities.CompoundButtonType.TOOLBAR;
 
-public class ScreenAlertsFragment extends BaseSettingsFragment implements OnPreferenceChanged {
+public class ScreenAlertsFragment extends BaseSettingsFragment {
 
 	public static final String TAG = ScreenAlertsFragment.class.getSimpleName();
 
@@ -34,12 +36,15 @@ public class ScreenAlertsFragment extends BaseSettingsFragment implements OnPref
 	@Override
 	protected void setupPreferences() {
 		Preference showRoutingAlarmsInfo = findPreference(SHOW_ROUTING_ALARMS_INFO);
-		SwitchPreferenceCompat showTrafficWarnings = (SwitchPreferenceCompat) findPreference(settings.SHOW_TRAFFIC_WARNINGS.getId());
-		SwitchPreferenceCompat showPedestrian = (SwitchPreferenceCompat) findPreference(settings.SHOW_PEDESTRIAN.getId());
-		SwitchPreferenceCompat showTunnels = (SwitchPreferenceCompat) findPreference(settings.SHOW_TUNNELS.getId());
+		SwitchPreferenceCompat showTrafficWarnings = findPreference(settings.SHOW_TRAFFIC_WARNINGS.getId());
+		SwitchPreferenceCompat showSpeedLimitWarnings = findPreference(settings.SHOW_SPEED_LIMIT_WARNINGS.getId());
+		SwitchPreferenceCompat showPedestrian = findPreference(settings.SHOW_PEDESTRIAN.getId());
+		SwitchPreferenceCompat showTunnels = findPreference(settings.SHOW_TUNNELS.getId());
 
 		showRoutingAlarmsInfo.setIcon(getContentIcon(R.drawable.ic_action_info_dark));
 		showTrafficWarnings.setIcon(getIcon(R.drawable.list_warnings_traffic_calming));
+		int speedLimitIcon = getSpeedLimitIcon();
+		showSpeedLimitWarnings.setIcon(speedLimitIcon);
 		showPedestrian.setIcon(getIcon(R.drawable.list_warnings_pedestrian));
 		showTunnels.setIcon(getIcon(R.drawable.list_warnings_tunnel));
 
@@ -49,8 +54,30 @@ public class ScreenAlertsFragment extends BaseSettingsFragment implements OnPref
 		enableDisablePreferences(settings.SHOW_ROUTING_ALARMS.getModeValue(getSelectedAppMode()));
 	}
 
+	private int getSpeedLimitIcon() {
+		int speedLimitIcon;
+		if (isUsaRegion()) {
+			speedLimitIcon = R.drawable.list_warnings_speed_limit_us;
+		} else if (isCanadaRegion()) {
+			speedLimitIcon = R.drawable.list_warnings_speed_limit_ca;
+		} else {
+			speedLimitIcon = R.drawable.list_warnings_limit;
+		}
+		return speedLimitIcon;
+	}
+
+	private boolean isUsaRegion() {
+		ApplicationMode mode = app.getSettings().getApplicationMode();
+		return settings.DRIVING_REGION.getModeValue(mode) == DrivingRegion.US;
+	}
+
+	private boolean isCanadaRegion() {
+		ApplicationMode mode = app.getSettings().getApplicationMode();
+		return settings.DRIVING_REGION.getModeValue(mode) == DrivingRegion.CANADA;
+	}
+
 	@Override
-	protected void createToolbar(LayoutInflater inflater, View view) {
+	protected void createToolbar(@NonNull LayoutInflater inflater, @NonNull View view) {
 		super.createToolbar(inflater, view);
 
 		view.findViewById(R.id.toolbar_switch_container).setOnClickListener(new View.OnClickListener() {
@@ -83,7 +110,7 @@ public class ScreenAlertsFragment extends BaseSettingsFragment implements OnPref
 		View switchContainer = view.findViewById(R.id.toolbar_switch_container);
 		AndroidUtils.setBackground(switchContainer, new ColorDrawable(color));
 
-		SwitchCompat switchView = (SwitchCompat) switchContainer.findViewById(R.id.switchWidget);
+		SwitchCompat switchView = switchContainer.findViewById(R.id.switchWidget);
 		switchView.setChecked(checked);
 		UiUtilities.setupCompoundButton(switchView, isNightMode(), TOOLBAR);
 
@@ -92,7 +119,7 @@ public class ScreenAlertsFragment extends BaseSettingsFragment implements OnPref
 	}
 
 	@Override
-	protected void onBindPreferenceViewHolder(Preference preference, PreferenceViewHolder holder) {
+	protected void onBindPreferenceViewHolder(@NonNull Preference preference, @NonNull PreferenceViewHolder holder) {
 		super.onBindPreferenceViewHolder(preference, holder);
 
 		String key = preference.getKey();
@@ -100,8 +127,8 @@ public class ScreenAlertsFragment extends BaseSettingsFragment implements OnPref
 			if (SHOW_ROUTING_ALARMS_INFO.equals(key)) {
 				holder.itemView.setBackgroundColor(ColorUtilities.getActivityBgColor(app, isNightMode()));
 			} else if (SCREEN_ALERTS_IMAGE.equals(key)) {
-				ImageView deviceImage = (ImageView) holder.itemView.findViewById(R.id.device_image);
-				ImageView warningIcon = (ImageView) holder.itemView.findViewById(R.id.warning_icon);
+				ImageView deviceImage = holder.itemView.findViewById(R.id.device_image);
+				ImageView warningIcon = holder.itemView.findViewById(R.id.warning_icon);
 
 				deviceImage.setImageDrawable(getDeviceImage());
 				warningIcon.setImageDrawable(getWarningIcon());
@@ -124,7 +151,7 @@ public class ScreenAlertsFragment extends BaseSettingsFragment implements OnPref
 	}
 
 	@Override
-	public void onPreferenceChanged(String prefId) {
+	public void onPreferenceChanged(@NonNull String prefId) {
 		if (prefId.equals(settings.SPEED_CAMERAS_UNINSTALLED.getId())) {
 			setupShowCamerasPref();
 			setupSpeedCamerasAlert();
@@ -160,7 +187,7 @@ public class ScreenAlertsFragment extends BaseSettingsFragment implements OnPref
 	}
 
 	private void setupShowCamerasPref() {
-		SwitchPreferenceCompat showCameras = (SwitchPreferenceCompat) findPreference(settings.SHOW_CAMERAS.getId());
+		SwitchPreferenceCompat showCameras = findPreference(settings.SHOW_CAMERAS.getId());
 		showCameras.setIcon(getIcon(R.drawable.list_warnings_speed_camera));
 		showCameras.setVisible(!settings.SPEED_CAMERAS_UNINSTALLED.get());
 	}

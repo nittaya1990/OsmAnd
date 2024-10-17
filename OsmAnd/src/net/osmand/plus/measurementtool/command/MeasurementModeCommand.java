@@ -9,7 +9,7 @@ public abstract class MeasurementModeCommand implements Command {
 
 	MeasurementToolLayer measurementLayer;
 
-	public MeasurementModeCommand(MeasurementToolLayer measurementLayer) {
+	public MeasurementModeCommand(@NonNull MeasurementToolLayer measurementLayer) {
 		this.measurementLayer = measurementLayer;
 	}
 
@@ -22,6 +22,7 @@ public abstract class MeasurementModeCommand implements Command {
 		return false;
 	}
 
+	@NonNull
 	public abstract MeasurementCommandType getType();
 
 	MeasurementEditingContext getEditingCtx() {
@@ -43,6 +44,7 @@ public abstract class MeasurementModeCommand implements Command {
 		APPROXIMATE_POINTS,
 		REVERSE_POINTS,
 		SPLIT_POINTS,
-		JOIN_POINTS
+		JOIN_POINTS,
+		DISABLE_APPROXIMATION_CHECK
 	}
 }

@@ -1,5 +1,7 @@
 package net.osmand.plus.profiles;
 
+import static net.osmand.plus.settings.fragments.BaseSettingsFragment.APP_MODE_KEY;
+
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -22,7 +24,6 @@ public class SelectAppModesBottomSheetDialogFragment extends AppModesBottomSheet
 
 	public static final String TAG = "SelectAppModesBottomSheetDialogFragment";
 
-	private static final String APP_MODE_KEY = "app_mode_key";
 	private static final String APP_MODE_CHANGEABLE_KEY = "app_mode_changeable_key";
 
 	private static final Log LOG = PlatformUtil.getLog(SelectAppModesBottomSheetDialogFragment.class);
@@ -109,7 +110,7 @@ public class SelectAppModesBottomSheetDialogFragment extends AppModesBottomSheet
 	}
 
 	@Override
-	protected boolean isNightMode(@NonNull OsmandApplication app) {
+	public boolean isNightMode(@NonNull OsmandApplication app) {
 		if (usedOnMap) {
 			return app.getDaynightHelper().isNightModeForMapControlsForProfile(getAppMode());
 		} else {
@@ -120,13 +121,13 @@ public class SelectAppModesBottomSheetDialogFragment extends AppModesBottomSheet
 	public static void showInstance(@NonNull FragmentManager fm, Fragment target, boolean usedOnMap,
 									@Nullable ApplicationMode appMode, boolean appModeChangeable) {
 		try {
-			if (fm.findFragmentByTag(SelectAppModesBottomSheetDialogFragment.TAG) == null) {
+			if (fm.findFragmentByTag(TAG) == null) {
 				SelectAppModesBottomSheetDialogFragment fragment = new SelectAppModesBottomSheetDialogFragment();
 				fragment.setTargetFragment(target, 0);
 				fragment.setUsedOnMap(usedOnMap);
 				fragment.setAppMode(appMode);
 				fragment.setAppModeChangeable(appModeChangeable);
-				fragment.show(fm, SelectAppModesBottomSheetDialogFragment.TAG);
+				fragment.show(fm, TAG);
 			}
 		} catch (RuntimeException e) {
 			LOG.error("showInstance", e);

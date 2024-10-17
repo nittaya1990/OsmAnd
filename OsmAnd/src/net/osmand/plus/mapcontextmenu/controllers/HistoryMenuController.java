@@ -7,7 +7,6 @@ import androidx.annotation.NonNull;
 import net.osmand.data.PointDescription;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.activities.search.SearchHistoryFragment;
 import net.osmand.plus.helpers.SearchHistoryHelper.HistoryEntry;
 import net.osmand.plus.mapcontextmenu.MenuBuilder;
 import net.osmand.plus.mapcontextmenu.MenuController;
@@ -18,7 +17,7 @@ public class HistoryMenuController extends MenuController {
 	private HistoryEntry entry;
 	private boolean hasTypeInDescription;
 
-	public HistoryMenuController(@NonNull MapActivity mapActivity, @NonNull PointDescription pointDescription, final @NonNull HistoryEntry entry) {
+	public HistoryMenuController(@NonNull MapActivity mapActivity, @NonNull PointDescription pointDescription, @NonNull HistoryEntry entry) {
 		super(new MenuBuilder(mapActivity), pointDescription, mapActivity);
 		this.entry = entry;
 		builder.setShowNearestWiki(true);
@@ -54,7 +53,7 @@ public class HistoryMenuController extends MenuController {
 
 	@Override
 	public Drawable getRightIcon() {
-		return getIcon(SearchHistoryFragment.getItemIcon(entry.getName()));
+		return getIcon(entry.getName().getItemIcon());
 	}
 
 	@Override

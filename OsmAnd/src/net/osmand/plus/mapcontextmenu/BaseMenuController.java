@@ -4,11 +4,12 @@ import android.graphics.drawable.Drawable;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.helpers.AndroidUiHelper;
 
@@ -17,8 +18,8 @@ public abstract class BaseMenuController {
 	@Nullable
 	private MapActivity mapActivity;
 	private boolean portraitMode;
-	private boolean nightMode;
 	private int landscapeWidthPx;
+	protected boolean nightMode;
 
 	public BaseMenuController(@NonNull MapActivity mapActivity) {
 		this.mapActivity = mapActivity;
@@ -49,7 +50,7 @@ public abstract class BaseMenuController {
 		return !nightMode;
 	}
 
-	protected void updateNightMode() {
+	public void updateNightMode() {
 		if (mapActivity != null) {
 			nightMode = mapActivity.getMyApplication().getDaynightHelper().isNightModeForMapControls();
 		}
@@ -105,5 +106,10 @@ public abstract class BaseMenuController {
 		} else {
 			return null;
 		}
+	}
+
+	@NonNull
+	protected String getString(@StringRes int resId, Object... formatArgs) {
+		return mapActivity != null ? mapActivity.getString(resId, formatArgs) : "";
 	}
 }

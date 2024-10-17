@@ -1,8 +1,10 @@
 package net.osmand.plus.notifications;
 
+import android.app.Service;
 import android.content.Intent;
 import android.os.AsyncTask;
 
+import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 import net.osmand.plus.OsmandApplication;
@@ -17,14 +19,10 @@ import java.util.List;
 
 public class DownloadNotification extends OsmandNotification {
 
-	public final static String GROUP_NAME = "DOWNLOAD";
+	public static final String GROUP_NAME = "DOWNLOAD";
 
 	public DownloadNotification(OsmandApplication app) {
 		super(app, GROUP_NAME);
-	}
-
-	@Override
-	public void init() {
 	}
 
 	@Override
@@ -39,29 +37,32 @@ public class DownloadNotification extends OsmandNotification {
 
 	@Override
 	public boolean isActive() {
-		DownloadService service = app.getDownloadService();
-		return isEnabled() && service != null;
-	}
-
-	@Override
-	public boolean isEnabled() {
 		DownloadIndexesThread downloadThread = app.getDownloadThread();
 		return downloadThread.isDownloading();
 	}
 
 	@Override
-	public Intent getContentIntent() {
-		return new Intent(app, DownloadActivity.class);
+	public boolean isUsedByService(@Nullable Service service) {
+		DownloadService downloadService = service instanceof DownloadService
+				? (DownloadService) service : app.getDownloadService();
+		return downloadService != null;
 	}
 
 	@Override
-	public NotificationCompat.Builder buildNotification(boolean wearable) {
+	public Intent getContentIntent() {
+		Intent intent = new Intent(app, DownloadActivity.class);
+		intent.setPackage(app.getPackageName());
+		return intent;
+	}
+
+	@Override
+	public NotificationCompat.Builder buildNotification(@Nullable Service service, boolean wearable) {
 		icon = android.R.drawable.stat_sys_download;
 		ongoing = true;
 		DownloadIndexesThread downloadThread = app.getDownloadThread();
 
 		BasicProgressAsyncTask<?, ?, ?, ?> task = downloadThread.getCurrentRunningTask();
-		final boolean isFinished = task == null || task.getStatus() == AsyncTask.Status.FINISHED;
+		boolean isFinished = task == null || task.getStatus() == AsyncTask.Status.FINISHED;
 
 		NotificationCompat.Builder notificationBuilder = createBuilder(wearable);
 		String msg = Version.getAppName(app);
@@ -84,7 +85,7 @@ public class DownloadNotification extends OsmandNotification {
 				.setContentText(contentText.toString())
 				.setOnlyAlertOnce(true)
 				.setOngoing(true);
-		int progress = downloadThread.getCurrentDownloadingItemProgress();
+		int progress = (int) downloadThread.getCurrentDownloadProgress();
 		notificationBuilder.setProgress(100, Math.max(progress, 0), progress < 0);
 		return notificationBuilder;
 	}

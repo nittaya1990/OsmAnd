@@ -1,13 +1,15 @@
 package net.osmand.plus.routepreparationmenu.cards;
 
+import static net.osmand.plus.routepreparationmenu.RoutingOptionsHelper.OtherLocalRoutingParameter;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
-import net.osmand.AndroidUtils;
-import net.osmand.GPXUtilities.GPXFile;
+import androidx.annotation.NonNull;
+
+import net.osmand.shared.gpx.GpxFile;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.routepreparationmenu.FollowTrackFragment;
 import net.osmand.plus.routepreparationmenu.RoutingOptionsHelper.LocalRoutingParameter;
@@ -15,18 +17,16 @@ import net.osmand.plus.routing.GPXRouteParams.GPXRouteParamsBuilder;
 import net.osmand.plus.routing.RouteService;
 import net.osmand.plus.routing.RoutingHelper;
 import net.osmand.plus.settings.backend.ApplicationMode;
-
-import androidx.annotation.NonNull;
-
-import static net.osmand.plus.routepreparationmenu.RoutingOptionsHelper.OtherLocalRoutingParameter;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.UiUtilities;
 
 public class SelectedTrackToFollowCard extends MapBaseCard {
 
 	final FollowTrackFragment target;
-	final GPXFile gpxFile;
+	final GpxFile gpxFile;
 
 	public SelectedTrackToFollowCard(@NonNull MapActivity mapActivity, @NonNull FollowTrackFragment target,
-	                                 @NonNull GPXFile gpxFile) {
+	                                 @NonNull GpxFile gpxFile) {
 		super(mapActivity);
 		this.target = target;
 		this.gpxFile = gpxFile;
@@ -48,7 +48,7 @@ public class SelectedTrackToFollowCard extends MapBaseCard {
 			}
 		});
 
-		ViewGroup cardsContainer = ((ViewGroup) view.findViewById(R.id.cards_container));
+		ViewGroup cardsContainer = view.findViewById(R.id.cards_container);
 		cardsContainer.removeAllViews();
 
 		TrackEditCard importTrackCard = new TrackEditCard(mapActivity, gpxFile);
@@ -71,20 +71,17 @@ public class SelectedTrackToFollowCard extends MapBaseCard {
 			reverseTrackCard.setListener(target);
 			cardsContainer.addView(reverseTrackCard.build(mapActivity));
 
-			if (!gpxFile.hasRtePt() && !gpxFile.hasRoute()) {
-				cardsContainer.addView(buildDividerView(cardsContainer, true));
+			cardsContainer.addView(buildDividerView(cardsContainer, true));
 
-				AttachTrackToRoadsCard attachTrackCard = new AttachTrackToRoadsCard(mapActivity);
-				attachTrackCard.setListener(target);
-				cardsContainer.addView(attachTrackCard.build(mapActivity));
-			}
+			AttachTrackToRoadsCard attachTrackCard = new AttachTrackToRoadsCard(mapActivity);
+			attachTrackCard.setListener(target);
+			cardsContainer.addView(attachTrackCard.build(mapActivity));
 
 			setupNavigateOptionsCard(cardsContainer, rparams);
 		}
 	}
 
 	private View buildDividerView(@NonNull ViewGroup view, boolean needMargin) {
-		LayoutInflater themedInflater = UiUtilities.getInflater(view.getContext(), nightMode);
 		View divider = themedInflater.inflate(R.layout.simple_divider_item, view, false);
 
 		ViewGroup.LayoutParams params = divider.getLayoutParams();
@@ -113,7 +110,7 @@ public class SelectedTrackToFollowCard extends MapBaseCard {
 
 		NavigateTrackOptionsCard navigateTrackCard = new NavigateTrackOptionsCard(mapActivity,
 				passWholeRoute, navigationType, connectTrackPointStraightly,
-				routeParamsBuilder.useIntermediateRtePoints());
+				routeParamsBuilder.shouldUseIntermediateRtePoints());
 		navigateTrackCard.setListener(target);
 		cardsContainer.addView(navigateTrackCard.build(mapActivity));
 	}

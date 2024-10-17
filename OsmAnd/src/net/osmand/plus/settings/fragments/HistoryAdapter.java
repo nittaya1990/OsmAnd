@@ -15,29 +15,32 @@ import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import net.osmand.data.LatLon;
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper.TargetPoint;
-import net.osmand.plus.UiUtilities;
-import net.osmand.plus.UiUtilities.UpdateLocationViewCache;
+import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.helpers.AndroidUiHelper;
-import net.osmand.plus.helpers.GpxUiHelper.GPXInfo;
+import net.osmand.plus.helpers.TargetPointsHelper.TargetPoint;
 import net.osmand.plus.mapmarkers.MapMarker;
 import net.osmand.plus.routepreparationmenu.cards.PreviousRouteCard;
-import net.osmand.plus.search.QuickSearchListAdapter;
+import net.osmand.plus.search.dialogs.QuickSearchListAdapter;
 import net.osmand.plus.search.listitems.QuickSearchListItem;
+import net.osmand.plus.track.data.GPXInfo;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.UiUtilities;
+import net.osmand.plus.utils.UpdateLocationUtils;
+import net.osmand.plus.utils.UpdateLocationUtils.UpdateLocationViewCache;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchResult;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 
 public class HistoryAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
@@ -58,7 +61,7 @@ public class HistoryAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 	private final UpdateLocationViewCache locationViewCache;
 
 	private List<Object> items = new ArrayList<>();
-	private List<?> selectedItems = new ArrayList<>();
+	private Set<?> selectedItems = new HashSet<>();
 	private Map<Integer, List<?>> itemsGroups = new HashMap<>();
 
 	private final LayoutInflater themedInflater;
@@ -67,20 +70,20 @@ public class HistoryAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 	private final int defaultColorId;
 	private final boolean nightMode;
 
-	public HistoryAdapter(@NonNull OsmandApplication app, @Nullable OnItemSelectedListener listener, boolean nightMode) {
-		this.app = app;
+	public HistoryAdapter(@NonNull MapActivity activity, @Nullable OnItemSelectedListener listener, boolean nightMode) {
+		this.app = activity.getMyApplication();
 		this.listener = listener;
 		this.nightMode = nightMode;
 		activeColorId = ColorUtilities.getActiveColorId(nightMode);
 		defaultColorId = ColorUtilities.getDefaultIconColorId(nightMode);
 		uiUtilities = app.getUIUtilities();
 		themedInflater = UiUtilities.getInflater(app, nightMode);
-		locationViewCache = app.getUIUtilities().getUpdateLocationViewCache();
+		locationViewCache = UpdateLocationUtils.getUpdateLocationViewCache(activity);
 	}
 
 	public void updateSettingsItems(@NonNull List<Object> items,
 									@NonNull Map<Integer, List<?>> markerGroups,
-									@NonNull List<?> selectedItems) {
+									@NonNull Set<?> selectedItems) {
 		this.items = items;
 		this.itemsGroups = markerGroups;
 		this.selectedItems = selectedItems;
@@ -112,7 +115,7 @@ public class HistoryAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 	}
 
 	@Override
-	public void onBindViewHolder(@NonNull final RecyclerView.ViewHolder holder, int position) {
+	public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int position) {
 		if (holder instanceof HeaderViewHolder) {
 			Integer dateHeader = (Integer) getItem(position);
 			bindHeaderItem((HeaderViewHolder) holder, dateHeader, position);
@@ -223,7 +226,7 @@ public class HistoryAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
 		boolean showCompass = location != null;
 		if (showCompass) {
-			app.getUIUtilities().updateLocationView(locationViewCache, direction, distanceText, location);
+			UpdateLocationUtils.updateLocationView(app, locationViewCache, direction, distanceText, location);
 		}
 		AndroidUiHelper.updateVisibility(compassView, showCompass);
 	}
@@ -320,9 +323,9 @@ public class HistoryAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 
 	public static String getMonth(int month) {
 		SimpleDateFormat dateFormat = new SimpleDateFormat("LLLL", Locale.getDefault());
-		Date date = new Date();
-		date.setMonth(month);
-		String monthStr = dateFormat.format(date);
+		Calendar calendar = Calendar.getInstance();
+		calendar.set(Calendar.MONTH, month);
+		String monthStr = dateFormat.format(calendar.getTime());
 		if (monthStr.length() > 1) {
 			monthStr = Character.toUpperCase(monthStr.charAt(0)) + monthStr.substring(1);
 		}
@@ -336,7 +339,7 @@ public class HistoryAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder
 		final View shadowDivider;
 		final CompoundButton compoundButton;
 
-		public HeaderViewHolder(final View itemView) {
+		public HeaderViewHolder(View itemView) {
 			super(itemView);
 			title = itemView.findViewById(R.id.title);
 			divider = itemView.findViewById(R.id.divider);

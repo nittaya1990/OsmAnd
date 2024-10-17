@@ -13,9 +13,9 @@ import android.util.Pair;
 
 import androidx.annotation.NonNull;
 
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.R;
-import net.osmand.plus.views.OsmandMapLayer.RenderingLineAttributes;
+import net.osmand.plus.views.layers.base.OsmandMapLayer.RenderingLineAttributes;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -28,9 +28,9 @@ public class PublicTransportGeometryWayContext extends GeometryWayContext {
 	private Bitmap walkArrowBitmap;
 	private Bitmap anchorBitmap;
 	private Map<Pair<Integer, Drawable>, Bitmap> stopBitmapsCache = new HashMap<>();
-	private Map<Integer, Bitmap> stopSmallBitmapsCache = new HashMap<>();
+	private final Map<Integer, Bitmap> stopSmallBitmapsCache = new HashMap<>();
 
-	public PublicTransportGeometryWayContext(Context ctx, float density) {
+	public PublicTransportGeometryWayContext(@NonNull Context ctx, float density) {
 		super(ctx, density);
 	}
 

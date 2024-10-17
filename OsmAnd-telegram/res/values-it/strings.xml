@@ -159,9 +159,7 @@
     <string name="shared_string_hour_short">h</string>
     <string name="shared_string_minute_short">min</string>
     <string name="shared_string_second_short">s</string>
-    <string name="welcome_descr">
-        <b>OsmAnd tracker</b> ti permette di condividere la tua posizione e di vedere quella di altri su OsmAnd.<br/>
-        <br/>L\'applicazione usa le API di Telegram e pertanto è necessario un account di Telegram.</string>
+    <string name="welcome_descr"><b>OsmAnd Tracker</b> ti permette di condividere la tua posizione e di vedere quella di altri su OsmAnd.<br/> <br/>L\'applicazione usa le API di Telegram, è pertanto necessario un account di Telegram.</string>
     <string name="my_location">La mia posizione</string>
     <string name="live_now">Ora in diretta</string>
     <string name="logout_from_osmand_telegram_descr">Sei sicuro di volerti disconnettere da OsmAnd Tracker, cosicché non potrai condividere la posizione o vedere quella di altri\?</string>
@@ -192,11 +190,11 @@
     <string name="disable_monitoring">Disattiva il monitoraggio</string>
     <string name="location_recording_enabled">Registrazione della posizione abilitata</string>
     <string name="timeline_description">Attivare il monitoraggio per salvare lo storico delle locazioni.</string>
-    <string name="app_name_short">Tracker OsmAnd</string>
+    <string name="app_name_short">Tracciatore OsmAnd</string>
     <string name="shared_string_telegram">Telegram</string>
     <string name="privacy_policy_use_telegram">Telegram (l\'applicazione di messaggistica) viene usato per connettersi e comunicare con le persone.</string>
     <string name="privacy_policy_telegram_client">Il tracker OsmAnd è uno dei client utilizzati dalla piattaforma aperta Telegram. I tuoi contatti possono usare un qualsiasi cliente Telegram.</string>
-    <string name="privacy_policy_agree">Cliccando \"Continua\" tu sottoscrivi le condizioni di privacy di Telegram e quelle di OsmAnd.</string>
+    <string name="privacy_policy_agree">Premendo su \"Continua\", accetti le condizioni delle privacy policy di Telegram e di OsmAnd.</string>
     <string name="shared_string_accept">Accettazione</string>
     <string name="how_it_works">Come funziona</string>
     <string name="telegram_privacy_policy">Informativa sulla privacy di Telegram</string>
@@ -220,7 +218,7 @@
     <string name="direction">Direzione</string>
     <string name="precision">Precisione</string>
     <string name="altitude">Altitudine</string>
-    <string name="bearing">Orientamento</string>
+    <string name="bearing">Direzione</string>
     <string name="proxy_key">Chiave</string>
     <string name="proxy_password">Password</string>
     <string name="proxy_username">Nome utente</string>
@@ -265,7 +263,7 @@
     <string name="last_response_date">Ultima risposta: %1$s</string>
     <string name="last_update_from_telegram_date">Ultimo aggiornamento da Telegram: %1$s</string>
     <string name="shared_string_error_short">ERR</string>
-    <string name="logcat_buffer_descr">Controlla e condividi i log dettagliati dell\'applicazione</string>
+    <string name="logcat_buffer_descr">Controlla e condividi log dettagliati dell\'applicazione</string>
     <string name="logcat_buffer">Logcat buffer</string>
     <string name="send_report">Invia segnalazione</string>
     <string name="shared_string_export">Esporta</string>
@@ -273,4 +271,12 @@
     <string name="time_zone_descr">Seleziona il fuso orario da mostrare nei messaggi sulla posizione.</string>
     <string name="buffer_time">Tempo di scadenza del buffer</string>
     <string name="buffer_time_descr">Tempo massimo per memorizzare i punti nel buffer</string>
+    <string name="ltr_or_rtl_combine_via_dash">%1$s — %2$s</string>
+    <string name="shared_string_error">Errore</string>
+    <string name="send_live_location_error">Invia errore posizione live: %1$s</string>
+    <string name="ltr_or_rtl_combine_via_colon">%1$s: %2$s</string>
+    <string name="location_source_summary">Per impostazione predefinita, OsmAnd installato da Google Play per determinare la posizione utilizza Google Play Services.
+\n
+\nSe ricevi informazioni sulla posizione imprecise o utilizzi il dispositivo senza Google Play Services, prova a passare all\'API Android</string>
+    <string name="location_source">Origine della posizione</string>
 </resources>

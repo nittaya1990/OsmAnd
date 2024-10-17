@@ -26,8 +26,8 @@ import org.xmlpull.v1.XmlPullParserException;
 public abstract class MapRenderingTypes {
 
 	private static final Log log = PlatformUtil.getLog(MapRenderingTypes.class);
-	public static final String[] langs = new String[] { "af", "als", "ar", "az", "be", "bg", "bn", "bpy", "br", "bs", "ca", "ceb", "cs", "cy", "da", "de", "el", "eo", "es", "et", "eu", "fa", "fi", "fr", "fy", "ga", "gl", "he", "hi", "hsb",
-		"hr", "ht", "hu", "hy", "id", "is", "it", "ja", "ka", "kn", "ko", "ku", "la", "lb", "lo", "lt", "lv", "mk", "ml", "mr", "ms", "nds", "new", "nl", "nn", "no", "nv", "os", "pl", "pms", "pt", "ro", "ru", "sc", "sh", "sk", "sl", "sq", "sr", "sv", "sw", "ta", "te", "th", "tl", "tr", "uk", "vi", "vo", "zh", "zh-hans", "zh-hant",  };
+	public static final String[] langs = new String[] { "af", "als", "ar", "az", "be", "bg", "bn", "bpy", "br", "bs", "ca", "ceb", "ckb", "cs", "cy", "da", "de", "el", "eo", "es", "et", "eu", "fa", "fi", "fr", "fy", "ga", "gl", "he", "hi", "hsb",
+		"hr", "ht", "hu", "hy", "id", "is", "it", "ja", "ka", "kk", "kn", "ko", "ku", "la", "lb", "lo", "lt", "lv", "mk", "ml", "mr", "ms", "nds", "new", "nl", "nn", "no", "nv", "oc", "os", "pl", "pms", "pt", "ro", "ru", "sat", "sc", "sh", "sk", "sl", "sq", "sr", "sr-latn", "sv", "sw", "ta", "te", "th", "tl", "tr", "uk", "vi", "vo", "zh", "zh-hans", "zh-hant",  };
 	
 	
 	public final static byte RESTRICTION_NO_RIGHT_TURN = 1;
@@ -58,7 +58,7 @@ public abstract class MapRenderingTypes {
 	
 	
 	protected void checkIfInitNeeded() {
-		if(types == null) {
+		if (types == null) {
 			types = new LinkedHashMap<String, MapRulType>();
 			typeList.clear();
 			nameRuleType = MapRulType.createText("name");
@@ -231,13 +231,16 @@ public abstract class MapRenderingTypes {
 			int tok;
 			parser.setInput(is, "UTF-8");
 			MapRulType parentCategory = null;
+			MapRulType parentType = null;
 			while ((tok = parser.next()) != XmlPullParser.END_DOCUMENT) {
 				if (tok == XmlPullParser.START_TAG) {
 					String name = parser.getName();
 					if (name.equals("category")) { //$NON-NLS-1$
 						parentCategory = parseCategoryFromXml(parser);
 					} else if (name.equals("type")) {
-						parseAndRegisterTypeFromXML(parser, parentCategory);
+						parentType = parseAndRegisterTypeFromXML(parser, parentCategory);
+					} else if (name.equals("propagate")) {
+						parsePropagate(parser, parentType);
 					} else if (name.equals("routing_type")) {
 						parseRouteTagFromXML(parser);
 					} else if (name.equals("entity_convert")) {
@@ -265,8 +268,39 @@ public abstract class MapRenderingTypes {
 	protected abstract void parseEntityConvertXML(XmlPullParser parser);
 
 	protected abstract void parseRouteTagFromXML(XmlPullParser parser);
+	
+	protected abstract void parsePropagate(XmlPullParser parser, MapRulType parentType);
 
-	protected abstract void parseAndRegisterTypeFromXML(XmlPullParser parser, MapRulType parentCategory) ;
+	protected abstract MapRulType parseAndRegisterTypeFromXML(XmlPullParser parser, MapRulType parentCategory) ;
+	
+	protected PropagateToNode parsePropagateType(XmlPullParser parser) {
+		String propagateToNodes = parser.getAttributeValue("", "propagateToNodes");
+		if (propagateToNodes != null) {
+			PropagateToNode rtype = new PropagateToNode();
+			if ("true".equals(propagateToNodes) || "yes".equals(propagateToNodes) || "all".equals(propagateToNodes)) {
+				rtype.propagateToNodes = PropagateToNodesType.ALL;
+			} else if ("start".equals(propagateToNodes)) {
+				rtype.propagateToNodes = PropagateToNodesType.START;
+			} else if ("end".equals(propagateToNodes)) {
+				rtype.propagateToNodes = PropagateToNodesType.END;
+			} else if ("center".equals(propagateToNodes)) {
+				rtype.propagateToNodes = PropagateToNodesType.CENTER;
+			} else if ("border".equals(propagateToNodes) || "borderin".equals(propagateToNodes)) {
+				rtype.propagateToNodes = PropagateToNodesType.BORDERIN;
+			} else if ("borderout".equals(propagateToNodes)) {
+				rtype.propagateToNodes = PropagateToNodesType.BORDEROUT;
+			}
+			String propagateToNodesPrefix = parser.getAttributeValue("", "propagateToNodesPrefix");
+			if (propagateToNodesPrefix != null) {
+				rtype.propagateToNodesPrefix = propagateToNodesPrefix;
+			}
+			rtype.propagateIf = parseMultiTagValue(parser, "propagateIf");
+			rtype.propagateNetworkIf = parseMultiTagValue(parser, "propagateNetworkIf");
+			return rtype;
+		}
+		return null;
+		
+	}
 	
 	protected MapRulType parseBaseRuleType(XmlPullParser parser, MapRulType parentCategory, String tag) {
 		String value = lc(parser.getAttributeValue("", "value"));
@@ -284,6 +318,10 @@ public abstract class MapRenderingTypes {
 				"yes".equals(parser.getAttributeValue("", "map")) || parser.getAttributeValue("", "map") == null;
 		rtype.poi = "true".equals(parser.getAttributeValue("", "poi")) || 
 				"yes".equals(parser.getAttributeValue("", "poi")) || parser.getAttributeValue("", "poi") == null;
+		PropagateToNode ptype = parsePropagateType(parser);
+		if (ptype != null) {
+			rtype.propagateToNodes.add(ptype);
+		}
 		
 		String order = parser.getAttributeValue("", "order");
 		if(!Algorithms.isEmpty(order)) {
@@ -367,6 +405,7 @@ public abstract class MapRenderingTypes {
 		return rtype;
 		
 	}
+
 
 	private void putNameTags(String namesList, Map<String, String> names, String namePrefix) {
 		if (namesList != null) {
@@ -526,6 +565,26 @@ public abstract class MapRenderingTypes {
 		
 	}
 	
+	public enum PropagateToNodesType {
+		ALL,
+		START,
+		END,
+		CENTER,
+		BORDERIN,
+		BORDEROUT;
+
+		public boolean isBorder() {
+			return this == PropagateToNodesType.BORDERIN || this == PropagateToNodesType.BORDEROUT;
+		}
+	}
+	
+	public static class PropagateToNode {
+		public PropagateToNodesType propagateToNodes;
+		public String propagateToNodesPrefix;
+		public Map<String, String> propagateIf;
+		public Map<String, String> propagateNetworkIf;
+	}
+	
 	public static class MapRulType {
 		// relation part
 		protected Map<String, String> relationNames;
@@ -534,6 +593,7 @@ public abstract class MapRenderingTypes {
 		protected String relationGroupPrefix;
 		protected Map<String, String> relationGroupNameTags;
 		protected Map<String, String> relationGroupAdditionalTags;
+		protected List<PropagateToNode> propagateToNodes = new ArrayList<>();
 		
 		protected TagValuePattern tagValuePattern;
 		protected boolean additional;
@@ -719,7 +779,12 @@ public abstract class MapRenderingTypes {
 			return true;
 		}
 		
+		public List<PropagateToNode> getPropagateToNodes() {
+			return propagateToNodes;
+		}
 		
+		
+
 	}
 
 	public static String getRestrictionValue(int i) {
@@ -741,6 +806,36 @@ public abstract class MapRenderingTypes {
 		}
 		return "unkonwn";
 
+	}
+
+	private Map<String, String> parseMultiTagValue(XmlPullParser parser, String attrPrefix) {
+		int cnt = parser.getAttributeCount();
+		Map<Integer, String> tags = new HashMap<>();
+		Map<Integer, String> values = new HashMap<>();
+		attrPrefix = attrPrefix.toLowerCase();
+		for (int i = 0; i < cnt; i++) {
+			String name = parser.getAttributeName(i).toLowerCase();
+			String value = parser.getAttributeValue(i).toLowerCase();
+			if (name.startsWith(attrPrefix + "tag")) {
+				String numStr = name.replace(attrPrefix + "tag", "");
+				int num = numStr.isEmpty() ? 0 : Integer.parseInt(numStr);
+				tags.put(num, value);
+			}
+			if (name.startsWith(attrPrefix + "value")) {
+				String numStr = name.replace(attrPrefix + "value", "");
+				int num = numStr.isEmpty() ? 0 : Integer.parseInt(numStr);
+				values.put(num, value);
+			}
+		}
+		if (tags.size() == 0) {
+			return null;
+		}
+		Map<String, String> result = new HashMap<>();
+		for (Map.Entry<Integer, String> entry : tags.entrySet()) {
+			int index = entry.getKey();
+			result.put(entry.getValue(), values.get(index));
+		}
+		return result;
 	}
 	
 }

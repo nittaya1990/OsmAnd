@@ -22,7 +22,6 @@ import com.huawei.hms.iap.entity.PurchaseResultInfo;
 import com.huawei.hms.iap.entity.StartIapActivityReq;
 import com.huawei.hms.iap.entity.StartIapActivityResult;
 
-import net.osmand.AndroidUtils;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.inapp.InAppPurchases.InAppPurchase;
 import net.osmand.plus.inapp.InAppPurchases.InAppSubscription;
@@ -30,12 +29,14 @@ import net.osmand.plus.inapp.InAppPurchases.InAppSubscriptionIntroductoryInfo;
 import net.osmand.plus.inapp.InAppPurchases.PurchaseInfo;
 import net.osmand.plus.inapp.InAppPurchasesImpl.InAppPurchaseLiveUpdatesOldSubscription;
 import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.util.Algorithms;
 
 import java.lang.ref.WeakReference;
 import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -224,7 +225,7 @@ public class InAppPurchaseHelperImpl extends InAppPurchaseHelper {
 	}
 
 	private PurchaseInfo getPurchaseInfo(InAppPurchaseData purchase) {
-		return new PurchaseInfo(purchase.getProductId(), purchase.getSubscriptionId(), purchase.getPurchaseToken(),
+		return new PurchaseInfo(Collections.singletonList(purchase.getProductId()), purchase.getSubscriptionId(), purchase.getPurchaseToken(),
 				purchase.getPurchaseTime(), purchase.getPurchaseState(), true, purchase.isAutoRenewing());
 	}
 
@@ -270,7 +271,7 @@ public class InAppPurchaseHelperImpl extends InAppPurchaseHelper {
 
 	@Override
 	protected InAppCommand getPurchaseSubscriptionCommand(final WeakReference<Activity> activity,
-														  String sku, String userInfo) throws UnsupportedOperationException {
+	                                                      String sku, String userInfo) throws UnsupportedOperationException {
 		return new InAppCommand() {
 			@Override
 			public void run(InAppPurchaseHelper helper) {
@@ -600,11 +601,11 @@ public class InAppPurchaseHelperImpl extends InAppPurchaseHelper {
 				for (InAppPurchaseData purchase : tokensToSend) {
 					purchaseInfoList.add(getPurchaseInfo(purchase));
 				}
-				onSkuDetailsResponseDone(purchaseInfoList, userRequested);
+				onProductDetailsResponseDone(purchaseInfoList, userRequested);
 			}
 
 			private void onSubscriptionExpired() {
-				if (!isDepthContoursPurchased(ctx)) {
+				if (!InAppPurchaseUtils.isDepthContoursPurchased(ctx)) {
 					ctx.getSettings().getCustomRenderBooleanProperty("depthContours").set(false);
 				}
 			}

@@ -5,13 +5,16 @@ import androidx.annotation.Nullable;
 
 import net.osmand.Location;
 import net.osmand.data.LatLon;
+import net.osmand.gpx.GPXFile;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.onlinerouting.EngineParameter;
 import net.osmand.plus.onlinerouting.VehicleType;
 import net.osmand.plus.routing.RouteCalculationResult;
 import net.osmand.plus.routing.RouteDirectionInfo;
+import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.TurnType;
+import net.osmand.shared.gpx.GpxFile;
 import net.osmand.util.GeoPolylineParserUtil;
 import net.osmand.util.MapUtils;
 
@@ -59,6 +62,11 @@ public class OsrmEngine extends JsonOnlineRoutingEngine {
 	}
 
 	@Override
+	public OnlineRoutingResponse responseByGpxFile(OsmandApplication app, GpxFile gpxFile, boolean initialCalculation, RouteCalculationProgress calculationProgress) {
+		return null;
+	}
+
+	@Override
 	protected void collectAllowedParameters(@NonNull Set<EngineParameter> params) {
 		params.add(EngineParameter.KEY);
 		params.add(EngineParameter.VEHICLE_KEY);
@@ -80,8 +88,7 @@ public class OsrmEngine extends JsonOnlineRoutingEngine {
 	}
 
 	@Override
-	protected void makeFullUrl(@NonNull StringBuilder sb,
-	                           @NonNull List<LatLon> path) {
+	protected void makeFullUrl(@NonNull StringBuilder sb, @NonNull List<LatLon> path, @Nullable Float startBearing) {
 		String vehicleKey = getVehicleKeyForUrl();
 		if (!isEmpty(vehicleKey)) {
 			sb.append(vehicleKey).append('/');

@@ -11,8 +11,11 @@ import net.osmand.plus.Version;
 import net.osmand.plus.onlinerouting.engine.EngineType;
 import net.osmand.plus.onlinerouting.engine.OnlineRoutingEngine;
 import net.osmand.plus.onlinerouting.engine.OnlineRoutingEngine.OnlineRoutingResponse;
+import net.osmand.plus.routing.RouteCalculationParams;
 import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.utils.AndroidNetworkUtils;
+import net.osmand.router.RouteCalculationProgress;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
@@ -25,6 +28,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -94,28 +98,63 @@ public class OnlineRoutingHelper {
 	}
 
 	@Nullable
-	public OnlineRoutingResponse calculateRouteOnline(@Nullable String stringKey,
-	                                                  @NonNull List<LatLon> path,
-	                                                  boolean leftSideNavigation) throws IOException, JSONException {
+	public OnlineRoutingResponse calculateRouteOnline(@Nullable String stringKey, @NonNull List<LatLon> path,
+	                                                  @NonNull RouteCalculationParams params) throws IOException, JSONException {
 		OnlineRoutingEngine engine = getEngineByKey(stringKey);
-		return engine != null ? calculateRouteOnline(engine, path, leftSideNavigation) : null;
+		return engine != null ? calculateRouteOnline(engine, path, params) : null;
 	}
 
 	@Nullable
-	public OnlineRoutingResponse calculateRouteOnline(@NonNull OnlineRoutingEngine engine,
-													  @NonNull List<LatLon> path,
-													  boolean leftSideNavigation) throws IOException, JSONException {
-		String url = engine.getFullUrl(path);
-		String content = makeRequest(url);
-		return engine.parseResponse(content, app, leftSideNavigation);
+	public OnlineRoutingResponse calculateRouteOnline(@NonNull OnlineRoutingEngine engine, @NonNull List<LatLon> path,
+	                                                  @NonNull RouteCalculationParams params) throws IOException, JSONException {
+		boolean leftSideNavigation = params.leftSide;
+		boolean initialCalculation = params.initialCalculation;
+		@Nullable RouteCalculationProgress calculationProgress = params.calculationProgress;
+		@Nullable Float startBearing = params.start.hasBearing() ? params.start.getBearing() : null;
+
+		if (params.gpxFile == null || initialCalculation) {
+			String url = engine.getFullUrl(path, startBearing);
+			String method = engine.getHTTPMethod();
+			String body = engine.getRequestBody(path, startBearing);
+			Map<String, String> headers = engine.getRequestHeaders();
+			String content = makeRequest(url, method, body, headers);
+			return engine.responseByContent(app, content, leftSideNavigation, initialCalculation, calculationProgress);
+		} else {
+			return engine.responseByGpxFile(app, params.gpxFile, initialCalculation, calculationProgress); // run 2nd phase
+		}
 	}
 
 	@NonNull
 	public String makeRequest(@NonNull String url) throws IOException {
+			return makeRequest(url, "GET", null, null);
+	}
+
+	@NonNull
+	public String makeRequest(@NonNull String url, @NonNull String method,
+							  @Nullable String body, @Nullable Map<String, String> headers)
+			throws IOException {
+		long tm = System.currentTimeMillis();
+		LOG.info("Calling online routing: " + url);
 		HttpURLConnection connection = NetworkUtils.getHttpURLConnection(url);
 		connection.setRequestProperty("User-Agent", Version.getFullVersion(app));
+		connection.setRequestMethod(method);
+		connection.setConnectTimeout(AndroidNetworkUtils.CONNECT_TIMEOUT);
+		connection.setReadTimeout(AndroidNetworkUtils.READ_TIMEOUT);
+		// set custom headers
+		if (headers != null) {
+			for (String key :  headers.keySet()) {
+				connection.setRequestProperty(key, headers.get(key));
+			}
+		}
+		// send body for non GET requests
+		if (!method.equals("GET") && body != null) {
+			connection.setRequestProperty("Content-Length", String.valueOf(body.length()));
+			connection.setDoOutput(true);
+			connection.getOutputStream().write(body.getBytes(StandardCharsets.UTF_8));
+		}
 		StringBuilder content = new StringBuilder();
 		BufferedReader reader;
+		// .getResponseCode() automatically connects
 		if (connection.getResponseCode() == HttpURLConnection.HTTP_OK) {
 			reader = new BufferedReader(new InputStreamReader(getInputStream(connection)));
 		} else {
@@ -129,6 +168,7 @@ public class OnlineRoutingHelper {
 			reader.close();
 		} catch (IOException ignored) {
 		}
+		LOG.info(String.format("Online routing request finished %d ms", System.currentTimeMillis() - tm));
 		return content.toString();
 	}
 
@@ -239,5 +279,14 @@ public class OnlineRoutingHelper {
 		} else {
 			settings.ONLINE_ROUTING_ENGINES.set(null);
 		}
+	}
+
+	public boolean wasOnlineEngineWithApproximationUsed() {
+		for (OnlineRoutingEngine engine : cachedEngines.values()) {
+			if (engine.isOnlineEngineWithApproximation()) {
+				return true;
+			}
+		}
+		return false;
 	}
 }

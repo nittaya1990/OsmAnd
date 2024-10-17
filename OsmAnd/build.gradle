@@ -1,6 +1,8 @@
 apply plugin: 'com.android.application'
 apply from: 'build-common.gradle'
 
+apply plugin: 'kotlin-android'
+
 // Global Parameters accepted
 // TARGET_APP_NAME    - app name
 // APK_NUMBER_VERSION - version number of apk
@@ -34,11 +36,16 @@ android {
 		}
 	}
 
+	compileOptions {
+		sourceCompatibility = JavaVersion.VERSION_17
+		targetCompatibility = JavaVersion.VERSION_17
+	}
+
 	defaultConfig {
-		minSdkVersion 23
-		versionCode 410
+		minSdkVersion 24
+		versionCode 4900
 		versionCode System.getenv("APK_NUMBER_VERSION") ? System.getenv("APK_NUMBER_VERSION").toInteger() : versionCode
-		versionName "4.1.0"
+		versionName "4.9.0"
 		versionName System.getenv("APK_VERSION")? System.getenv("APK_VERSION").toString(): versionName
 		versionName System.getenv("APK_VERSION_SUFFIX")? versionName + System.getenv("APK_VERSION_SUFFIX").toString(): versionName
 	}
@@ -69,36 +76,41 @@ android {
 		debug {
 			manifest.srcFile "AndroidManifest-debug.xml"
 		}
-		androidFull {
-			java.srcDirs = ["src-nogms", "src-google"]
-		}
 		gplayFull {
-			java.srcDirs = ["src-gms", "src-google"]
+			java.srcDirs = ["src-google"]
 		}
 		gplayFree {
-			java.srcDirs = ["src-gms", "src-google"]
+			java.srcDirs = ["src-google"]
 			manifest.srcFile "AndroidManifest-gplayFree.xml"
 		}
+		androidFull {
+			java.srcDirs = ["src-google", "src-osmand"]
+			manifest.srcFile "AndroidManifest-androidFull.xml"
+		}
 		nightlyFree {
-			java.srcDirs = ["src-nogms", "src-google"]
+			java.srcDirs = ["src-google", "src-osmand"]
 			manifest.srcFile "AndroidManifest-nightlyFree.xml"
 		}
 		amazonFree {
-			java.srcDirs = ["src-nogms", "src-amazon"]
+			java.srcDirs = ["src-amazon"]
 			manifest.srcFile "AndroidManifest-amazonFree.xml"
 		}
 		amazonFull {
-			java.srcDirs = ["src-nogms", "src-amazon"]
+			java.srcDirs = ["src-amazon"]
 			manifest.srcFile "AndroidManifest-amazonFull.xml"
 		}
 		huawei {
-			java.srcDirs = ["src-nogms", "src-huawei"]
+			java.srcDirs = ["src-huawei"]
 			manifest.srcFile "AndroidManifest-huawei.xml"
 		}
 
 		legacy {
 			jniLibs.srcDirs = ["libc++"]
 		}
+	}
+
+	buildFeatures {
+		aidl true
 	}
 
 	flavorDimensions "version", "coreversion", "abi"
@@ -167,16 +179,49 @@ android {
 		}
 	}
 
+	applicationVariants.configureEach {
+		def variant = it
+		def taskName = variant.name.capitalize()
+		def mergeAssetsTaskName = "merge${taskName}Assets"
+		tasks.named(mergeAssetsTaskName).configure { osmandTask ->
+			println(osmandTask.getName() + " merge assets")
+			osmandTask.dependsOn(collectExternalResources)
+		}
+		if (taskName.endsWith("Debug")) {
+			def mergeAndroidTestAssetsTaskName = "merge${taskName}AndroidTestAssets"
+			tasks.named(mergeAndroidTestAssetsTaskName).configure { osmandTask ->
+				println(osmandTask.getName() + " merge test assets")
+				osmandTask.dependsOn(collectExternalResources)
+			}
+		}
+		def mapSourceSetPathsName= "map${taskName}SourceSetPaths"
+		tasks.named(mapSourceSetPathsName).configure { osmandTask ->
+			println(osmandTask.getName())
+			osmandTask.dependsOn(copyMapShaderIcons)
+			osmandTask.dependsOn(copyMapPOIIcons)
+			osmandTask.dependsOn(copyLargePOIIcons)
+		}
+		def mergeResources= "merge${taskName}Resources"
+		tasks.named(mergeResources).configure { osmandTask ->
+			println(osmandTask.getName() + " merge resources")
+			osmandTask.dependsOn(collectExternalResources)
+		}
+	}
 }
 
 afterEvaluate {
-	android.applicationVariants.all { variant ->
+	android.applicationVariants.configureEach { variant ->
 		if (variant.name.contains('Opengldebug')) {
-			variant.javaCompiler.dependsOn(collectExternalResources, buildOsmAndCore, copyOsmAndCoreWithJNI, cleanupDuplicatesInCore)
+			variant.javaCompileProvider.configure {
+				dependsOn collectExternalResources, buildOsmAndCore, copyOsmAndCoreWithJNI, cleanupDuplicatesInCore
+			}
 		} else {
-			variant.javaCompiler.dependsOn(collectExternalResources, buildOsmAndCore, cleanupDuplicatesInCore)
+			variant.javaCompileProvider.configure {
+				dependsOn collectExternalResources, buildOsmAndCore, cleanupDuplicatesInCore
+			}
 		}
 	}
+
 	Gradle gradle = getGradle()
 	String tskReqStr = gradle.getStartParameter().getTaskRequests().toString().toLowerCase()
 	if (tskReqStr.contains("huawei")) {
@@ -184,7 +229,7 @@ afterEvaluate {
 	}
 }
 
-task copyOsmAndCoreWithJNI() {
+tasks.register('copyOsmAndCoreWithJNI') {
 	dependsOn buildOsmAndCore
 	doLast {
 		file("libs/armeabi-v7a").mkdirs()
@@ -203,20 +248,18 @@ dependencies {
 	opengldebugImplementation fileTree(include:  ['QtAndroid.jar', 'QtAndroidBearer.jar'], dir: 'libs')
 
 	// Uncomment for local debug
-	//opengldebugImplementation files('../../core/wrappers/android/build/outputs/aar/OsmAndCore_android-debug.aar')
+	//openglImplementation files('../../core/wrappers/android/build/outputs/aar/OsmAndCore_android-debug.aar')
 
 	// Comment for local debug
-	opengldebugImplementation "net.osmand:OsmAndCore_androidNativeDebug:0.1-SNAPSHOT@aar"
-	opengldebugImplementation "net.osmand:OsmAndCore_android:0.1-SNAPSHOT@aar"
+	opengldebugImplementation "net.osmand:OsmAndCore_androidNativeDebug:master-snapshot@aar"
+	opengldebugImplementation "net.osmand:OsmAndCore_android:master-snapshot@aar"
 
-	openglImplementation "net.osmand:OsmAndCore_androidNativeRelease:0.1-SNAPSHOT@aar"
-	openglImplementation "net.osmand:OsmAndCore_android:0.1-SNAPSHOT@aar"
+	openglImplementation "net.osmand:OsmAndCore_androidNativeRelease:master-snapshot@aar"
+	openglImplementation "net.osmand:OsmAndCore_android:master-snapshot@aar"
 
-	huaweiImplementation 'com.huawei.hms:iap:5.0.2.300'
-	huaweiImplementation 'com.huawei.hms:appservice:5.0.4.303'
-
-	gplayFreeImplementation 'com.google.android.gms:play-services-location:18.0.0'
-	gplayFullImplementation 'com.google.android.gms:play-services-location:18.0.0'
+	//huaweiImplementation 'com.huawei.agconnect:agconnect-core:1.8.0.300'
+	huaweiImplementation 'com.huawei.hms:iap:6.4.0.301'
+	huaweiImplementation 'com.huawei.hms:appservice:6.8.0.300'
 
 	amazonFreeImplementation "com.amazon:in-app-purchasing:2.0.76@jar"
 	amazonFullImplementation "com.amazon:in-app-purchasing:2.0.76@jar"

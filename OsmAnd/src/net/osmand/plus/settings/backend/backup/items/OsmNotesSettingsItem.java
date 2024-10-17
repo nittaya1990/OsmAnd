@@ -6,12 +6,12 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
+import net.osmand.plus.plugins.PluginsHelper;
 import net.osmand.plus.R;
-import net.osmand.plus.osmedit.OsmBugsDbHelper;
-import net.osmand.plus.osmedit.OsmEditingPlugin;
-import net.osmand.plus.osmedit.OsmNotesPoint;
-import net.osmand.plus.osmedit.OsmPoint;
+import net.osmand.plus.plugins.osmedit.helpers.OsmBugsDbHelper;
+import net.osmand.plus.plugins.osmedit.OsmEditingPlugin;
+import net.osmand.plus.plugins.osmedit.data.OsmNotesPoint;
+import net.osmand.plus.plugins.osmedit.data.OsmPoint;
 import net.osmand.plus.settings.backend.backup.SettingsHelper;
 import net.osmand.plus.settings.backend.backup.SettingsItemReader;
 import net.osmand.plus.settings.backend.backup.SettingsItemType;
@@ -50,9 +50,9 @@ public class OsmNotesSettingsItem extends CollectionSettingsItem<OsmNotesPoint> 
 	@Override
 	protected void init() {
 		super.init();
-		OsmEditingPlugin osmEditingPlugin = OsmandPlugin.getPlugin(OsmEditingPlugin.class);
+		OsmEditingPlugin osmEditingPlugin = PluginsHelper.getPlugin(OsmEditingPlugin.class);
 		if (osmEditingPlugin != null) {
-			existingItems = osmEditingPlugin.getDBBug().getOsmbugsPoints();
+			existingItems = osmEditingPlugin.getDBBug().getOsmBugsPoints();
 		}
 	}
 
@@ -64,7 +64,7 @@ public class OsmNotesSettingsItem extends CollectionSettingsItem<OsmNotesPoint> 
 
 	@Override
 	public long getLocalModifiedTime() {
-		OsmEditingPlugin osmEditingPlugin = OsmandPlugin.getPlugin(OsmEditingPlugin.class);
+		OsmEditingPlugin osmEditingPlugin = PluginsHelper.getPlugin(OsmEditingPlugin.class);
 		if (osmEditingPlugin != null) {
 			return osmEditingPlugin.getDBBug().getLastModifiedTime();
 		}
@@ -73,7 +73,7 @@ public class OsmNotesSettingsItem extends CollectionSettingsItem<OsmNotesPoint> 
 
 	@Override
 	public void setLocalModifiedTime(long lastModifiedTime) {
-		OsmEditingPlugin osmEditingPlugin = OsmandPlugin.getPlugin(OsmEditingPlugin.class);
+		OsmEditingPlugin osmEditingPlugin = PluginsHelper.getPlugin(OsmEditingPlugin.class);
 		if (osmEditingPlugin != null) {
 			osmEditingPlugin.getDBBug().setLastModifiedTime(lastModifiedTime);
 		}
@@ -85,7 +85,7 @@ public class OsmNotesSettingsItem extends CollectionSettingsItem<OsmNotesPoint> 
 		if (!newItems.isEmpty() || !duplicateItems.isEmpty()) {
 			appliedItems = new ArrayList<>(newItems);
 
-			OsmEditingPlugin osmEditingPlugin = OsmandPlugin.getPlugin(OsmEditingPlugin.class);
+			OsmEditingPlugin osmEditingPlugin = PluginsHelper.getPlugin(OsmEditingPlugin.class);
 			if (osmEditingPlugin != null) {
 				OsmBugsDbHelper db = osmEditingPlugin.getDBBug();
 				for (OsmNotesPoint duplicate : duplicateItems) {
@@ -104,6 +104,11 @@ public class OsmNotesSettingsItem extends CollectionSettingsItem<OsmNotesPoint> 
 				}
 			}
 		}
+	}
+
+	@Override
+	protected void deleteItem(OsmNotesPoint item) {
+		// TODO: delete settings item
 	}
 
 	@Override
@@ -145,7 +150,7 @@ public class OsmNotesSettingsItem extends CollectionSettingsItem<OsmNotesPoint> 
 			if (!json.has("items")) {
 				return;
 			}
-			OsmEditingPlugin osmEditingPlugin = OsmandPlugin.getPlugin(OsmEditingPlugin.class);
+			OsmEditingPlugin osmEditingPlugin = PluginsHelper.getPlugin(OsmEditingPlugin.class);
 			long minId = osmEditingPlugin != null ? osmEditingPlugin.getDBBug().getMinID() - 1 : -2;
 			int idOffset = 0;
 			JSONArray jsonArray = json.getJSONArray("items");

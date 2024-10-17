@@ -1,5 +1,16 @@
 package net.osmand.aidl;
 
+import static net.osmand.aidl.OsmandAidlApi.KEY_ON_CONTEXT_MENU_BUTTONS_CLICK;
+import static net.osmand.aidl.OsmandAidlApi.KEY_ON_KEY_EVENT;
+import static net.osmand.aidl.OsmandAidlApi.KEY_ON_LOGCAT_MESSAGE;
+import static net.osmand.aidl.OsmandAidlApi.KEY_ON_NAV_DATA_UPDATE;
+import static net.osmand.aidl.OsmandAidlApi.KEY_ON_UPDATE;
+import static net.osmand.aidl.OsmandAidlApi.KEY_ON_VOICE_MESSAGE;
+import static net.osmand.aidlapi.OsmandAidlConstants.CANNOT_ACCESS_API_ERROR;
+import static net.osmand.aidlapi.OsmandAidlConstants.MIN_UPDATE_TIME_MS;
+import static net.osmand.aidlapi.OsmandAidlConstants.MIN_UPDATE_TIME_MS_ERROR;
+import static net.osmand.aidlapi.OsmandAidlConstants.UNKNOWN_API_ERROR;
+
 import android.app.Service;
 import android.content.Intent;
 import android.graphics.Bitmap;
@@ -28,10 +39,13 @@ import net.osmand.aidlapi.customization.CustomizationInfoParams;
 import net.osmand.aidlapi.customization.MapMarginsParams;
 import net.osmand.aidlapi.customization.OsmandSettingsInfoParams;
 import net.osmand.aidlapi.customization.OsmandSettingsParams;
+import net.osmand.aidlapi.customization.PreferenceParams;
 import net.osmand.aidlapi.customization.ProfileSettingsParams;
 import net.osmand.aidlapi.customization.SelectProfileParams;
 import net.osmand.aidlapi.customization.SetWidgetsParams;
+import net.osmand.aidlapi.customization.ZoomLimitsParams;
 import net.osmand.aidlapi.events.AKeyEventsParams;
+import net.osmand.aidlapi.exit.ExitAppParams;
 import net.osmand.aidlapi.favorite.AFavorite;
 import net.osmand.aidlapi.favorite.AddFavoriteParams;
 import net.osmand.aidlapi.favorite.RemoveFavoriteParams;
@@ -51,7 +65,9 @@ import net.osmand.aidlapi.gpx.ShowGpxParams;
 import net.osmand.aidlapi.gpx.StartGpxRecordingParams;
 import net.osmand.aidlapi.gpx.StopGpxRecordingParams;
 import net.osmand.aidlapi.info.AppInfoParams;
+import net.osmand.aidlapi.info.GetTextParams;
 import net.osmand.aidlapi.lock.SetLockStateParams;
+import net.osmand.aidlapi.logcat.ALogcatListenerParams;
 import net.osmand.aidlapi.map.ALatLon;
 import net.osmand.aidlapi.map.SetLocationParams;
 import net.osmand.aidlapi.map.SetMapLocationParams;
@@ -111,22 +127,12 @@ import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicLong;
 
-import static net.osmand.aidl.OsmandAidlApi.KEY_ON_CONTEXT_MENU_BUTTONS_CLICK;
-import static net.osmand.aidl.OsmandAidlApi.KEY_ON_KEY_EVENT;
-import static net.osmand.aidl.OsmandAidlApi.KEY_ON_NAV_DATA_UPDATE;
-import static net.osmand.aidl.OsmandAidlApi.KEY_ON_UPDATE;
-import static net.osmand.aidl.OsmandAidlApi.KEY_ON_VOICE_MESSAGE;
-import static net.osmand.aidlapi.OsmandAidlConstants.CANNOT_ACCESS_API_ERROR;
-import static net.osmand.aidlapi.OsmandAidlConstants.MIN_UPDATE_TIME_MS;
-import static net.osmand.aidlapi.OsmandAidlConstants.MIN_UPDATE_TIME_MS_ERROR;
-import static net.osmand.aidlapi.OsmandAidlConstants.UNKNOWN_API_ERROR;
-
 public class OsmandAidlServiceV2 extends Service implements AidlCallbackListenerV2 {
 
 	private static final Log LOG = PlatformUtil.getLog(OsmandAidlService.class);
 
-	private Map<Long, AidlCallbackParams> callbacks = new ConcurrentHashMap<>();
-	private Handler mHandler = null;
+	private final Map<Long, AidlCallbackParams> callbacks = new ConcurrentHashMap<>();
+	private Handler mHandler;
 	HandlerThread mHandlerThread = new HandlerThread("OsmAndAidlServiceV2Thread");
 
 	private final AtomicLong aidlCallbackId = new AtomicLong(0);
@@ -553,7 +559,7 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 			try {
 				if (params != null && params.getFileName() != null) {
 					OsmandAidlApi api = getApi("hideGpx");
-					return api != null && api.hideGpx(params.getFileName());
+					return api != null && api.hideGpx(params.getFilePath(), params.getFileName());
 				}
 				return false;
 			} catch (Exception e) {
@@ -593,9 +599,9 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 		@Override
 		public boolean removeGpx(RemoveGpxParams params) {
 			try {
-				if (params != null && params.getFileName() != null) {
+				if (params != null && (params.getFileName() != null || params.getRelativePath() != null)) {
 					OsmandAidlApi api = getApi("removeGpx");
-					return api != null && api.removeGpx(params.getFileName());
+					return api != null && api.removeGpx(params.getFileName(), params.getRelativePath());
 				}
 				return false;
 			} catch (Exception e) {
@@ -708,8 +714,7 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 		public boolean navigateGpx(NavigateGpxParams params) {
 			try {
 				OsmandAidlApi api = getApi("navigateGpx");
-				return params != null && api != null && api.navigateGpx(params.getData(), params.getUri(),
-						params.isForce(), params.isNeedLocationPermission());
+				return params != null && api != null && api.navigateGpxV2(params);
 			} catch (Exception e) {
 				handleException(e);
 				return false;
@@ -786,7 +791,7 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 		}
 
 		@Override
-		public boolean search(SearchParams params, final IOsmAndAidlCallback callback) {
+		public boolean search(SearchParams params, IOsmAndAidlCallback callback) {
 			try {
 				OsmandAidlApi api = getApi("search");
 				return params != null && api != null && api.search(params.getSearchQuery(), params.getSearchType(),
@@ -907,22 +912,19 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 			}
 		}
 
-		void startRemoteUpdates(final long updateTimeMS, final long callbackId, final IOsmAndAidlCallback callback) {
+		void startRemoteUpdates(long updateTimeMS, long callbackId, IOsmAndAidlCallback callback) {
 			try {
-				mHandler.postDelayed(new Runnable() {
-					@Override
-					public void run() {
-						try {
-							if (callbacks.containsKey(callbackId)) {
-								OsmandAidlApi api = getApi("isUpdateAllowed");
-								if (api != null && api.isUpdateAllowed()) {
-									callback.onUpdate();
-								}
-								startRemoteUpdates(updateTimeMS, callbackId, callback);
+				mHandler.postDelayed(() -> {
+					try {
+						if (callbacks.containsKey(callbackId)) {
+							OsmandAidlApi api = getApi("isUpdateAllowed");
+							if (api != null && api.isUpdateAllowed()) {
+								callback.onUpdate();
 							}
-						} catch (RemoteException e) {
-							handleException(e);
+							startRemoteUpdates(updateTimeMS, callbackId, callback);
 						}
+					} catch (RemoteException e) {
+						handleException(e);
 					}
 				}, updateTimeMS);
 			} catch (Exception e) {
@@ -1054,7 +1056,7 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 		}
 
 		@Override
-		public boolean registerForOsmandInitListener(final IOsmAndAidlCallback callback) {
+		public boolean registerForOsmandInitListener(IOsmAndAidlCallback callback) {
 			try {
 				OsmandAidlApi api = getApi("registerForOsmandInitListener");
 				return api != null && api.registerForOsmandInitialization(new OsmandAppInitCallback() {
@@ -1074,7 +1076,7 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 		}
 
 		@Override
-		public boolean getBitmapForGpx(CreateGpxBitmapParams params, final IOsmAndAidlCallback callback) {
+		public boolean getBitmapForGpx(CreateGpxBitmapParams params, IOsmAndAidlCallback callback) {
 			try {
 				OsmandAidlApi api = getApi("getBitmapForGpx");
 				return params != null && api != null && api.getBitmapForGpx(params.getGpxUri(), params.getDensity(), params.getWidthPixels(), params.getHeightPixels(), params.getColor(), new GpxBitmapCreatedCallback() {
@@ -1109,7 +1111,7 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 		}
 
 		@Override
-		public long registerForNavigationUpdates(ANavigationUpdateParams params, final IOsmAndAidlCallback callback) {
+		public long registerForNavigationUpdates(ANavigationUpdateParams params, IOsmAndAidlCallback callback) {
 			try {
 				OsmandAidlApi api = getApi("registerForNavUpdates");
 				if (api != null) {
@@ -1132,7 +1134,7 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 		}
 
 		@Override
-		public long registerForKeyEvents(AKeyEventsParams params, final IOsmAndAidlCallback callback) {
+		public long registerForKeyEvents(AKeyEventsParams params, IOsmAndAidlCallback callback) {
 			try {
 				OsmandAidlApi api = getApi("registerForKeyEvents");
 				if (api != null) {
@@ -1155,7 +1157,7 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 		}
 
 		@Override
-		public long addContextMenuButtons(ContextMenuButtonsParams params, final IOsmAndAidlCallback callback) {
+		public long addContextMenuButtons(ContextMenuButtonsParams params, IOsmAndAidlCallback callback) {
 			try {
 				OsmandAidlApi api = getApi("addContextMenuButtons");
 				if (api != null && params != null) {
@@ -1232,7 +1234,7 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 		}
 
 		@Override
-		public long registerForVoiceRouterMessages(ANavigationVoiceRouterMessageParams params, final IOsmAndAidlCallback callback) {
+		public long registerForVoiceRouterMessages(ANavigationVoiceRouterMessageParams params, IOsmAndAidlCallback callback) {
 			try {
 				OsmandAidlApi api = getApi("registerForVoiceRouterMessages");
 				if (api != null) {
@@ -1457,6 +1459,96 @@ public class OsmandAidlServiceV2 extends Service implements AidlCallbackListener
 				handleException(e);
 			}
 			return false;
+		}
+
+		@Override
+		public boolean exitApp(ExitAppParams params) {
+			try {
+				OsmandAidlApi api = getApi("exitApp");
+				return api != null && api.exitApp(params);
+			} catch (Exception e) {
+				handleException(e);
+				return false;
+			}
+		}
+
+		@Override
+		public boolean getText(GetTextParams params) {
+			try {
+				OsmandAidlApi api = getApi("getText");
+				return api != null && api.getText(params);
+			} catch (Exception e) {
+				handleException(e);
+				return false;
+			}
+		}
+
+		@Override
+		public boolean reloadIndexes() {
+			try {
+				OsmandAidlApi api = getApi("reloadIndexes");
+				return api != null && api.reloadIndexes();
+			} catch (Exception e) {
+				handleException(e);
+				return false;
+			}
+		}
+
+		@Override
+		public boolean setPreference(PreferenceParams params) {
+			try {
+				OsmandAidlApi api = getApi("setPreference");
+				return api != null && api.setPreference(params);
+			} catch (Exception e) {
+				handleException(e);
+				return false;
+			}
+		}
+
+		@Override
+		public boolean getPreference(PreferenceParams params) {
+			try {
+				OsmandAidlApi api = getApi("getPreference");
+				return api != null && api.getPreference(params);
+			} catch (Exception e) {
+				handleException(e);
+				return false;
+			}
+		}
+
+		@Override
+		public long registerForLogcatMessages(ALogcatListenerParams params, IOsmAndAidlCallback callback) {
+			try {
+				OsmandAidlApi api = getApi("registerForLogcatMessages");
+				if (api != null) {
+					if (!params.isSubscribeToUpdates() && params.getCallbackId() != -1) {
+						api.stopLogcatTask(params.getCallbackId());
+						removeAidlCallback(params.getCallbackId());
+						return -1;
+					} else {
+						long id = addAidlCallback(callback, KEY_ON_LOGCAT_MESSAGE);
+						String filterLevel = params.getFilterLevel();
+						api.registerLogcatListener(id, filterLevel);
+						return id;
+					}
+				} else {
+					return -1;
+				}
+			} catch (Exception e) {
+				handleException(e);
+				return UNKNOWN_API_ERROR;
+			}
+		}
+
+		@Override
+		public boolean setZoomLimits(ZoomLimitsParams params) throws RemoteException {
+			try {
+				OsmandAidlApi api = getApi("setZoomLimits");
+				return api != null && api.setZoomLimits(params.getMinZoom(), params.getMaxZoom());
+			} catch (Exception e) {
+				handleException(e);
+				return false;
+			}
 		}
 	};
 

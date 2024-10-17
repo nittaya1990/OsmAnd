@@ -1,65 +1,41 @@
 package net.osmand.plus.settings.datastorage;
 
+import android.app.ProgressDialog;
 import android.os.Environment;
-
-import net.osmand.IndexConstants;
-import net.osmand.ValueHolder;
-import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.R;
-import net.osmand.plus.settings.backend.OsmandSettings;
-import net.osmand.plus.settings.datastorage.item.DirectoryItem;
-import net.osmand.plus.settings.datastorage.item.DirectoryItem.CheckingType;
-import net.osmand.plus.settings.datastorage.item.MemoryItem;
-import net.osmand.plus.settings.datastorage.item.StorageItem;
-import net.osmand.plus.settings.datastorage.task.RefreshUsedMemoryTask;
-
-import java.io.File;
-import java.text.DecimalFormat;
-import java.util.ArrayList;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
+import androidx.fragment.app.FragmentActivity;
 
-import static net.osmand.IndexConstants.AV_INDEX_DIR;
-import static net.osmand.IndexConstants.BACKUP_INDEX_DIR;
-import static net.osmand.IndexConstants.GPX_INDEX_DIR;
-import static net.osmand.IndexConstants.MAPS_PATH;
-import static net.osmand.IndexConstants.ROADS_INDEX_DIR;
-import static net.osmand.IndexConstants.SRTM_INDEX_DIR;
-import static net.osmand.IndexConstants.TILES_INDEX_DIR;
-import static net.osmand.IndexConstants.WIKIVOYAGE_INDEX_DIR;
-import static net.osmand.IndexConstants.WIKI_INDEX_DIR;
-import static net.osmand.plus.settings.datastorage.item.DirectoryItem.CheckingType.EXTENSIONS;
-import static net.osmand.plus.settings.datastorage.item.DirectoryItem.CheckingType.PREFIX;
+import net.osmand.IProgress;
+import net.osmand.data.ValueHolder;
+import net.osmand.plus.OsmandApplication;
+import net.osmand.plus.ProgressImplementation;
+import net.osmand.plus.R;
+import net.osmand.plus.resources.ResourceManager.ReloadIndexesListener;
+import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.settings.datastorage.item.StorageItem;
+import net.osmand.plus.utils.FileUtils;
+
+import java.io.File;
+import java.lang.ref.WeakReference;
+import java.text.DecimalFormat;
+import java.util.ArrayList;
+import java.util.List;
 
 public class DataStorageHelper {
-	public final static String INTERNAL_STORAGE = "internal_storage";
-	public final static String EXTERNAL_STORAGE = "external_storage";
-	public final static String SHARED_STORAGE = "shared_storage";
-	public final static String MULTIUSER_STORAGE = "multiuser_storage";
-	public final static String MANUALLY_SPECIFIED = "manually_specified";
 
-	public final static String MAPS_MEMORY = "maps_memory_used";
-	public final static String TRAVEL_MEMORY = "travel_memory_used";
-	public final static String TERRAIN_MEMORY = "terrain_memory_used";
-	public final static String TRACKS_MEMORY = "tracks_memory_used";
-	public final static String NOTES_MEMORY = "notes_memory_used";
-	public final static String TILES_MEMORY = "tiles_memory_used";
-	public final static String OTHER_MEMORY = "other_memory_used";
+	public static final String INTERNAL_STORAGE = "internal_storage";
+	public static final String EXTERNAL_STORAGE = "external_storage";
+	public static final String SHARED_STORAGE = "shared_storage";
+	public static final String MULTIUSER_STORAGE = "multiuser_storage";
+	public static final String MANUALLY_SPECIFIED = "manually_specified";
 
-	private OsmandApplication app;
-	private ArrayList<StorageItem> storageItems = new ArrayList<>();
+	private final OsmandApplication app;
+	private final List<StorageItem> storageItems = new ArrayList<>();
+
 	private StorageItem currentDataStorage;
 	private StorageItem manuallySpecified;
-
-	private ArrayList<MemoryItem> memoryItems = new ArrayList<>();
-	private MemoryItem mapsMemory;
-	private MemoryItem travelMemory;
-	private MemoryItem terrainMemory;
-	private MemoryItem tracksMemory;
-	private MemoryItem notesMemory;
-	private MemoryItem tilesMemory;
-	private MemoryItem otherMemory;
 
 	private int currentStorageType;
 	private String currentStoragePath;
@@ -69,9 +45,17 @@ public class DataStorageHelper {
 		prepareData();
 	}
 
+	@NonNull
+	public List<StorageItem> getStorageItems() {
+		return storageItems;
+	}
+
+	public StorageItem getCurrentStorage() {
+		return currentDataStorage;
+	}
+
 	private void prepareData() {
 		initStorageItems();
-		initUsedMemoryItems();
 	}
 
 	private void initStorageItems() {
@@ -165,74 +149,6 @@ public class DataStorageHelper {
 				: R.drawable.ic_action_folder;
 	}
 
-	private void initUsedMemoryItems() {
-		mapsMemory = MemoryItem.builder()
-				.setKey(MAPS_MEMORY)
-				.setExtensions(IndexConstants.BINARY_MAP_INDEX_EXT)
-				.setDirectories(
-						createDirectory(MAPS_PATH, false, EXTENSIONS, true),
-						createDirectory(ROADS_INDEX_DIR, true, EXTENSIONS, true),
-						createDirectory(WIKI_INDEX_DIR, true, EXTENSIONS, true),
-						createDirectory(BACKUP_INDEX_DIR, true, EXTENSIONS, true))
-				.createItem();
-		memoryItems.add(mapsMemory);
-
-		travelMemory = MemoryItem.builder()
-				.setKey(TRAVEL_MEMORY)
-				.setExtensions(IndexConstants.BINARY_TRAVEL_GUIDE_MAP_INDEX_EXT)
-				.setDirectories(
-						createDirectory(WIKIVOYAGE_INDEX_DIR, true, EXTENSIONS, true))
-				.createItem();
-		memoryItems.add(travelMemory);
-
-		terrainMemory = MemoryItem.builder()
-				.setKey(TERRAIN_MEMORY)
-				.setExtensions(IndexConstants.BINARY_SRTM_MAP_INDEX_EXT, IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT)
-				.setDirectories(
-						createDirectory(SRTM_INDEX_DIR, true, EXTENSIONS, true),
-						createDirectory(TILES_INDEX_DIR, false, PREFIX, false))
-				.setPrefixes("Hillshade", "Slope")
-				.createItem();
-		memoryItems.add(terrainMemory);
-
-		tracksMemory = MemoryItem.builder()
-				.setKey(TRACKS_MEMORY)
-//				.setExtensions(IndexConstants.GPX_FILE_EXT, ".gpx.bz2")
-				.setDirectories(
-						createDirectory(GPX_INDEX_DIR, true, EXTENSIONS, true))
-				.createItem();
-		memoryItems.add(tracksMemory);
-
-		notesMemory = MemoryItem.builder()
-				.setKey(NOTES_MEMORY)
-//				.setExtensions("")
-				.setDirectories(
-						createDirectory(AV_INDEX_DIR, true, EXTENSIONS, true))
-				.createItem();
-		memoryItems.add(notesMemory);
-
-		tilesMemory = MemoryItem.builder()
-				.setKey(TILES_MEMORY)
-//				.setExtensions("")
-				.setDirectories(
-						createDirectory(TILES_INDEX_DIR, true, EXTENSIONS, true))
-				.createItem();
-		memoryItems.add(tilesMemory);
-
-		otherMemory = MemoryItem.builder()
-				.setKey(OTHER_MEMORY)
-				.createItem();
-		memoryItems.add(otherMemory);
-	}
-
-	public ArrayList<StorageItem> getStorageItems() {
-		return storageItems;
-	}
-
-	public StorageItem getCurrentStorage() {
-		return currentDataStorage;
-	}
-
 	private void addItem(StorageItem item) {
 		if (currentStorageType == item.getType() && currentStoragePath.equals(item.getDirectory())) {
 			currentDataStorage = item;
@@ -245,7 +161,7 @@ public class DataStorageHelper {
 	}
 
 	public StorageItem getStorage(String key) {
-		if (storageItems != null && key != null) {
+		if (key != null) {
 			for (StorageItem storageItem : storageItems) {
 				if (key.equals(storageItem.getKey())) {
 					return storageItem;
@@ -253,43 +169,6 @@ public class DataStorageHelper {
 			}
 		}
 		return null;
-	}
-
-	public ArrayList<MemoryItem> getMemoryInfoItems() {
-		return memoryItems;
-	}
-
-	public RefreshUsedMemoryTask calculateMemoryUsedInfo(UpdateMemoryInfoUIAdapter uiAdapter) {
-		File rootDir = new File(currentStoragePath);
-		RefreshUsedMemoryTask task = new RefreshUsedMemoryTask(uiAdapter, otherMemory, rootDir, null, null, OTHER_MEMORY);
-		task.execute(mapsMemory, travelMemory, terrainMemory, tracksMemory, notesMemory);
-		return task;
-	}
-
-	public RefreshUsedMemoryTask calculateTilesMemoryUsed(UpdateMemoryInfoUIAdapter listener) {
-		File rootDir = new File(tilesMemory.getDirectories()[0].getAbsolutePath());
-		RefreshUsedMemoryTask task = new RefreshUsedMemoryTask(listener, otherMemory, rootDir, null, terrainMemory.getPrefixes(), TILES_MEMORY);
-		task.execute(tilesMemory);
-		return task;
-	}
-
-	public long getTotalUsedBytes() {
-		long total = 0;
-		if (memoryItems != null && memoryItems.size() > 0) {
-			for (MemoryItem mi : memoryItems) {
-				total += mi.getUsedMemoryBytes();
-			}
-			return total;
-		}
-		return -1;
-	}
-
-	public DirectoryItem createDirectory(@NonNull String relativePath,
-	                                     boolean processInternalDirectories,
-	                                     CheckingType checkingType,
-	                                     boolean addUnmatchedToOtherMemory) {
-		String path = app.getAppPath(relativePath).getAbsolutePath();
-		return new DirectoryItem(path, processInternalDirectories, checkingType, addUnmatchedToOtherMemory);
 	}
 
 	public static String getFormattedMemoryInfo(long bytes, String[] formatStrings) {
@@ -303,16 +182,50 @@ public class DataStorageHelper {
 		return String.format(formatStrings[type], formattedUsed);
 	}
 
-	public static boolean isCurrentStorageShared(@NonNull OsmandApplication app) {
-		DataStorageHelper dataStorageHelper = new DataStorageHelper(app);
-		return SHARED_STORAGE.equals(dataStorageHelper.getCurrentStorage().getKey());
+	public static boolean saveFilesLocation(@NonNull OsmandApplication app, @NonNull FragmentActivity activity, int type, @NonNull File selectedFile) {
+		boolean writable = FileUtils.isWritable(selectedFile);
+		if (writable) {
+			app.setExternalStorageDirectory(type, selectedFile.getAbsolutePath());
+			reloadData(app, activity);
+		} else {
+			app.showToastMessage(R.string.specified_directiory_not_writeable);
+		}
+		return writable;
 	}
 
-	public interface UpdateMemoryInfoUIAdapter {
+	public static void checkAssetsAsync(@NonNull OsmandApplication app) {
+		app.getResourceManager().checkAssetsAsync(IProgress.EMPTY_PROGRESS, true, false, null);
+	}
 
-		void onMemoryInfoUpdate();
+	public static void updateDownloadIndexes(@NonNull OsmandApplication app) {
+		app.getDownloadThread().runReloadIndexFilesSilent();
+	}
 
-		void onFinishUpdating(String tag);
+	public static void reloadData(@NonNull OsmandApplication app, @NonNull FragmentActivity activity) {
+		WeakReference<FragmentActivity> activityRef = new WeakReference<>(activity);
+		app.getResourceManager().reloadIndexesAsync(IProgress.EMPTY_PROGRESS, new ReloadIndexesListener() {
 
+			private ProgressImplementation progress;
+
+			@Override
+			public void reloadIndexesStarted() {
+				FragmentActivity activity = activityRef.get();
+				if (activity != null) {
+					progress = ProgressImplementation.createProgressDialog(activity, app.getString(R.string.loading_data),
+							app.getString(R.string.loading_data), ProgressDialog.STYLE_HORIZONTAL);
+				}
+			}
+
+			@Override
+			public void reloadIndexesFinished(@NonNull List<String> warnings) {
+				try {
+					if (progress != null && progress.getDialog().isShowing()) {
+						progress.getDialog().dismiss();
+					}
+				} catch (Exception e) {
+					//ignored
+				}
+			}
+		});
 	}
 }

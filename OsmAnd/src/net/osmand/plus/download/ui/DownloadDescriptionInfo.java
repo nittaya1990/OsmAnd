@@ -3,7 +3,7 @@ package net.osmand.plus.download.ui;
 import android.content.Context;
 import android.text.Html;
 
-import net.osmand.JsonUtils;
+import net.osmand.plus.utils.JsonUtils;
 import net.osmand.PlatformUtil;
 
 import org.apache.commons.logging.Log;
@@ -89,9 +89,9 @@ public class DownloadDescriptionInfo {
 
 		public static final String DOWNLOAD_ACTION = "download";
 
-		private String actionType;
-		private String name;
-		private String url;
+		private final String actionType;
+		private final String name;
+		private final String url;
 
 		public ActionButton(String actionType, String name, String url) {
 			this.actionType = actionType;

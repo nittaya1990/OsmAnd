@@ -1,11 +1,10 @@
 package net.osmand.plus.mapsource;
 
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
 import android.os.Bundle;
-import android.text.SpannableString;
-import android.text.Spanned;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.TextView;
@@ -22,12 +21,11 @@ import com.google.android.material.slider.RangeSlider;
 import net.osmand.PlatformUtil;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.base.MenuBottomSheetDialogFragment;
 import net.osmand.plus.base.bottomsheetmenu.SimpleBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.TitleItem;
-import net.osmand.plus.helpers.FontCache;
-import net.osmand.plus.widgets.style.CustomTypefaceSpan;
+import net.osmand.plus.utils.FontCache;
+import net.osmand.plus.utils.UiUtilities;
 
 import org.apache.commons.logging.Log;
 
@@ -82,20 +80,20 @@ public class InputZoomLevelsBottomSheet extends MenuBottomSheetDialogFragment {
 		LayoutInflater inflater = UiUtilities.getInflater(app, nightMode);
 		TitleItem titleItem = new TitleItem(getString(R.string.shared_string_zoom_levels));
 		items.add(titleItem);
-		final View sliderView = inflater.inflate(R.layout.zoom_levels_with_descr, null);
+		View sliderView = inflater.inflate(R.layout.zoom_levels_with_descr, null);
 		((TextView) sliderView.findViewById(R.id.slider_descr)).setText(sliderDescrRes);
 		TextView dialogDescrTv = sliderView.findViewById(R.id.dialog_descr);
 		if (dialogDescrRes == R.string.map_source_zoom_levels_descr) {
 			String mapSource = getString(R.string.map_source);
 			String overlayUnderlay = getString(R.string.pref_overlay);
 			String dialogDesr = getString(dialogDescrRes, mapSource, overlayUnderlay);
-			dialogDescrTv.setText(UiUtilities.createCustomFontSpannable(FontCache.getRobotoMedium(app), dialogDesr, mapSource, overlayUnderlay));
+			dialogDescrTv.setText(UiUtilities.createCustomFontSpannable(FontCache.getMediumFont(), dialogDesr, mapSource, overlayUnderlay));
 		} else {
 			dialogDescrTv.setText(getString(dialogDescrRes));
 		}
-		final TextView minZoomValue = sliderView.findViewById(R.id.zoom_value_min);
+		TextView minZoomValue = sliderView.findViewById(R.id.zoom_value_min);
 		minZoomValue.setText(String.valueOf(minZoom));
-		final TextView maxZoomValue = sliderView.findViewById(R.id.zoom_value_max);
+		TextView maxZoomValue = sliderView.findViewById(R.id.zoom_value_max);
 		maxZoomValue.setText(String.valueOf(maxZoom));
 		RangeSlider slider = sliderView.findViewById(R.id.zoom_slider);
 		int colorProfile = app.getSettings().getApplicationMode().getProfileColor(nightMode);
@@ -127,7 +125,7 @@ public class InputZoomLevelsBottomSheet extends MenuBottomSheetDialogFragment {
 				}
 			}
 		});
-		final SimpleBottomSheetItem sliderItem = (SimpleBottomSheetItem) new SimpleBottomSheetItem.Builder()
+		SimpleBottomSheetItem sliderItem = (SimpleBottomSheetItem) new SimpleBottomSheetItem.Builder()
 				.setCustomView(sliderView)
 				.create();
 		items.add(sliderItem);

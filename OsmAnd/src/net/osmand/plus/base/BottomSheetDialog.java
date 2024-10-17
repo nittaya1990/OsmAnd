@@ -84,8 +84,8 @@ public class BottomSheetDialog extends Dialog {
 
 	@NonNull
 	private View wrapInContainer(int layoutResId, View view, LayoutParams params) {
-		final View res = View.inflate(getContext(), R.layout.bottom_sheet_dialog, null);
-		final FrameLayout container = (FrameLayout) res.findViewById(R.id.content_container);
+		View res = View.inflate(getContext(), R.layout.bottom_sheet_dialog, null);
+		FrameLayout container = res.findViewById(R.id.content_container);
 
 		if (layoutResId != 0 && view == null) {
 			view = getLayoutInflater().inflate(layoutResId, container, false);
@@ -96,21 +96,15 @@ public class BottomSheetDialog extends Dialog {
 			container.addView(view, params);
 		}
 
-		res.findViewById(R.id.touch_outside).setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				if (cancelable && isShowing() && shouldWindowCloseOnTouchOutside()) {
-					cancel();
-				}
+		res.findViewById(R.id.touch_outside).setOnClickListener(v -> {
+			if (cancelable && isShowing() && shouldWindowCloseOnTouchOutside()) {
+				cancel();
 			}
 		});
 
-		container.setOnTouchListener(new View.OnTouchListener() {
-			@Override
-			public boolean onTouch(View view, MotionEvent motionEvent) {
-				// Consume the event and prevent it from falling through
-				return true;
-			}
+		container.setOnTouchListener((v, motionEvent) -> {
+			// Consume the event and prevent it from falling through
+			return true;
 		});
 
 		return res;

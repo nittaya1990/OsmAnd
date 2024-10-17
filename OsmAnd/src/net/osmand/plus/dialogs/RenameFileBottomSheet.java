@@ -1,9 +1,10 @@
 package net.osmand.plus.dialogs;
 
+import static net.osmand.plus.utils.FileUtils.ILLEGAL_FILE_NAME_CHARACTERS;
+
 import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.text.Editable;
-import android.text.TextWatcher;
 import android.view.View;
 
 import androidx.annotation.NonNull;
@@ -15,28 +16,26 @@ import androidx.fragment.app.FragmentManager;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.android.material.textfield.TextInputLayout;
 
-import net.osmand.AndroidUtils;
-import net.osmand.FileUtils.RenameCallback;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.shared.SharedUtil;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.SQLiteTileSource;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.base.MenuBottomSheetDialogFragment;
 import net.osmand.plus.base.bottomsheetmenu.BaseBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.TitleItem;
+import net.osmand.plus.resources.SQLiteTileSource;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.FileUtils;
+import net.osmand.plus.utils.FileUtils.RenameCallback;
+import net.osmand.plus.utils.UiUtilities;
+import net.osmand.plus.widgets.tools.SimpleTextWatcher;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 
 import java.io.File;
-
-import static net.osmand.FileUtils.ILLEGAL_FILE_NAME_CHARACTERS;
-import static net.osmand.FileUtils.renameFile;
-import static net.osmand.FileUtils.renameGpxFile;
-import static net.osmand.FileUtils.renameSQLiteFile;
 
 public class RenameFileBottomSheet extends MenuBottomSheetDialogFragment {
 
@@ -50,7 +49,7 @@ public class RenameFileBottomSheet extends MenuBottomSheetDialogFragment {
 	private TextInputLayout nameTextBox;
 	private TextInputEditText editText;
 
-	private File file;
+	private File srcFile;
 	private String selectedFileName;
 
 	@Override
@@ -59,11 +58,11 @@ public class RenameFileBottomSheet extends MenuBottomSheetDialogFragment {
 		if (savedInstanceState != null) {
 			String path = savedInstanceState.getString(SOURCE_FILE_NAME_KEY);
 			if (!Algorithms.isEmpty(path)) {
-				file = new File(path);
+				srcFile = new File(path);
 			}
 			selectedFileName = savedInstanceState.getString(SELECTED_FILE_NAME_KEY);
 		} else {
-			selectedFileName = Algorithms.getFileNameWithoutExtension(file);
+			selectedFileName = Algorithms.getFileNameWithoutExtension(srcFile);
 		}
 		items.add(new TitleItem(getString(R.string.shared_string_rename)));
 
@@ -92,15 +91,7 @@ public class RenameFileBottomSheet extends MenuBottomSheetDialogFragment {
 		TextInputEditText editText = mainView.findViewById(R.id.name_edit_text);
 		editText.setText(selectedFileName);
 		editText.requestFocus();
-		editText.addTextChangedListener(new TextWatcher() {
-			@Override
-			public void beforeTextChanged(CharSequence s, int start, int count, int after) {
-			}
-
-			@Override
-			public void onTextChanged(CharSequence s, int start, int before, int count) {
-			}
-
+		editText.addTextChangedListener(new SimpleTextWatcher() {
 			@Override
 			public void afterTextChanged(Editable s) {
 				updateFileName(s.toString());
@@ -128,7 +119,7 @@ public class RenameFileBottomSheet extends MenuBottomSheetDialogFragment {
 
 	@Override
 	public void onSaveInstanceState(@NonNull Bundle outState) {
-		outState.putString(SOURCE_FILE_NAME_KEY, file.getAbsolutePath());
+		outState.putString(SOURCE_FILE_NAME_KEY, srcFile.getAbsolutePath());
 		outState.putString(SELECTED_FILE_NAME_KEY, selectedFileName);
 		super.onSaveInstanceState(outState);
 	}
@@ -139,29 +130,32 @@ public class RenameFileBottomSheet extends MenuBottomSheetDialogFragment {
 		if (activity != null) {
 			AndroidUtils.hideSoftKeyboard(activity, editText);
 		}
+		File dest = renameFile();
+		if (dest != null) {
+			app.getSmartFolderHelper().onTrackRenamed(SharedUtil.kFile(srcFile), SharedUtil.kFile(dest));
+			Fragment fragment = getTargetFragment();
+			if (fragment instanceof RenameCallback) {
+				((RenameCallback) fragment).fileRenamed(srcFile, dest);
+			}
+			dismiss();
+		}
+	}
 
-		int idxOfLastDot = file.getName().lastIndexOf('.');
-		String extension = idxOfLastDot == -1 ? "" : file.getName().substring(idxOfLastDot).trim();
+	@Nullable
+	private File renameFile() {
+		int index = srcFile.getName().lastIndexOf('.');
+		String extension = index == -1 ? "" : srcFile.getName().substring(index).trim();
 		String newValidName = selectedFileName.trim();
 		if (newValidName.endsWith(extension)) {
 			newValidName = newValidName.substring(0, newValidName.lastIndexOf(extension)).trim();
 		}
 
-		File dest;
 		if (SQLiteTileSource.EXT.equals(extension)) {
-			dest = renameSQLiteFile(app, file, newValidName + extension, null);
+			return FileUtils.renameSQLiteFile(app, srcFile, newValidName + extension, null);
 		} else if (IndexConstants.GPX_FILE_EXT.equals(extension)) {
-			dest = renameGpxFile(app, file, newValidName + extension, false, null);
+			return FileUtils.renameGpxFile(app, srcFile, newValidName + extension, false, null);
 		} else {
-			dest = renameFile(app, file, newValidName + extension, false, null);
-		}
-		if (dest != null) {
-			Fragment fragment = getTargetFragment();
-			if (fragment instanceof RenameCallback) {
-				RenameCallback listener = (RenameCallback) fragment;
-				listener.renamedTo(dest);
-			}
-			dismiss();
+			return FileUtils.renameFile(app, srcFile, newValidName + extension, false, null);
 		}
 	}
 
@@ -175,15 +169,14 @@ public class RenameFileBottomSheet extends MenuBottomSheetDialogFragment {
 		return R.string.shared_string_save;
 	}
 
-	public static void showInstance(@NonNull FragmentManager fragmentManager, @Nullable Fragment target,
-									@NonNull File file, boolean usedOnMap) {
-		if (file.exists() && !fragmentManager.isStateSaved()
-				&& fragmentManager.findFragmentByTag(RenameFileBottomSheet.TAG) == null) {
+	public static void showInstance(@NonNull FragmentManager manager, @Nullable Fragment target,
+	                                @NonNull File srcFile, boolean usedOnMap) {
+		if (srcFile.exists() && AndroidUtils.isFragmentCanBeAdded(manager, TAG)) {
 			RenameFileBottomSheet fragment = new RenameFileBottomSheet();
-			fragment.file = file;
+			fragment.srcFile = srcFile;
 			fragment.setUsedOnMap(usedOnMap);
 			fragment.setTargetFragment(target, 0);
-			fragment.show(fragmentManager, RenameFileBottomSheet.TAG);
+			fragment.show(manager, TAG);
 		}
 	}
 }

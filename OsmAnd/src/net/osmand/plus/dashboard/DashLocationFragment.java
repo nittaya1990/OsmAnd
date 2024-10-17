@@ -1,14 +1,16 @@
 package net.osmand.plus.dashboard;
 
-import java.util.ArrayList;
-import java.util.List;
-
-import net.osmand.data.LatLon;
-import net.osmand.plus.UiUtilities;
-import net.osmand.plus.UiUtilities.UpdateLocationViewCache;
 import android.annotation.SuppressLint;
 import android.widget.ImageView;
 import android.widget.TextView;
+
+import net.osmand.data.LatLon;
+import net.osmand.plus.OsmandApplication;
+import net.osmand.plus.utils.UpdateLocationUtils;
+import net.osmand.plus.utils.UpdateLocationUtils.UpdateLocationViewCache;
+
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Created by Denis
@@ -27,7 +29,6 @@ public abstract class DashLocationFragment extends DashBaseFragment {
 		public boolean paint = true;
 
 		public DashLocationView(ImageView arrow, TextView txt, LatLon loc) {
-			super();
 			this.arrow = arrow;
 			this.txt = txt;
 			this.loc = loc;
@@ -50,16 +51,15 @@ public abstract class DashLocationFragment extends DashBaseFragment {
 	}
 
 	public void updateAllWidgets() {
-		DashboardOnMap d = dashboard;
-		if (d == null) {
+		OsmandApplication app = getMyApplication();
+		if (app == null || dashboard == null) {
 			return;
 		}
-		UiUtilities ic = getMyApplication().getUIUtilities();
-		UpdateLocationViewCache cache = ic.getUpdateLocationViewCache();
-		for (DashLocationView lv : distances) {
-			cache.arrowResId = lv.arrowResId;
-			cache.paintTxt = lv.paint;
-			ic.updateLocationView(cache, lv.arrow, lv.txt, lv.loc);
+		UpdateLocationViewCache cache = UpdateLocationUtils.getUpdateLocationViewCache(requireContext());
+		for (DashLocationView view : distances) {
+			cache.arrowResId = view.arrowResId;
+			cache.paintTxt = view.paint;
+			UpdateLocationUtils.updateLocationView(app, cache, view.arrow, view.txt, view.loc);
 		}
 	}
 

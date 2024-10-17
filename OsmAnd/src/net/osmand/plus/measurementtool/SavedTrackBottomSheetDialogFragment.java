@@ -5,35 +5,40 @@ import android.os.Bundle;
 import android.view.View;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
-import androidx.fragment.app.FragmentActivity;
-import androidx.fragment.app.FragmentManager;
-
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.MenuBottomSheetDialogFragment;
 import net.osmand.plus.base.bottomsheetmenu.BottomSheetItemButton;
 import net.osmand.plus.base.bottomsheetmenu.SimpleBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.DividerItem;
-import net.osmand.plus.helpers.GpxUiHelper;
-import net.osmand.plus.track.TrackMenuFragment;
+import net.osmand.plus.track.helpers.GpxUiHelper;
+import net.osmand.plus.track.fragments.TrackMenuFragment;
+import net.osmand.plus.widgets.dialogbutton.DialogButtonType;
 import net.osmand.util.Algorithms;
 
 import java.io.File;
 
+import androidx.annotation.NonNull;
+import androidx.fragment.app.FragmentActivity;
+import androidx.fragment.app.FragmentManager;
+
 public class SavedTrackBottomSheetDialogFragment extends MenuBottomSheetDialogFragment {
 
 	public static final String TAG = SavedTrackBottomSheetDialogFragment.class.getSimpleName();
-	public static final String FILE_NAME_KEY = "file_name_key";
 
-	String fileName;
+	private static final String FILE_NAME_KEY = "file_name_key";
+	private static final String SHOW_CREATE_NEW_ROUTE_BUTTON = "show_create_new_route_button";
+
+	private String fileName;
+	private boolean showCreateNewRouteButton;
 
 	@Override
 	public void createMenuItems(Bundle savedInstanceState) {
 
 		if (savedInstanceState != null) {
 			fileName = savedInstanceState.getString(FILE_NAME_KEY);
+			showCreateNewRouteButton = savedInstanceState.getBoolean(SHOW_CREATE_NEW_ROUTE_BUTTON);
 		}
 
 		View mainView = View.inflate(UiUtilities.getThemedContext(getMyApplication(), nightMode),
@@ -53,17 +58,19 @@ public class SavedTrackBottomSheetDialogFragment extends MenuBottomSheetDialogFr
 		items.add(new BottomSheetItemButton.Builder()
 				.setTitle(getString(R.string.open_saved_track))
 				.setLayoutId(R.layout.bottom_sheet_button)
-				.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						FragmentActivity activity = getActivity();
-						if (activity != null && !Algorithms.isEmpty(fileName)) {
-							TrackMenuFragment.openTrack(activity, new File(fileName), null);
-						}
-						dismiss();
+				.setOnClickListener(v -> {
+					FragmentActivity activity = getActivity();
+					if (activity != null && !Algorithms.isEmpty(fileName)) {
+						TrackMenuFragment.openTrack(activity, new File(fileName), null);
 					}
+					dismiss();
 				})
 				.create());
+	}
+
+	@Override
+	protected boolean useVerticalButtons() {
+		return true;
 	}
 
 	@Override
@@ -81,8 +88,8 @@ public class SavedTrackBottomSheetDialogFragment extends MenuBottomSheetDialogFr
 	}
 
 	@Override
-	protected UiUtilities.DialogButtonType getThirdBottomButtonType() {
-		return UiUtilities.DialogButtonType.SECONDARY;
+	protected DialogButtonType getThirdBottomButtonType() {
+		return DialogButtonType.SECONDARY;
 	}
 
 	@Override
@@ -92,12 +99,12 @@ public class SavedTrackBottomSheetDialogFragment extends MenuBottomSheetDialogFr
 
 	@Override
 	protected int getRightBottomButtonTextId() {
-		return R.string.plan_route_create_new_route;
+		return showCreateNewRouteButton ? R.string.plan_route_create_new_route : DEFAULT_VALUE;
 	}
 
 	@Override
-	protected UiUtilities.DialogButtonType getRightBottomButtonType() {
-		return UiUtilities.DialogButtonType.SECONDARY;
+	protected DialogButtonType getRightBottomButtonType() {
+		return DialogButtonType.SECONDARY;
 	}
 
 	@Override
@@ -123,13 +130,16 @@ public class SavedTrackBottomSheetDialogFragment extends MenuBottomSheetDialogFr
 	@Override
 	public void onSaveInstanceState(@NonNull Bundle outState) {
 		outState.putString(FILE_NAME_KEY, fileName);
+		outState.putBoolean(SHOW_CREATE_NEW_ROUTE_BUTTON, showCreateNewRouteButton);
 		super.onSaveInstanceState(outState);
 	}
 
-	public static void showInstance(@NonNull FragmentManager fragmentManager, String fileName) {
+	public static void showInstance(@NonNull FragmentManager fragmentManager, String fileName,
+	                                boolean showCreateNewRouteButton) {
 		if (!fragmentManager.isStateSaved()) {
 			SavedTrackBottomSheetDialogFragment fragment = new SavedTrackBottomSheetDialogFragment();
 			fragment.fileName = fileName;
+			fragment.showCreateNewRouteButton = showCreateNewRouteButton;
 			fragment.show(fragmentManager, TAG);
 		}
 	}

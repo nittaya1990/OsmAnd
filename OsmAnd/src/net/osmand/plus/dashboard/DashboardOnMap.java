@@ -1,5 +1,26 @@
 package net.osmand.plus.dashboard;
 
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.CONFIGURE_MAP;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.CONTOUR_LINES;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.CYCLE_ROUTES;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.DASHBOARD;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.ALPINE_HIKING;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.HIKING_ROUTES;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.MAPILLARY;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.MTB_ROUTES;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.NAUTICAL_DEPTH;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.OSM_NOTES;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.OVERLAY_MAP;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.RELIEF_3D;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.TERRAIN;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.TRANSPORT_LINES;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.TRAVEL_ROUTES;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.UNDERLAY_MAP;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.WEATHER;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.WEATHER_CONTOURS;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.WEATHER_LAYER;
+import static net.osmand.plus.dashboard.DashboardOnMap.DashboardType.WIKIPEDIA;
+
 import android.animation.Animator;
 import android.animation.AnimatorListenerAdapter;
 import android.animation.AnimatorSet;
@@ -9,16 +30,16 @@ import android.content.Context;
 import android.content.Intent;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.view.Gravity;
 import android.view.LayoutInflater;
-import android.view.MenuItem;
 import android.view.View;
+import android.view.View.OnClickListener;
 import android.view.ViewAnimationUtils;
+import android.view.ViewGroup;
+import android.view.ViewGroup.MarginLayoutParams;
 import android.view.ViewTreeObserver;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.AbsListView;
-import android.widget.AdapterView;
 import android.widget.AdapterView.OnItemClickListener;
 import android.widget.ArrayAdapter;
 import android.widget.Button;
@@ -43,50 +64,59 @@ import androidx.fragment.app.FragmentManager;
 import com.github.ksoichiro.android.observablescrollview.ObservableListView;
 import com.github.ksoichiro.android.observablescrollview.ObservableScrollView;
 import com.github.ksoichiro.android.observablescrollview.ObservableScrollViewCallbacks;
-import com.github.ksoichiro.android.observablescrollview.ScrollState;
 
-import net.osmand.AndroidUtils;
 import net.osmand.PlatformUtil;
-import net.osmand.ValueHolder;
 import net.osmand.data.LatLon;
-import net.osmand.plus.ColorUtilities;
-import net.osmand.plus.ContextMenuAdapter;
-import net.osmand.plus.ContextMenuAdapter.OnRowItemClick;
-import net.osmand.plus.ContextMenuItem;
+import net.osmand.data.ValueHolder;
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
+import net.osmand.plus.configmap.ConfigureMapFragment;
+import net.osmand.plus.configmap.CycleRoutesFragment;
+import net.osmand.plus.configmap.AlpineHikingScaleFragment;
+import net.osmand.plus.configmap.HikingRoutesFragment;
+import net.osmand.plus.configmap.MtbRoutesFragment;
+import net.osmand.plus.configmap.TravelRoutesFragment;
 import net.osmand.plus.dashboard.tools.DashFragmentData;
 import net.osmand.plus.dashboard.tools.DashboardSettingsDialogFragment;
 import net.osmand.plus.dashboard.tools.TransactionBuilder;
-import net.osmand.plus.dialogs.ConfigureMapMenu;
-import net.osmand.plus.dialogs.CycleRoutesFragment;
-import net.osmand.plus.dialogs.HikingRoutesFragment;
 import net.osmand.plus.dialogs.RasterMapMenu;
-import net.osmand.plus.dialogs.TravelRoutesFragment;
 import net.osmand.plus.download.DownloadActivity;
 import net.osmand.plus.download.DownloadIndexesThread;
 import net.osmand.plus.download.IndexItem;
 import net.osmand.plus.helpers.AndroidUiHelper;
 import net.osmand.plus.helpers.WaypointDialogHelper;
-import net.osmand.plus.mapcontextmenu.other.RoutePreferencesMenu;
-import net.osmand.plus.mapillary.MapillaryFiltersFragment;
-import net.osmand.plus.mapillary.MapillaryPlugin.MapillaryFirstDialogFragment;
-import net.osmand.plus.osmedit.OsmNotesMenu;
-import net.osmand.plus.rastermaps.OsmandRasterMapsPlugin;
-import net.osmand.plus.routepreparationmenu.RoutingOptionsHelper.LocalRoutingParameter;
+import net.osmand.plus.plugins.PluginsHelper;
+import net.osmand.plus.plugins.mapillary.MapillaryFiltersFragment;
+import net.osmand.plus.plugins.mapillary.MapillaryFirstDialogFragment;
+import net.osmand.plus.plugins.mapillary.MapillaryPlugin;
+import net.osmand.plus.plugins.openseamaps.NauticalDepthContourFragment;
+import net.osmand.plus.plugins.osmedit.menu.OsmNotesMenu;
+import net.osmand.plus.plugins.rastermaps.OsmandRasterMapsPlugin;
+import net.osmand.plus.plugins.srtm.ContourLinesMenu;
+import net.osmand.plus.plugins.srtm.Relief3DFragment;
+import net.osmand.plus.plugins.srtm.TerrainFragment;
+import net.osmand.plus.plugins.weather.WeatherBand;
+import net.osmand.plus.plugins.weather.WeatherPlugin;
+import net.osmand.plus.plugins.weather.dialogs.WeatherContoursFragment;
+import net.osmand.plus.plugins.weather.dialogs.WeatherLayerFragment;
+import net.osmand.plus.plugins.weather.dialogs.WeatherMainFragment;
 import net.osmand.plus.routing.IRouteInformationListener;
 import net.osmand.plus.routing.RoutingHelper;
 import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.settings.backend.OsmandSettings;
-import net.osmand.plus.srtmplugin.ContourLinesMenu;
-import net.osmand.plus.srtmplugin.SRTMPlugin;
-import net.osmand.plus.srtmplugin.TerrainFragment;
+import net.osmand.plus.track.fragments.TrackMenuFragment;
+import net.osmand.plus.transport.TransportLinesFragment;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.views.OsmandMapTileView;
 import net.osmand.plus.views.layers.DownloadedRegionsLayer;
-import net.osmand.plus.views.layers.MapInfoLayer;
-import net.osmand.plus.views.mapwidgets.MapWidgetRegistry;
+import net.osmand.plus.widgets.ctxmenu.ContextMenuAdapter;
+import net.osmand.plus.widgets.ctxmenu.ContextMenuListAdapter;
+import net.osmand.plus.widgets.ctxmenu.ViewCreator;
+import net.osmand.plus.widgets.ctxmenu.callback.ItemClickListener;
+import net.osmand.plus.widgets.ctxmenu.callback.OnRowItemClick;
+import net.osmand.plus.widgets.ctxmenu.data.ContextMenuItem;
 import net.osmand.plus.wikipedia.WikipediaPoiMenu;
 
 import java.lang.ref.WeakReference;
@@ -103,12 +133,12 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	private static final org.apache.commons.logging.Log LOG = PlatformUtil.getLog(DashboardOnMap.class);
 	private static final String TAG = "DashboardOnMap";
 
-	public static boolean staticVisible = false;
-	public static DashboardType staticVisibleType = DashboardType.DASHBOARD;
+	public static boolean staticVisible;
+	public static DashboardType staticVisibleType = DASHBOARD;
 	public static final String SHOULD_SHOW = "should_show";
 
 
-	private final DashFragmentData[] fragmentsData = new DashFragmentData[] {
+	private final DashFragmentData[] fragmentsData = {
 			new DashFragmentData(DashDashboardOrDrawerFragment.TAG, DashDashboardOrDrawerFragment.class,
 					DashDashboardOrDrawerFragment.SHOULD_SHOW_FUNCTION, 5, null),
 			new DashFragmentData(DashErrorFragment.TAG, DashErrorFragment.class,
@@ -131,11 +161,11 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	private FrameLayout dashboardView;
 
 	private ArrayAdapter<?> listAdapter;
-	private OnItemClickListener listAdapterOnClickListener;
+	private OnItemClickListener adapterClickListener;
 
-	private boolean visible = false;
-	private DashboardType visibleType;
-	private DashboardType previousVisibleType;
+	private boolean visible;
+	private final DashboardVisibilityStack visibleTypes = new DashboardVisibilityStack();
+	private final Map<DashboardType, Integer> lastKnownScrolls = new HashMap<>();
 	private ApplicationMode previousAppMode;
 	private boolean landscape;
 	private final List<WeakReference<DashBaseFragment>> fragList = new LinkedList<>();
@@ -143,7 +173,7 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	private float heading;
 	private boolean mapLinkedToLocation;
 	private float mapRotation;
-	private boolean inLocationUpdate = false;
+	private boolean inLocationUpdate;
 	private ObservableListView listView;
 	private View listBackgroundView;
 	private Toolbar toolbar;
@@ -151,7 +181,6 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	private int mFlexibleSpaceImageHeight;
 	private int mFlexibleBlurSpaceHeight;
 	private boolean portrait;
-	private TextView listEmptyTextView;
 	private int[] animationCoordinates;
 	private ProgressBar planRouteProgressBar;
 
@@ -166,10 +195,7 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	}
 
 	public enum DashboardType {
-		CONFIGURE_SCREEN,
 		CONFIGURE_MAP,
-		LIST_MENU,
-		ROUTE_PREFERENCES,
 		DASHBOARD,
 		OVERLAY_MAP,
 		UNDERLAY_MAP,
@@ -178,9 +204,17 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		OSM_NOTES,
 		WIKIPEDIA,
 		TERRAIN,
+		RELIEF_3D,
 		CYCLE_ROUTES,
 		HIKING_ROUTES,
-		TRAVEL_ROUTES
+		TRAVEL_ROUTES,
+		TRANSPORT_LINES,
+		WEATHER,
+		WEATHER_LAYER,
+		WEATHER_CONTOURS,
+		NAUTICAL_DEPTH,
+		MTB_ROUTES,
+		ALPINE_HIKING
 	}
 
 	private final Map<DashboardActionButtonType, DashboardActionButton> actionButtons = new HashMap<>();
@@ -191,14 +225,14 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		ROUTE
 	}
 
-	private class DashboardActionButton {
+	private static class DashboardActionButton {
 		private Drawable icon;
 		private String text;
-		private View.OnClickListener onClickListener;
+		private OnClickListener onClickListener;
 	}
 
-	public DashboardOnMap(MapActivity ma) {
-		this.mapActivity = ma;
+	public DashboardOnMap(@NonNull MapActivity activity) {
+		this.mapActivity = activity;
 	}
 
 	public WaypointDialogHelper getWaypointDialogHelper() {
@@ -226,11 +260,11 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		landscape = !AndroidUiHelper.isOrientationPortrait(mapActivity);
 		dashboardView = mapActivity.findViewById(R.id.dashboard);
 		AndroidUtils.addStatusBarPadding21v(mapActivity, dashboardView);
-		final View.OnClickListener listener = new View.OnClickListener() {
+		OnClickListener listener = new OnClickListener() {
 			@Override
 			public void onClick(View v) {
 				hideDashboard();
-				mapActivity.dismissSettingsScreens();
+				mapActivity.getFragmentsHelper().dismissSettingsScreens();
 			}
 		};
 		toolbar = dashboardView.findViewById(R.id.toolbar);
@@ -239,7 +273,6 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		//listView.setChoiceMode(ListView.CHOICE_MODE_SINGLE);
 		listView.setDrawSelectorOnTop(true);
 		listView.setScrollViewCallbacks(this);
-		listEmptyTextView = dashboardView.findViewById(R.id.emptyTextView);
 		gradientToolbar = AppCompatResources.getDrawable(mapActivity, R.drawable.gradient_toolbar).mutate();
 		if (AndroidUiHelper.isOrientationPortrait(mapActivity)) {
 			this.portrait = true;
@@ -286,20 +319,14 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 
 	private void updateListBackgroundHeight() {
 		if (listBackgroundView != null) {
-			final View contentView = mapActivity.getWindow().getDecorView().findViewById(android.R.id.content);
+			View contentView = mapActivity.getWindow().getDecorView().findViewById(android.R.id.content);
 			ViewTreeObserver vto = contentView.getViewTreeObserver();
 			vto.addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
 
 				@Override
 				public void onGlobalLayout() {
-
 					ViewTreeObserver obs = contentView.getViewTreeObserver();
-					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-						obs.removeOnGlobalLayoutListener(this);
-					} else {
-						//noinspection deprecation
-						obs.removeGlobalOnLayoutListener(this);
-					}
+					obs.removeOnGlobalLayoutListener(this);
 					listBackgroundView.getLayoutParams().height = contentView.getHeight();
 				}
 			});
@@ -309,32 +336,50 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	private void updateToolbarActions() {
 		TextView tv = dashboardView.findViewById(R.id.toolbar_text);
 		tv.setText("");
-		if (visibleType == DashboardType.CONFIGURE_MAP) {
+		if (isCurrentType(CONFIGURE_MAP)) {
 			tv.setText(R.string.configure_map);
-		} else if (visibleType == DashboardType.CONFIGURE_SCREEN) {
-			tv.setText(R.string.layer_map_appearance);
-		} else if (visibleType == DashboardType.ROUTE_PREFERENCES) {
-			tv.setText(R.string.shared_string_settings);
-		} else if (visibleType == DashboardType.UNDERLAY_MAP) {
+		} else if (isCurrentType(UNDERLAY_MAP)) {
 			tv.setText(R.string.map_underlay);
-		} else if (visibleType == DashboardType.OVERLAY_MAP) {
+		} else if (isCurrentType(OVERLAY_MAP)) {
 			tv.setText(R.string.map_overlay);
-		} else if (visibleType == DashboardType.MAPILLARY) {
+		} else if (isCurrentType(MAPILLARY)) {
 			tv.setText(R.string.street_level_imagery);
-		} else if (visibleType == DashboardType.CONTOUR_LINES) {
-			tv.setText(R.string.srtm_plugin_name);
-		} else if (visibleType == DashboardType.OSM_NOTES) {
+		} else if (isCurrentType(CONTOUR_LINES)) {
+			tv.setText(R.string.download_srtm_maps);
+		} else if (isCurrentType(OSM_NOTES)) {
 			tv.setText(R.string.osm_notes);
-		} else if (visibleType == DashboardType.TERRAIN) {
+		} else if (isCurrentType(TERRAIN)) {
 			tv.setText(R.string.shared_string_terrain);
-		} else if (visibleType == DashboardType.WIKIPEDIA) {
+		}else if (isCurrentType(RELIEF_3D)) {
+			tv.setText(R.string.relief_3d);
+		} else if (isCurrentType(WIKIPEDIA)) {
 			tv.setText(R.string.shared_string_wikipedia);
-		} else if (visibleType == DashboardType.CYCLE_ROUTES) {
+		} else if (isCurrentType(CYCLE_ROUTES)) {
 			tv.setText(R.string.rendering_attr_showCycleRoutes_name);
-		} else if (visibleType == DashboardType.HIKING_ROUTES) {
+		} else if (isCurrentType(HIKING_ROUTES)) {
 			tv.setText(R.string.rendering_attr_hikingRoutesOSMC_name);
-		} else if (visibleType == DashboardType.TRAVEL_ROUTES) {
+		} else if (isCurrentType(TRAVEL_ROUTES)) {
 			tv.setText(R.string.travel_routes);
+		} else if (isCurrentType(TRANSPORT_LINES)) {
+			tv.setText(R.string.rendering_category_transport);
+		} else if (isCurrentType(WEATHER)) {
+			tv.setText(R.string.shared_string_weather);
+		} else if (isCurrentType(WEATHER_LAYER)) {
+			WeatherPlugin plugin = PluginsHelper.getPlugin(WeatherPlugin.class);
+			if (plugin != null) {
+				WeatherBand weatherBand = getMyApplication().getWeatherHelper().getWeatherBand(plugin.getCurrentConfigureBand());
+				if (weatherBand != null) {
+					tv.setText(weatherBand.getMeasurementName());
+				}
+			}
+		} else if (isCurrentType(WEATHER_CONTOURS)) {
+			tv.setText(R.string.shared_string_contours);
+		} else if (isCurrentType(NAUTICAL_DEPTH)) {
+			tv.setText(R.string.nautical_depth);
+		} else if (isCurrentType(MTB_ROUTES)) {
+			tv.setText(R.string.app_mode_mountain_bicycle);
+		} else if (isCurrentType(ALPINE_HIKING)) {
+			tv.setText(R.string.rendering_attr_alpineHiking_name);
 		}
 		ImageView edit = dashboardView.findViewById(R.id.toolbar_edit);
 		edit.setVisibility(View.GONE);
@@ -351,54 +396,22 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		ImageButton back = dashboardView.findViewById(R.id.toolbar_back);
 		Drawable icBack = getMyApplication().getUIUtilities().getIcon(AndroidUtils.getNavigationIconResId(mapActivity));
 		back.setImageDrawable(icBack);
-		back.setOnClickListener(new View.OnClickListener() {
+		back.setOnClickListener(v -> backPressed());
 
-			@Override
-			public void onClick(View v) {
-				backPressed();
-			}
-		});
-
-		if (visibleType == DashboardType.DASHBOARD || visibleType == DashboardType.LIST_MENU) {
+		if (isCurrentType(DASHBOARD)) {
 			settingsButton.setVisibility(View.VISIBLE);
-			settingsButton.setOnClickListener(new View.OnClickListener() {
-
-				@Override
-				public void onClick(View v) {
-					new DashboardSettingsDialogFragment().show(
-							mapActivity.getSupportFragmentManager(), "dashboard_settings");
-				}
+			settingsButton.setOnClickListener(v -> {
+				DashboardSettingsDialogFragment fragment = new DashboardSettingsDialogFragment();
+				fragment.show(mapActivity.getSupportFragmentManager(), "dashboard_settings");
 			});
 			lst.setVisibility(View.VISIBLE);
-			lst.setOnClickListener(new View.OnClickListener() {
-
-				@Override
-				public void onClick(View v) {
-					hideDashboard(false);
-					mapActivity.openDrawer();
-				}
+			lst.setOnClickListener(v -> {
+				hideDashboard(false);
+				mapActivity.openDrawer();
 			});
 		}
 
 		toolbar.getMenu().clear();
-		if (visibleType == DashboardType.CONFIGURE_SCREEN) {
-			toolbar.inflateMenu(R.menu.refresh_menu);
-			toolbar.setOnMenuItemClickListener(new Toolbar.OnMenuItemClickListener() {
-				@Override
-				public boolean onMenuItemClick(MenuItem menuItem) {
-					if (menuItem.getItemId() == R.id.action_refresh) {
-						MapWidgetRegistry registry = mapActivity.getMapLayers().getMapWidgetRegistry();
-						registry.resetToDefault();
-						MapInfoLayer mil = mapActivity.getMapLayers().getMapInfoLayer();
-						if (mil != null) {
-							mil.recreateControls();
-						}
-						updateListAdapter(registry.getViewConfigureMenuAdapter(mapActivity));
-					}
-					return false;
-				}
-			});
-		}
 	}
 
 	private FrameLayout.LayoutParams getActionButtonLayoutParams(int btnSizePx) {
@@ -424,38 +437,29 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		DashboardActionButton myLocationButton = new DashboardActionButton();
 		myLocationButton.icon = AppCompatResources.getDrawable(mapActivity, R.drawable.ic_my_location);
 		myLocationButton.text = mapActivity.getString(R.string.map_widget_back_to_loc);
-		myLocationButton.onClickListener = new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				if (getMyApplication().accessibilityEnabled()) {
-					mapActivity.getMapActions().whereAmIDialog();
-				} else {
-					mapActivity.getMapViewTrackingUtilities().backToLocationImpl();
-				}
-				hideDashboard();
+		myLocationButton.onClickListener = v -> {
+			if (getMyApplication().accessibilityEnabled()) {
+				mapActivity.getMapActions().whereAmIDialog();
+			} else {
+				mapActivity.getMapViewTrackingUtilities().backToLocationImpl();
 			}
+			hideDashboard();
 		};
 
 		DashboardActionButton navigateButton = new DashboardActionButton();
 		navigateButton.icon = AppCompatResources.getDrawable(mapActivity, R.drawable.ic_action_start_navigation);
 		navigateButton.text = mapActivity.getString(R.string.follow);
-		navigateButton.onClickListener = new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				mapActivity.getMapLayers().getMapControlsLayer().doNavigate();
-				hideDashboard();
-			}
+		navigateButton.onClickListener = v -> {
+			mapActivity.getMapLayers().getMapActionsHelper().doNavigate();
+			hideDashboard();
 		};
 
 		DashboardActionButton routeButton = new DashboardActionButton();
 		routeButton.icon = AppCompatResources.getDrawable(mapActivity, R.drawable.ic_action_gdirections_dark);
 		routeButton.text = mapActivity.getString(R.string.layer_route);
-		routeButton.onClickListener = new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				hideDashboard();
-				mapActivity.getMapLayers().getMapControlsLayer().doRoute(false);
-			}
+		routeButton.onClickListener = v -> {
+			hideDashboard();
+			mapActivity.getMapLayers().getMapActionsHelper().doRoute();
 		};
 
 		actionButtons.put(DashboardActionButtonType.MY_LOCATION, myLocationButton);
@@ -466,12 +470,8 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	private void setActionButton(DashboardType type) {
 		DashboardActionButton button = null;
 
-		if (type == DashboardType.DASHBOARD
-				|| type == DashboardType.LIST_MENU
-				|| type == DashboardType.CONFIGURE_SCREEN) {
+		if (type == DASHBOARD) {
 			button = actionButtons.get(DashboardActionButtonType.MY_LOCATION);
-		} else if (type == DashboardType.ROUTE_PREFERENCES) {
-			button = actionButtons.get(DashboardActionButtonType.NAVIGATE);
 		}
 
 		if (button != null) {
@@ -512,16 +512,12 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		return listAdapter;
 	}
 
-	public OnItemClickListener getListAdapterOnClickListener() {
-		return listAdapterOnClickListener;
-	}
-
 	public void hideDashboard() {
-		setDashboardVisibility(false, visibleType);
+		setDashboardVisibility(false, visibleTypes.getCurrent());
 	}
 
 	public void hideDashboard(boolean animation) {
-		setDashboardVisibility(false, visibleType, animation);
+		setDashboardVisibility(false, visibleTypes.getCurrent(), animation);
 	}
 
 	public void setDashboardVisibility(boolean visible, DashboardType type) {
@@ -530,15 +526,11 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 
 	public void setDashboardVisibility(boolean visible, DashboardType type, int[] animationCoordinates) {
 		boolean animate = !getMyApplication().getSettings().DO_NOT_USE_ANIMATIONS.get();
-		setDashboardVisibility(visible, type, this.visible ? visibleType : null, animate, animationCoordinates);
+		setDashboardVisibility(visible, type, animate, animationCoordinates);
 	}
 
 	public void setDashboardVisibility(boolean visible, DashboardType type, boolean animation) {
 		setDashboardVisibility(visible, type, animation, null);
-	}
-
-	public void setDashboardVisibility(boolean visible, DashboardType type, boolean animation, int[] animationCoordinates) {
-		setDashboardVisibility(visible, type, this.visible ? visibleType : null, animation, animationCoordinates);
 	}
 
 	public void refreshDashboardFragments() {
@@ -550,30 +542,33 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		return R.color.status_bar_transparent_gradient;
 	}
 
-	public void setDashboardVisibility(boolean visible, DashboardType type, DashboardType prevItem, boolean animation, int[] animationCoordinates) {
-		if (visible == this.visible && type == visibleType) {
+	public void setDashboardVisibility(boolean visible, DashboardType type, boolean animation, int[] animationCoordinates) {
+		boolean currentType = isCurrentType(type);
+		if (visible == this.visible && currentType || !AndroidUtils.isActivityNotDestroyed(mapActivity)) {
 			return;
 		}
 		mapActivity.getRoutingHelper().removeListener(this);
-		nightMode = mapActivity.getMyApplication().getDaynightHelper().isNightModeForMapControls();
-		this.previousVisibleType = prevItem;
+		nightMode = getMyApplication().getDaynightHelper().isNightModeForMapControls();
 		this.visible = visible;
+		updateVisibilityStack(type, visible);
+
 		ApplicationMode currentAppMode = getMyApplication().getSettings().APPLICATION_MODE.get();
 		boolean appModeChanged = currentAppMode != previousAppMode;
-
-		boolean refresh = this.visibleType == type && !appModeChanged;
+		boolean refresh = currentType && !appModeChanged;
 		previousAppMode = currentAppMode;
-		visibleType = type;
-		DashboardOnMap.staticVisible = visible;
-		DashboardOnMap.staticVisibleType = type;
+		staticVisible = visible;
+		staticVisibleType = type;
 		mapActivity.enableDrawer();
+		removeFragment(ConfigureMapFragment.TAG);
 		removeFragment(MapillaryFiltersFragment.TAG);
 		removeFragment(TerrainFragment.TAG);
+		removeFragment(TransportLinesFragment.TAG);
+		removeFragment(WeatherMainFragment.TAG);
 
 		if (visible) {
-			mapActivity.dismissCardDialog();
-			mapActivity.dismissTrackMenu();
-			mapActivity.getContextMenu().hideMenues();
+			mapActivity.getFragmentsHelper().dismissCardDialog();
+			mapActivity.getFragmentsHelper().dismissFragment(TrackMenuFragment.TAG);
+			mapActivity.getContextMenu().hideMenus();
 			mapViewLocation = mapActivity.getMapLocation();
 			mapRotation = mapActivity.getMapRotate();
 			mapLinkedToLocation = mapActivity.getMapViewTrackingUtilities().isMapLinkedToLocation();
@@ -581,43 +576,55 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 			mapActivity.disableDrawer();
 			dashboardView.setVisibility(View.VISIBLE);
 			if (isActionButtonVisible()) {
-				setActionButton(visibleType);
+				setActionButton(visibleTypes.getCurrent());
 				actionButton.setVisibility(View.VISIBLE);
 			} else {
 				hideActionButton();
-				if (visibleType == DashboardType.CONFIGURE_MAP) {
+				if (isCurrentType(CONFIGURE_MAP)) {
 					int btnSizePx = mapActivity.getResources().getDimensionPixelSize(R.dimen.map_small_button_size);
 					compassButton = mapActivity.getMapLayers().getMapControlsLayer()
-							.moveCompassButton(dashboardView, getActionButtonLayoutParams(btnSizePx), nightMode);
+							.moveCompassButton(dashboardView, getActionButtonLayoutParams(btnSizePx));
 				}
 			}
 			updateDownloadBtn();
 			View listViewLayout = dashboardView.findViewById(R.id.dash_list_view_layout);
 			ScrollView scrollView = dashboardView.findViewById(R.id.main_scroll);
-			if (visibleType == DashboardType.DASHBOARD
-					|| visibleType == DashboardType.MAPILLARY
-					|| visibleType == DashboardType.CYCLE_ROUTES
-					|| visibleType == DashboardType.HIKING_ROUTES
-					|| visibleType == DashboardType.TRAVEL_ROUTES
-					|| visibleType == DashboardType.TERRAIN) {
+			if (isCurrentType(DASHBOARD) || isCurrentTypeHasIndividualFragment()) {
 				FragmentManager fragmentManager = mapActivity.getSupportFragmentManager();
-				if (visibleType == DashboardType.DASHBOARD) {
+				if (isCurrentType(DASHBOARD)) {
 					addOrUpdateDashboardFragments();
-				} else if (visibleType == DashboardType.MAPILLARY) {
+				} else if (isCurrentType(CONFIGURE_MAP)) {
+					ConfigureMapFragment.showInstance(fragmentManager);
+				} else if (isCurrentType(MAPILLARY)) {
 					MapillaryFiltersFragment.showInstance(fragmentManager);
-				} else if (visibleType == DashboardType.CYCLE_ROUTES) {
+				} else if (isCurrentType(CYCLE_ROUTES)) {
 					CycleRoutesFragment.showInstance(fragmentManager);
-				} else if (visibleType == DashboardType.HIKING_ROUTES) {
+				} else if (isCurrentType(HIKING_ROUTES)) {
 					HikingRoutesFragment.showInstance(fragmentManager);
-				} else if (visibleType == DashboardType.TRAVEL_ROUTES) {
+				} else if (isCurrentType(TRAVEL_ROUTES)) {
 					TravelRoutesFragment.showInstance(fragmentManager);
-				} else {
+				} else if (isCurrentType(TRANSPORT_LINES)) {
+					TransportLinesFragment.showInstance(fragmentManager);
+				} else if (isCurrentType(NAUTICAL_DEPTH)) {
+					NauticalDepthContourFragment.showInstance(fragmentManager);
+				} else if (isCurrentType(TERRAIN)) {
 					TerrainFragment.showInstance(fragmentManager);
+				}else if (isCurrentType(RELIEF_3D)) {
+					Relief3DFragment.showInstance(fragmentManager);
+				} else if (isCurrentType(WEATHER)) {
+					WeatherMainFragment.showInstance(fragmentManager);
+				} else if (isCurrentType(WEATHER_LAYER)) {
+					WeatherLayerFragment.showInstance(fragmentManager);
+				} else if (isCurrentType(WEATHER_CONTOURS)) {
+					WeatherContoursFragment.showInstance(fragmentManager);
+				} else if (isCurrentType(MTB_ROUTES)) {
+					MtbRoutesFragment.showInstance(fragmentManager);
+				} else if (isCurrentType(ALPINE_HIKING)) {
+					AlpineHikingScaleFragment.showInstance(fragmentManager);
 				}
 				scrollView.setVisibility(View.VISIBLE);
-				scrollView.scrollTo(0, 0);
 				listViewLayout.setVisibility(View.GONE);
-				onScrollChanged(scrollView.getScrollY(), false, false);
+				applyScrollPosition(scrollView);
 			} else {
 				scrollView.setVisibility(View.GONE);
 				listViewLayout.setVisibility(View.VISIBLE);
@@ -626,7 +633,7 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 				} else {
 					listView.scrollTo(0, 0);
 					listView.clearParams();
-					onScrollChanged(listView.getScrollY(), false, false);
+					onScrollChangedImpl(listView.getScrollY());
 					updateListAdapter();
 				}
 				updateListBackgroundHeight();
@@ -650,24 +657,26 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 				}
 			}
 
-			OsmandSettings settings = getMyApplication().getSettings();
-			if (settings.SHOW_MAPILLARY.get() && !settings.MAPILLARY_FIRST_DIALOG_SHOWN.get()) {
+			MapillaryPlugin plugin = PluginsHelper.getPlugin(MapillaryPlugin.class);
+			if (plugin != null && plugin.SHOW_MAPILLARY.get() && !plugin.MAPILLARY_FIRST_DIALOG_SHOWN.get()) {
 				MapillaryFirstDialogFragment fragment = new MapillaryFirstDialogFragment();
 				fragment.show(mapActivity.getSupportFragmentManager(), MapillaryFirstDialogFragment.TAG);
-				settings.MAPILLARY_FIRST_DIALOG_SHOWN.set(true);
+				plugin.MAPILLARY_FIRST_DIALOG_SHOWN.set(true);
 			}
 		}
 		mapActivity.updateStatusBarColor();
 	}
 
-	public void updateDashboard() {
-		if (visibleType == DashboardType.ROUTE_PREFERENCES) {
-			refreshContent(false);
+	private void updateVisibilityStack(@NonNull DashboardType type, boolean visible) {
+		if (visible) {
+			visibleTypes.add(type);
+		} else {
+			visibleTypes.clear();
 		}
 	}
 
 	private void applyDayNightMode() {
-		final int backgroundColor;
+		int backgroundColor;
 		backgroundColor = ColorUtilities.getActivityBgColor(mapActivity, nightMode);
 		Drawable dividerDrawable = new ColorDrawable(ColorUtilities.getDividerColor(mapActivity, nightMode));
 
@@ -675,23 +684,15 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 			listBackgroundView.setBackgroundColor(backgroundColor);
 		} else {
 			listView.setBackgroundColor(backgroundColor);
-			listEmptyTextView.setBackgroundColor(backgroundColor);
 		}
-		if (visibleType != DashboardType.CONFIGURE_SCREEN
-				&& visibleType != DashboardType.CONFIGURE_MAP
-				&& visibleType != DashboardType.CONTOUR_LINES
-				&& visibleType != DashboardType.TERRAIN
-				&& visibleType != DashboardType.CYCLE_ROUTES
-				&& visibleType != DashboardType.HIKING_ROUTES
-				&& visibleType != DashboardType.TRAVEL_ROUTES
-				&& visibleType != DashboardType.OSM_NOTES
-				&& visibleType != DashboardType.WIKIPEDIA) {
+		if (isNoCurrentType(CONFIGURE_MAP, CONTOUR_LINES, TERRAIN, CYCLE_ROUTES, HIKING_ROUTES,
+				TRAVEL_ROUTES, OSM_NOTES, WIKIPEDIA, TRANSPORT_LINES, WEATHER, WEATHER_LAYER,
+				WEATHER_CONTOURS, NAUTICAL_DEPTH, MTB_ROUTES, ALPINE_HIKING)) {
 			listView.setDivider(dividerDrawable);
 			listView.setDividerHeight(AndroidUtils.dpToPx(mapActivity, 1f));
 		} else {
 			listView.setDivider(null);
 		}
-		AndroidUtils.setTextSecondaryColor(mapActivity, listEmptyTextView, nightMode);
 
 		if (planRouteProgressBar != null) {
 			mapActivity.setupRouteCalculationProgressBar(planRouteProgressBar);
@@ -699,29 +700,17 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	}
 
 	private void updateListAdapter() {
-		listEmptyTextView.setVisibility(View.GONE);
 		listView.setEmptyView(null);
 		ContextMenuAdapter cm = null;
-		if (visibleType == DashboardType.CONFIGURE_SCREEN) {
-			cm = mapActivity.getMapLayers().getMapWidgetRegistry().getViewConfigureMenuAdapter(mapActivity);
-		} else if (visibleType == DashboardType.CONFIGURE_MAP) {
-			cm = new ConfigureMapMenu().createListAdapter(mapActivity);
-		} else if (visibleType == DashboardType.LIST_MENU) {
-			cm = mapActivity.getMapActions().createMainOptionsMenu();
-		} else if (visibleType == DashboardType.ROUTE_PREFERENCES) {
-			RoutePreferencesMenu routePreferencesMenu = new RoutePreferencesMenu(mapActivity);
-			ArrayAdapter<LocalRoutingParameter> listAdapter = routePreferencesMenu.getRoutePreferencesDrawerAdapter(nightMode);
-			OnItemClickListener listener = routePreferencesMenu.getItemClickListener(listAdapter);
-			updateListAdapter(listAdapter, listener);
-		} else if (visibleType == DashboardType.UNDERLAY_MAP) {
+		if (isCurrentType(UNDERLAY_MAP)) {
 			cm = RasterMapMenu.createListAdapter(mapActivity, OsmandRasterMapsPlugin.RasterMapType.UNDERLAY);
-		} else if (visibleType == DashboardType.OVERLAY_MAP) {
+		} else if (isCurrentType(OVERLAY_MAP)) {
 			cm = RasterMapMenu.createListAdapter(mapActivity, OsmandRasterMapsPlugin.RasterMapType.OVERLAY);
-		} else if (visibleType == DashboardType.CONTOUR_LINES) {
+		} else if (isCurrentType(CONTOUR_LINES)) {
 			cm = ContourLinesMenu.createListAdapter(mapActivity);
-		} else if (visibleType == DashboardType.OSM_NOTES) {
+		} else if (isCurrentType(OSM_NOTES)) {
 			cm = OsmNotesMenu.createListAdapter(mapActivity);
-		} else if (visibleType == DashboardType.WIKIPEDIA) {
+		} else if (isCurrentType(WIKIPEDIA)) {
 			cm = WikipediaPoiMenu.createListAdapter(mapActivity);
 		}
 		if (cm != null) {
@@ -730,32 +719,44 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	}
 
 	public void updateListAdapter(ContextMenuAdapter cm) {
-		boolean nightMode = mapActivity.getMyApplication().getDaynightHelper().isNightModeForMapControls();
+		OsmandApplication app = mapActivity.getMyApplication();
+		OsmandSettings settings = app.getSettings();
+		ApplicationMode appMode = settings.getApplicationMode();
+
+		boolean nightMode = app.getDaynightHelper().isNightModeForMapControls();
 		if (this.nightMode != nightMode) {
 			this.nightMode = nightMode;
 			applyDayNightMode();
 		}
-		final ArrayAdapter<ContextMenuItem> listAdapter = cm.createListAdapter(mapActivity, !nightMode);
+
+		ViewCreator viewCreator = new ViewCreator(mapActivity, nightMode);
+		int profileColor = appMode.getProfileColor(nightMode);
+		if (isCurrentType(WIKIPEDIA)) {
+			viewCreator.setDefaultLayoutId(R.layout.dash_item_with_description_72dp);
+			viewCreator.setCustomControlsColor(profileColor);
+		} else {
+			viewCreator.setDefaultLayoutId(R.layout.list_item_icon_and_menu);
+			viewCreator.setCustomControlsColor(profileColor);
+		}
+
+		ContextMenuListAdapter listAdapter = cm.toListAdapter(mapActivity, viewCreator);
 		OnItemClickListener listener = getOptionsMenuOnClickListener(cm, listAdapter);
 		updateListAdapter(listAdapter, listener);
 	}
 
 	public void onNewDownloadIndexes() {
-		if (visibleType == DashboardType.CONTOUR_LINES
-				|| visibleType == DashboardType.TERRAIN
-				|| visibleType == DashboardType.WIKIPEDIA) {
+		if (isCurrentType(CONTOUR_LINES, WIKIPEDIA)) {
 			refreshContent(true);
 		}
 	}
 
 	@SuppressWarnings("unchecked")
 	public void onDownloadInProgress() {
-		if (visibleType == DashboardType.CONTOUR_LINES || visibleType == DashboardType.TERRAIN
-				|| visibleType == DashboardType.WIKIPEDIA) {
+		if (isCurrentType(CONTOUR_LINES, WIKIPEDIA)) {
 			DownloadIndexesThread downloadThread = getMyApplication().getDownloadThread();
 			IndexItem downloadIndexItem = downloadThread.getCurrentDownloadingItem();
-			if (downloadIndexItem != null) {
-				int downloadProgress = downloadThread.getCurrentDownloadingItemProgress();
+			if (downloadIndexItem != null && listAdapter != null) {
+				int downloadProgress = (int) downloadThread.getCurrentDownloadProgress();
 				ArrayAdapter<ContextMenuItem> adapter = (ArrayAdapter<ContextMenuItem>) listAdapter;
 				for (int i = 0; i < adapter.getCount(); i++) {
 					ContextMenuItem item = adapter.getItem(i);
@@ -769,40 +770,54 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	}
 
 	public void onDownloadHasFinished() {
-		if (visibleType == DashboardType.CONTOUR_LINES || visibleType == DashboardType.TERRAIN) {
+		if (isCurrentType(CONTOUR_LINES, WIKIPEDIA)) {
 			refreshContent(true);
-			if (visibleType == DashboardType.TERRAIN) {
-				SRTMPlugin plugin = OsmandPlugin.getActivePlugin(SRTMPlugin.class);
-				if (plugin != null && plugin.isTerrainLayerEnabled()) {
-					plugin.registerLayers(mapActivity, mapActivity);
-				}
+			if (isCurrentType(CONTOUR_LINES)) {
+				mapActivity.refreshMapComplete();
 			}
-			mapActivity.refreshMapComplete();
-		} else if (visibleType == DashboardType.WIKIPEDIA) {
-			refreshContent(true);
 		}
 	}
 
+	public void refreshContent() {
+		refreshContent(!isCurrentTypeHasIndividualFragment());
+	}
+
 	public void refreshContent(boolean force) {
-		if (visibleType == DashboardType.CONFIGURE_SCREEN || force) {
+		if (force) {
+			listView.clearParams();
 			updateListAdapter();
-		} else if (visibleType == DashboardType.CONFIGURE_MAP || visibleType == DashboardType.ROUTE_PREFERENCES) {
-			int index = listView.getFirstVisiblePosition();
-			View v = listView.getChildAt(0);
-			int top = (v == null) ? 0 : (v.getTop() - listView.getPaddingTop());
-			updateListAdapter();
-			listView.setSelectionFromTop(index, top);
-		} else if (visibleType == DashboardType.MAPILLARY) {
-			refreshFragment((MapillaryFiltersFragment.TAG));
-		} else if (visibleType == DashboardType.TERRAIN) {
+		} else if (isCurrentType(CONFIGURE_MAP)) {
+			ConfigureMapFragment cm = ConfigureMapFragment.getVisibleInstance(mapActivity);
+			if (cm != null) {
+				cm.onDataSetInvalidated();
+			}
+		} else if (isCurrentType(MAPILLARY)) {
+			refreshFragment(MapillaryFiltersFragment.TAG);
+		} else if (isCurrentType(TERRAIN)) {
 			refreshFragment(TerrainFragment.TAG);
-		} else if (visibleType == DashboardType.CYCLE_ROUTES) {
+		}else if (isCurrentType(RELIEF_3D)) {
+			refreshFragment(Relief3DFragment.TAG);
+		} else if (isCurrentType(CYCLE_ROUTES)) {
 			refreshFragment(CycleRoutesFragment.TAG);
-		} else if (visibleType == DashboardType.HIKING_ROUTES) {
+		} else if (isCurrentType(HIKING_ROUTES)) {
 			refreshFragment(HikingRoutesFragment.TAG);
-		} else if (visibleType == DashboardType.TRAVEL_ROUTES) {
+		} else if (isCurrentType(TRAVEL_ROUTES)) {
 			refreshFragment(TravelRoutesFragment.TAG);
-		} else {
+		} else if (isCurrentType(TRANSPORT_LINES)) {
+			refreshFragment(TransportLinesFragment.TAG);
+		} else if (isCurrentType(WEATHER)) {
+			refreshFragment(WeatherMainFragment.TAG);
+		} else if (isCurrentType(WEATHER_LAYER)) {
+			refreshFragment(WeatherLayerFragment.TAG);
+		} else if (isCurrentType(WEATHER_CONTOURS)) {
+			refreshFragment(WeatherContoursFragment.TAG);
+		} else if (isCurrentType(NAUTICAL_DEPTH)) {
+			refreshFragment(NauticalDepthContourFragment.TAG);
+		} else if (isCurrentType(MTB_ROUTES)) {
+			refreshFragment(MtbRoutesFragment.TAG);
+		} else if (isCurrentType(ALPINE_HIKING)) {
+			refreshFragment(AlpineHikingScaleFragment.TAG);
+		} else if (listAdapter != null) {
 			listAdapter.notifyDataSetChanged();
 		}
 	}
@@ -810,7 +825,7 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	private void refreshFragment(@NonNull String tag) {
 		FragmentManager fragmentManager = mapActivity.getSupportFragmentManager();
 		Fragment fragment = fragmentManager.findFragmentByTag(tag);
-		if (AndroidUtils.isFragmentCanBeAdded(fragmentManager, TAG)) {
+		if (fragment != null && AndroidUtils.isFragmentCanBeAdded(fragmentManager, TAG)) {
 			fragmentManager.beginTransaction()
 					.detach(fragment)
 					.attach(fragment)
@@ -818,33 +833,30 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		}
 	}
 
-	private OnItemClickListener getOptionsMenuOnClickListener(final ContextMenuAdapter cm,
-															  final ArrayAdapter<ContextMenuItem> listAdapter) {
-		return new AdapterView.OnItemClickListener() {
-
-			@Override
-			public void onItemClick(AdapterView<?> parent, View view, int which, long id) {
-				ContextMenuItem item = cm.getItem(which);
-				ContextMenuAdapter.ItemClickListener click = item.getItemClickListener();
-				if (click instanceof OnRowItemClick) {
-					boolean cl = ((OnRowItemClick) click).onRowItemClick(listAdapter, view, item.getTitleId(), which);
-					if (cl) {
-						hideDashboard();
-					}
-				} else if (click != null) {
-					CompoundButton btn = view.findViewById(R.id.toggle_item);
-					if (btn != null && btn.getVisibility() == View.VISIBLE) {
-						btn.setChecked(!btn.isChecked());
-					} else {
-						if (click.onContextMenuClick(listAdapter, item.getTitleId(), which, false, null)) {
-							hideDashboard();
-						}
-					}
-				} else {
-					if (!item.isCategory()) {
-						hideDashboard();
-					}
+	private OnItemClickListener getOptionsMenuOnClickListener(ContextMenuAdapter adapter,
+	                                                          ContextMenuListAdapter listAdapter) {
+		return (parent, view, position, id) -> {
+			int size = adapter.getItems().size();
+			if (position < 0 || position >= size) {
+				LOG.warn("Tried to select item " + position + " items in list: " + size);
+				return;
+			}
+			ContextMenuItem item = adapter.getItem(position);
+			ItemClickListener click = item.getItemClickListener();
+			if (click instanceof OnRowItemClick) {
+				boolean cl = ((OnRowItemClick) click).onRowItemClick(listAdapter, view, item);
+				if (cl) {
+					hideDashboard();
 				}
+			} else if (click != null) {
+				CompoundButton btn = view.findViewById(R.id.toggle_item);
+				if (btn != null && btn.getVisibility() == View.VISIBLE) {
+					btn.setChecked(!btn.isChecked());
+				} else if (click.onContextMenuClick(listAdapter, view, item, false)) {
+					hideDashboard();
+				}
+			} else if (!item.isCategory()) {
+				hideDashboard();
 			}
 		};
 	}
@@ -854,7 +866,7 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		String filter = null;
 		String txt = "";
 		OsmandMapTileView mv = mapActivity.getMapView();
-		if (mv != null && !mapActivity.getMyApplication().isApplicationInitializing()) {
+		if (!mapActivity.getMyApplication().isApplicationInitializing()) {
 			if (mv.getZoom() < 11 && !mapActivity.getMyApplication().getResourceManager().containsBasemap()) {
 				filter = "basemap";
 				txt = mapActivity.getString(R.string.shared_string_download) + " "
@@ -871,32 +883,24 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 
 		btn.setText(txt);
 		btn.setVisibility(filter == null ? View.GONE : View.VISIBLE);
-		final String f = filter;
-		btn.setOnClickListener(new View.OnClickListener() {
-
-			@Override
-			public void onClick(View v) {
-				hideDashboard(false);
-				final Intent intent = new Intent(mapActivity, mapActivity.getMyApplication().getAppCustomization()
-						.getDownloadIndexActivity());
-				if (f != null && !f.equals("basemap")) {
-					intent.putExtra(DownloadActivity.FILTER_KEY, f);
-				}
-				intent.putExtra(DownloadActivity.TAB_TO_OPEN, DownloadActivity.DOWNLOAD_TAB);
-				mapActivity.startActivity(intent);
+		String f = filter;
+		btn.setOnClickListener(v -> {
+			hideDashboard(false);
+			Intent intent = new Intent(mapActivity, mapActivity.getMyApplication().getAppCustomization()
+					.getDownloadIndexActivity());
+			if (f != null && !f.equals("basemap")) {
+				intent.putExtra(DownloadActivity.FILTER_KEY, f);
 			}
+			intent.putExtra(DownloadActivity.TAB_TO_OPEN, DownloadActivity.DOWNLOAD_TAB);
+			mapActivity.startActivity(intent);
 		});
 		scheduleDownloadButtonCheck();
 	}
 
 	private void scheduleDownloadButtonCheck() {
-		mapActivity.getMyApplication().runInUIThread(new Runnable() {
-
-			@Override
-			public void run() {
-				if (isVisible()) {
-					updateDownloadBtn();
-				}
+		mapActivity.getMyApplication().runInUIThread(() -> {
+			if (isVisible()) {
+				updateDownloadBtn();
 			}
 		}, 4000);
 	}
@@ -907,7 +911,7 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 			mapActivity.getMapActions().enterRoutePlanningMode(null, null);
 		} else {
 			mapActivity.getRoutingHelper().setRoutePlanningMode(true);
-			mapActivity.getMapViewTrackingUtilities().switchToRoutePlanningMode();
+			mapActivity.getMapViewTrackingUtilities().switchRoutePlanningMode();
 			mapActivity.refreshMap();
 		}
 		boolean animate = !getMyApplication().getSettings().DO_NOT_USE_ANIMATIONS.get();
@@ -925,14 +929,14 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		}
 	}
 
-	private void animateDashboard(final boolean show) {
-		final View content = dashboardView.findViewById(R.id.animateContent);
-		final View toolbar = dashboardView.findViewById(R.id.toolbar);
+	private void animateDashboard(boolean show) {
+		View content = dashboardView.findViewById(R.id.animateContent);
+		View toolbar = dashboardView.findViewById(R.id.toolbar);
 		AnimatorSet set = new AnimatorSet();
 		List<Animator> animators = new ArrayList<>();
 		if (animationCoordinates != null) {
-			int screenHeight = mapActivity.getResources().getDisplayMetrics().heightPixels;
-			int screenWidth = mapActivity.getResources().getDisplayMetrics().widthPixels;
+			float screenHeight = mapActivity.getResources().getDisplayMetrics().heightPixels;
+			float screenWidth = mapActivity.getResources().getDisplayMetrics().widthPixels;
 			float initialValueX = show ? animationCoordinates[0] - screenWidth / 2 : 0;
 			float finalValueX = show ? 0 : animationCoordinates[0] - screenWidth / 2;
 			float initialValueY = show ? animationCoordinates[1] - screenHeight / 2 : 0;
@@ -940,15 +944,15 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 			animators.add(ObjectAnimator.ofFloat(content, View.TRANSLATION_X, initialValueX, finalValueX));
 			animators.add(ObjectAnimator.ofFloat(content, View.TRANSLATION_Y, initialValueY, finalValueY));
 		}
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP && ViewCompat.isAttachedToWindow(content)) {
+		if (ViewCompat.isAttachedToWindow(content)) {
 			int centerX = content.getMeasuredWidth() / 2;
 			int centerY = content.getMeasuredHeight() / 2;
-			float initialRadius = show ? 0 : (float) Math.sqrt(Math.pow(content.getWidth() / 2, 2) + Math.pow(content.getHeight() / 2, 2));
-			float finalRadius = show ? (float) Math.sqrt(Math.pow(content.getWidth() / 2, 2) + Math.pow(content.getHeight() / 2, 2)) : 0;
+			float initialRadius = show ? 0 : (float) Math.sqrt(Math.pow((float) content.getWidth() / 2, 2) + Math.pow((float) content.getHeight() / 2, 2));
+			float finalRadius = show ? (float) Math.sqrt(Math.pow((float) content.getWidth() / 2, 2) + Math.pow((float) content.getHeight() / 2, 2)) : 0;
 			Animator circleAnimator = ViewAnimationUtils.createCircularReveal(content, centerX, centerY, initialRadius, finalRadius);
 			animators.add(circleAnimator);
 		}
-		final float initialValueScale = show ? 0f : 1f;
+		float initialValueScale = show ? 0f : 1f;
 		float finalValueScale = show ? 1f : 0f;
 		animators.add(ObjectAnimator.ofFloat(content, View.SCALE_X, initialValueScale, finalValueScale));
 		animators.add(ObjectAnimator.ofFloat(content, View.SCALE_Y, initialValueScale, finalValueScale));
@@ -991,7 +995,7 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 
 	private void hide(boolean animation) {
 		if (compassButton != null) {
-			mapActivity.getMapLayers().getMapControlsLayer().restoreCompassButton(nightMode);
+			mapActivity.getMapLayers().getMapControlsLayer().restoreCompassButton();
 			compassButton = null;
 		}
 		if (!animation) {
@@ -1009,7 +1013,7 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		TransactionBuilder builder =
 				new TransactionBuilder(mapActivity.getSupportFragmentManager(), settings, mapActivity);
 		builder.addFragmentsData(fragmentsData)
-				.addFragmentsData(OsmandPlugin.getPluginsCardsList())
+				.addFragmentsData(PluginsHelper.getPluginsCardsList())
 				.getFragmentTransaction().commitAllowingStateLoss();
 	}
 
@@ -1029,6 +1033,27 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		return visible;
 	}
 
+	public boolean isCurrentType(@NonNull DashboardType... types) {
+		for (DashboardType type : types) {
+			if (visibleTypes.getCurrent() == type) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	public boolean isNoCurrentType(@NonNull DashboardType... types) {
+		return !isCurrentType(types);
+	}
+
+	public boolean isCurrentTypeHasIndividualFragment() {
+		return isCurrentType(
+				CONFIGURE_MAP, MAPILLARY, TERRAIN, RELIEF_3D, CYCLE_ROUTES, HIKING_ROUTES,
+				TRAVEL_ROUTES, TRANSPORT_LINES, WEATHER, WEATHER_LAYER,
+				WEATHER_CONTOURS, NAUTICAL_DEPTH, MTB_ROUTES, ALPINE_HIKING
+		);
+	}
+
 	void onDetach(DashBaseFragment dashBaseFragment) {
 		Iterator<WeakReference<DashBaseFragment>> it = fragList.iterator();
 		while (it.hasNext()) {
@@ -1039,44 +1064,23 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		}
 	}
 
-	public void onMapSettingsUpdated() {
-		if (DashboardType.CONFIGURE_MAP == visibleType) {
-			updateMenuItems();
+	public void onAppModeChanged() {
+		if (isCurrentType(CONFIGURE_MAP)) {
+			refreshContent(false);
 		}
 	}
 
-	public void onApplicationModeSettingsUpdated() {
-		if (DashboardType.CONFIGURE_MAP == visibleType) {
-			updateListAdapter(new ConfigureMapMenu().createListAdapter(mapActivity));
-		}
-	}
-
-	public void updateMenuItems() {
-		if (listAdapter != null) {
-			for (int i = 0; i < listAdapter.getCount(); i++) {
-				Object o = listAdapter.getItem(i);
-				if (o instanceof ContextMenuItem) {
-					((ContextMenuItem) o).update();
-				}
-			}
-			listAdapter.notifyDataSetChanged();
-		}
-	}
-
-	public void updateLocation(final boolean centerChanged, final boolean locationChanged,
-							   final boolean compassChanged) {
+	public void updateLocation(boolean centerChanged, boolean locationChanged,
+	                           boolean compassChanged) {
 		if (inLocationUpdate) {
 			return;
 		}
 		inLocationUpdate = true;
-		mapActivity.runOnUiThread(new Runnable() {
-			@Override
-			public void run() {
-				inLocationUpdate = false;
-				for (WeakReference<DashBaseFragment> df : fragList) {
-					if (df.get() instanceof DashLocationFragment) {
-						((DashLocationFragment) df.get()).updateLocation(centerChanged, locationChanged, compassChanged);
-					}
+		mapActivity.runOnUiThread(() -> {
+			inLocationUpdate = false;
+			for (WeakReference<DashBaseFragment> df : fragList) {
+				if (df.get() instanceof DashLocationFragment) {
+					((DashLocationFragment) df.get()).updateLocation(centerChanged, locationChanged, compassChanged);
 				}
 			}
 		});
@@ -1105,15 +1109,20 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	}
 
 	private void backPressed() {
-		if (previousVisibleType != visibleType && previousVisibleType != null) {
-			if (visibleType == DashboardType.MAPILLARY) {
+		// Remove known scroll when screen closed
+		lastKnownScrolls.remove(visibleTypes.getCurrent());
+
+		DashboardType previous = visibleTypes.getPrevious();
+		if (previous != null) {
+			if (isCurrentType(MAPILLARY)) {
 				hideKeyboard();
 			}
-			visibleType = null;
-			setDashboardVisibility(true, previousVisibleType);
+			visibleTypes.pop(); // Remove current visible type.
+			visibleTypes.pop(); // Also remove previous type. It will be add later.
+			setDashboardVisibility(true, previous);
 		} else {
 			hideDashboard();
-			mapActivity.backToConfigureProfileFragment();
+			mapActivity.getFragmentsHelper().backToConfigureProfileFragment();
 		}
 	}
 
@@ -1127,8 +1136,25 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 		}
 	}
 
+	private void applyScrollPosition(@NonNull ScrollView scrollView) {
+		Integer lastKnownScroll = lastKnownScrolls.get(visibleTypes.getCurrent());
+		applyScrollPosition(scrollView, lastKnownScroll != null ? lastKnownScroll : 0);
+	}
+
+	private void applyScrollPosition(@NonNull ScrollView scrollView, int scrollYPos) {
+		scrollView.postDelayed(() -> {
+			scrollView.scrollTo(0, scrollYPos);
+			onScrollChangedImpl(scrollYPos);
+		}, 100);
+	}
+
 	@Override
 	public void onScrollChanged(int scrollY, boolean firstScroll, boolean dragging) {
+		lastKnownScrolls.put(visibleTypes.getCurrent(), scrollY);
+		onScrollChangedImpl(scrollY);
+	}
+
+	private void onScrollChangedImpl(int scrollY) {
 		// Translate list background
 		if (portrait) {
 			if (listBackgroundView != null) {
@@ -1144,14 +1170,11 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	}
 
 	private boolean isActionButtonVisible() {
-		return visibleType == DashboardType.DASHBOARD
-				|| visibleType == DashboardType.LIST_MENU
-				|| visibleType == DashboardType.ROUTE_PREFERENCES
-				|| visibleType == DashboardType.CONFIGURE_SCREEN;
+		return isCurrentType(DASHBOARD);
 	}
 
 	private boolean isBackButtonVisible() {
-		return !(visibleType == DashboardType.DASHBOARD || visibleType == DashboardType.LIST_MENU);
+		return isNoCurrentType(DASHBOARD);
 	}
 
 	private void updateMapShadow(int scrollY) {
@@ -1183,13 +1206,13 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 			double scale = mapActivity.getResources().getDisplayMetrics().density;
 			int originalPosition = mFlexibleSpaceImageHeight - (int) (64 * scale);
 			int minTop = mFlexibleBlurSpaceHeight + (int) (5 * scale);
-			FrameLayout.LayoutParams lp = (FrameLayout.LayoutParams) compassButton.getLayoutParams();
+			MarginLayoutParams lp = (MarginLayoutParams) compassButton.getLayoutParams();
 			if (minTop > originalPosition - scrollY) {
 				hideActionButton();
 			} else {
 				compassButton.setVisibility(View.VISIBLE);
 				lp.topMargin = originalPosition - scrollY;
-				((FrameLayout) compassButton.getParent()).updateViewLayout(compassButton, lp);
+				((ViewGroup) compassButton.getParent()).updateViewLayout(compassButton, lp);
 			}
 		}
 	}
@@ -1211,7 +1234,7 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 			updateMapShadowColor(malpha);
 			if (t < 1) {
 				//noinspection deprecation
-				toolbar.setBackgroundDrawable(gradientToolbar);
+				toolbar.setBackground(gradientToolbar);
 			} else {
 				toolbar.setBackgroundColor(0xff000000 | baseColor);
 			}
@@ -1227,16 +1250,12 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 
 	private void updateListAdapter(ArrayAdapter<?> listAdapter, OnItemClickListener listener) {
 		this.listAdapter = listAdapter;
-		listAdapterOnClickListener = listener;
+		adapterClickListener = listener;
 		if (listView != null) {
 			listView.setAdapter(listAdapter);
-			if (listAdapterOnClickListener != null) {
-				listView.setOnItemClickListener(new OnItemClickListener() {
-					@Override
-					public void onItemClick(AdapterView<?> parent, View view, int position, long id) {
-						listAdapterOnClickListener.onItemClick(parent, view, position - listView.getHeaderViewsCount(), id);
-					}
-				});
+			if (adapterClickListener != null) {
+				listView.setOnItemClickListener((parent, view, position, id) ->
+						adapterClickListener.onItemClick(parent, view, position - listView.getHeaderViewsCount(), id));
 			} else {
 				listView.setOnItemClickListener(null);
 			}
@@ -1248,23 +1267,8 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	}
 
 	@SuppressLint("NewApi")
-	private void setAlpha(View v, int alpha, int clr) {
-//		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
-//			v.setAlpha(alpha/255.f);
-//		} else {
-		int colr = (alpha << 24) | clr;
-		v.setBackgroundColor(colr);
-//		}
-	}
-
-	@Override
-	public void onDownMotionEvent() {
-	}
-
-
-	@Override
-	public void onUpOrCancelMotionEvent(ScrollState scrollState) {
-
+	private void setAlpha(View v, int alpha, int color) {
+		v.setBackgroundColor((alpha << 24) | color);
 	}
 
 	<T extends DashBaseFragment> T getFragmentByClass(Class<T> class1) {
@@ -1315,7 +1319,7 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	}
 
 	public static <T> void handleNumberOfRows(List<T> list, OsmandSettings settings,
-											  String rowNumberTag) {
+	                                          String rowNumberTag) {
 		int numberOfRows = settings.registerIntPreference(rowNumberTag, 3)
 				.makeGlobal().get();
 		if (list.size() > numberOfRows) {
@@ -1326,7 +1330,6 @@ public class DashboardOnMap implements ObservableScrollViewCallbacks, IRouteInfo
 	}
 
 	public static class DefaultShouldShow extends DashFragmentData.ShouldShowFunction {
-
 		public boolean shouldShow(OsmandSettings settings, MapActivity activity, String tag) {
 			return settings.registerBooleanPreference(SHOULD_SHOW + tag, true).makeGlobal().get();
 		}

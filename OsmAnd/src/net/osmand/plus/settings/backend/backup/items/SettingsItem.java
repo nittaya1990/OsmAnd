@@ -5,8 +5,8 @@ import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.plus.shared.SharedUtil;
+import net.osmand.shared.gpx.GpxFile;
 import net.osmand.IProgress;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
@@ -20,15 +20,12 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.io.BufferedReader;
-import java.io.BufferedWriter;
 import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.OutputStream;
-import java.io.OutputStreamWriter;
-import java.io.Writer;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -41,7 +38,7 @@ public abstract class SettingsItem {
 	protected long lastModifiedTime;
 	private boolean fromJson;
 
-	protected boolean shouldReplace = false;
+	protected boolean shouldReplace;
 
 	protected List<String> warnings;
 
@@ -152,6 +149,10 @@ public abstract class SettingsItem {
 		// non implemented
 	}
 
+	public void delete() {
+		// non implemented
+	}
+
 	public void applyAdditionalParams(@Nullable SettingsItemReader<? extends SettingsItem> reader) {
 		// non implemented
 	}
@@ -214,7 +215,8 @@ public abstract class SettingsItem {
 	protected SettingsItemReader<? extends SettingsItem> getJsonReader() {
 		return new SettingsItemReader<SettingsItem>(this) {
 			@Override
-			public void readFromStream(@NonNull InputStream inputStream, String entryName) throws IOException, IllegalArgumentException {
+			public void readFromStream(@NonNull InputStream inputStream, @Nullable File inputFile,
+			                           @Nullable String entryName) throws IOException, IllegalArgumentException {
 				StringBuilder buf = new StringBuilder();
 				try {
 					BufferedReader in = new BufferedReader(new InputStreamReader(inputStream, "UTF-8"));
@@ -265,12 +267,11 @@ public abstract class SettingsItem {
 	}
 
 	@NonNull
-	protected SettingsItemWriter<? extends SettingsItem> getGpxWriter(@NonNull final GPXFile gpxFile) {
+	protected SettingsItemWriter<? extends SettingsItem> getGpxWriter(@NonNull GpxFile gpxFile) {
 		return new SettingsItemWriter<SettingsItem>(this) {
 			@Override
 			public void writeToStream(@NonNull OutputStream outputStream, @Nullable IProgress progress) throws IOException {
-				Writer writer = new BufferedWriter(new OutputStreamWriter(outputStream, "UTF-8"));
-				Exception error = GPXUtilities.writeGpx(writer, gpxFile, progress);
+				Exception error = SharedUtil.writeGpx(outputStream, gpxFile, SharedUtil.kIProgress(progress));
 				if (error != null) {
 					warnings.add(app.getString(R.string.settings_item_write_error, String.valueOf(getType())));
 					SettingsHelper.LOG.error("Failed write to gpx file", error);

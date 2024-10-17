@@ -1,5 +1,6 @@
 package net.osmand.search;
 
+import net.osmand.CallbackWithObject;
 import net.osmand.Collator;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
@@ -15,6 +16,7 @@ import net.osmand.search.core.CustomSearchPoiFilter;
 import net.osmand.search.core.ObjectType;
 import net.osmand.search.core.SearchCoreAPI;
 import net.osmand.search.core.SearchCoreFactory;
+import net.osmand.search.core.SearchCoreFactory.SearchAmenityByNameAPI;
 import net.osmand.search.core.SearchCoreFactory.SearchAmenityByTypeAPI;
 import net.osmand.search.core.SearchCoreFactory.SearchAmenityTypesAPI;
 import net.osmand.search.core.SearchCoreFactory.SearchBuildingAndIntersectionsByStreetAPI;
@@ -49,13 +51,14 @@ import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
 
 public class SearchUICore {
+	
 
 	private static final int TIMEOUT_BETWEEN_CHARS = 700;
 	private static final int TIMEOUT_BEFORE_SEARCH = 50;
 	private static final int TIMEOUT_BEFORE_FILTER = 20;
 	private static final Log LOG = PlatformUtil.getLog(SearchUICore.class);
 	private SearchPhrase phrase;
-	private SearchResultCollection  currentSearchResult;
+	private SearchResultCollection currentSearchResult;
 
 	private ThreadPoolExecutor singleThreadedExecutor;
 	private LinkedBlockingQueue<Runnable> taskQueue;
@@ -92,12 +95,12 @@ public class SearchUICore {
 	}
 
 	public static class SearchResultCollection {
-		private List<SearchResult> searchResults;
+		private final List<SearchResult> searchResults = new ArrayList<>();
 		private SearchPhrase phrase;
+		private boolean useLimit;
 		private static final int DEPTH_TO_CHECK_SAME_SEARCH_RESULTS = 20;
 
 		public SearchResultCollection(SearchPhrase phrase) {
-			searchResults = new ArrayList<>();
 			this.phrase = phrase;
 		}
 
@@ -106,6 +109,14 @@ public class SearchUICore {
 			src.addSearchResults(searchResults, false, false);
 			src.addSearchResults(collection.searchResults, resort, removeDuplicates);
 			return src;
+		}
+		
+		public boolean getUseLimit() {
+			return this.useLimit;
+		}
+		
+		public void setUseLimit(boolean useLimit) {
+			this.useLimit = useLimit;
 		}
 
 		public SearchResultCollection addSearchResults(List<SearchResult> sr, boolean resortAll, boolean removeDuplicates) {
@@ -172,6 +183,10 @@ public class SearchUICore {
 			return this;
 		}
 
+		public boolean hasSearchResults() {
+			return !Algorithms.isEmpty(searchResults);
+		}
+
 		public List<SearchResult> getCurrentSearchResults() {
 			return Collections.unmodifiableList(searchResults);
 		}
@@ -224,15 +239,22 @@ public class SearchUICore {
 		}
 
 		public boolean sameSearchResult(SearchResult r1, SearchResult r2) {
+			boolean isSameType = r1.objectType == r2.objectType;
+			if (isSameType) {
+				ObjectType type = r1.objectType;
+				if (type == ObjectType.INDEX_ITEM || type == ObjectType.GPX_TRACK) {
+					return Algorithms.objectEquals(r1.localeName, r2.localeName);
+				}
+			}
 			if (r1.location != null && r2.location != null &&
 					!ObjectType.isTopVisible(r1.objectType) && !ObjectType.isTopVisible(r2.objectType)) {
-				if (r1.objectType == r2.objectType) {
+				if (isSameType) {
 					if (r1.objectType == ObjectType.STREET) {
 						Street st1 = (Street) r1.object;
 						Street st2 = (Street) r2.object;
 						return st1.getLocation().equals(st2.getLocation());
 					}
-				} 
+				}
 				Amenity a1 = null;
 				if (r1.object instanceof Amenity) {
 					a1 = (Amenity) r1.object;
@@ -279,6 +301,10 @@ public class SearchUICore {
 			return false;
 		}
 	}
+	
+	public MapPoiTypes getPoiTypes() {
+		return poiTypes;
+	}
 
 	public void setPoiTypes(MapPoiTypes poiTypes) {
 		this.poiTypes = poiTypes;
@@ -310,6 +336,13 @@ public class SearchUICore {
 	public <T extends SearchCoreAPI> SearchResultCollection shallowSearch(Class<T> cl, String text,
 	                                                                      final ResultMatcher<SearchResult> matcher,
 	                                                                      boolean resortAll, boolean removeDuplicates) throws IOException {
+		return shallowSearch(cl, text, matcher, resortAll, removeDuplicates, searchSettings);
+	}
+
+	public <T extends SearchCoreAPI> SearchResultCollection shallowSearch(Class<T> cl, String text,
+	                                                                      final ResultMatcher<SearchResult> matcher,
+	                                                                      boolean resortAll, boolean removeDuplicates,
+	                                                                      SearchSettings searchSettings) throws IOException {
 		T api = getApiByClass(cl);
 		if (api != null) {
 			if (debugMode) {
@@ -321,8 +354,10 @@ public class SearchUICore {
 			SearchResultMatcher rm = new SearchResultMatcher(matcher, sphrase, ai.get(), ai, totalLimit);
 			api.search(sphrase, rm);
 
-			SearchResultCollection collection = new SearchResultCollection(
-					sphrase);
+			SearchResultCollection collection = new SearchResultCollection(sphrase);
+			if (rm.totalLimit != -1 && rm.count > rm.totalLimit) {
+				collection.setUseLimit(true);
+			}
 			collection.addSearchResults(rm.getRequestResults(), resortAll, removeDuplicates);
 			if (debugMode) {
 				LOG.info("Finish shallow search <" + sphrase + "> Results=" + rm.getRequestResults().size());
@@ -332,14 +367,35 @@ public class SearchUICore {
 		return null;
 	}
 
+	public <T extends SearchCoreAPI> void shallowSearchAsync(final Class<T> cl, final String text,
+	                                                         final ResultMatcher<SearchResult> matcher,
+	                                                         final boolean resortAll, final boolean removeDuplicates,
+	                                                         final SearchSettings searchSettings,
+	                                                         final CallbackWithObject<SearchResultCollection> callback) {
+		singleThreadedExecutor.submit(new Runnable() {
+			@Override
+			public void run() {
+				try {
+					SearchResultCollection collection = shallowSearch(cl, text, matcher, resortAll, removeDuplicates, searchSettings);
+					if (callback != null) {
+						callback.processResult(collection);
+					}
+				} catch (IOException e) {
+					e.printStackTrace();
+					LOG.error(e.getMessage(), e);
+				}
+			}
+		});
+	}
+
 	public void init() {
-		apis.add(new SearchCoreFactory.SearchLocationAndUrlAPI());
+		SearchAmenityByNameAPI amenitiesApi = new SearchCoreFactory.SearchAmenityByNameAPI();
+		apis.add(amenitiesApi);
+		apis.add(new SearchCoreFactory.SearchLocationAndUrlAPI(amenitiesApi));
 		SearchAmenityTypesAPI searchAmenityTypesAPI = new SearchAmenityTypesAPI(poiTypes);
 		apis.add(searchAmenityTypesAPI);
 		apis.add(new SearchAmenityByTypeAPI(poiTypes, searchAmenityTypesAPI));
-		apis.add(new SearchCoreFactory.SearchAmenityByNameAPI());
-		SearchBuildingAndIntersectionsByStreetAPI streetsApi =
-				new SearchCoreFactory.SearchBuildingAndIntersectionsByStreetAPI();
+		SearchBuildingAndIntersectionsByStreetAPI streetsApi = new SearchCoreFactory.SearchBuildingAndIntersectionsByStreetAPI();
 		apis.add(streetsApi);
 		SearchStreetByCityAPI cityApi = new SearchCoreFactory.SearchStreetByCityAPI(streetsApi);
 		apis.add(cityApi);
@@ -433,6 +489,27 @@ public class SearchUICore {
 		this.phrase = this.phrase.generateNewPhrase(text, searchSettings);
 		return this.phrase;
 	}
+	
+	public SearchPhrase resetPhrase(SearchResult result) {
+		this.phrase = this.phrase.generateNewPhrase("", searchSettings);
+		this.phrase.addResult(result, this.phrase);
+		return this.phrase;
+	}
+	
+	public SearchResultCollection immediateSearch(final String text, final LatLon loc) {
+		if (loc != null) {
+			searchSettings = searchSettings.setOriginalLocation(loc);
+		}
+		final SearchPhrase searchPhrase = this.phrase.generateNewPhrase(text, searchSettings);
+		final SearchResultMatcher rm = new SearchResultMatcher(null, searchPhrase, requestNumber.get(), requestNumber, totalLimit);
+		searchInternal(searchPhrase, rm);
+		SearchResultCollection resultCollection = new SearchResultCollection(searchPhrase);
+		if (rm.totalLimit != -1 && rm.count > rm.totalLimit) {
+			resultCollection.setUseLimit(true);
+		}
+		resultCollection.addSearchResults(rm.getRequestResults(), true, true);
+		return resultCollection;
+	}
 
 	public void search(final String text, final boolean delayedExecution, final ResultMatcher<SearchResult> matcher) {
 		search(text, delayedExecution, matcher, searchSettings);
@@ -441,6 +518,7 @@ public class SearchUICore {
 	public void search(final String text, final boolean delayedExecution, final ResultMatcher<SearchResult> matcher, final SearchSettings searchSettings) {
 		final int request = requestNumber.incrementAndGet();
 		final SearchPhrase phrase = this.phrase.generateNewPhrase(text, searchSettings);
+		phrase.setAcceptPrivate(this.phrase.isAcceptPrivate());
 		this.phrase = phrase;
 		if (debugMode) {
 			LOG.info("Prepare search <" + phrase + ">");
@@ -497,6 +575,9 @@ public class SearchUICore {
 								if (debugMode) {
 									LOG.info("Current data filtered <" + phrase + "> Results=" + quickRes.searchResults.size());
 								}
+								if (rm.totalLimit != -1 && rm.count > rm.totalLimit) {
+									quickRes.setUseLimit(true);
+								}
 								if (!rm.isCancelled()) {
 									currentSearchResult = quickRes;
 									rm.filterFinished(phrase);
@@ -515,8 +596,10 @@ public class SearchUICore {
 					}
 					searchInternal(phrase, rm);
 					if (!rm.isCancelled()) {
-						SearchResultCollection collection = new SearchResultCollection(
-								phrase);
+						SearchResultCollection collection = new SearchResultCollection(phrase);
+						if (rm.totalLimit != -1 && rm.count > rm.totalLimit) {
+							collection.setUseLimit(true);
+						}
 						if (debugMode) {
 							LOG.info("Processing search results <" + phrase + ">");
 						}
@@ -542,6 +625,7 @@ public class SearchUICore {
 					}
 				} catch (InterruptedException e) {
 					e.printStackTrace();
+					LOG.error(e.getMessage(), e);
 				}
 			}
 		});
@@ -654,11 +738,11 @@ public class SearchUICore {
 		}
 	}
 
-	public static class SearchResultMatcher implements ResultMatcher<SearchResult>{
+	public static class SearchResultMatcher implements ResultMatcher<SearchResult> {
 		private final List<SearchResult> requestResults = new ArrayList<>();
 		private final ResultMatcher<SearchResult> matcher;
 		private final int request;
-		private final int totalLimit;
+		int totalLimit;
 		private SearchResult parentSearchResult;
 		private final AtomicInteger requestNumber;
 		int count = 0;
@@ -728,7 +812,7 @@ public class SearchUICore {
 		}
 
 		public void apiSearchRegionFinished(SearchCoreAPI api, BinaryMapIndexReader region, SearchPhrase phrase) {
-			if(matcher != null) {
+			if (matcher != null) {
 				SearchResult sr = new SearchResult(phrase);
 				sr.objectType = ObjectType.SEARCH_API_REGION_FINISHED;
 				sr.object = api;
@@ -744,10 +828,12 @@ public class SearchUICore {
 		@Override
 		public boolean publish(SearchResult object) {
 			if (phrase != null && object.otherNames != null && !phrase.getFirstUnknownNameStringMatcher().matches(object.localeName)) {
-				for (String s : object.otherNames) {
-					if (phrase.getFirstUnknownNameStringMatcher().matches(s)) {
-						object.alternateName = s;
-						break;
+				if (Algorithms.isEmpty(object.alternateName)) {
+					for (String s : object.otherNames) {
+						if (phrase.getFirstUnknownNameStringMatcher().matches(s)) {
+							object.alternateName = s;
+							break;
+						}
 					}
 				}
 				if (Algorithms.isEmpty(object.alternateName) && object.object instanceof Amenity) {
@@ -773,7 +859,7 @@ public class SearchUICore {
 			}
 			return false;
 		}
-		
+
 		@Override
 		public boolean isCancelled() {
 			boolean cancelled = request != requestNumber.get();
@@ -860,7 +946,7 @@ public class SearchUICore {
 			SearchExportSettings exportSettings = phrase.getSettings().getExportSettings();
 			json.put("settings", phrase.getSettings().toJSON());
 			json.put("phrase", phrase.getFullSearchPhrase());
-			if (searchResult.searchResults != null && searchResult.searchResults.size() > 0) {
+			if (searchResult.hasSearchResults()) {
 				JSONArray resultsArr = new JSONArray();
 				for (SearchResult r : searchResult.searchResults) {
 					resultsArr.put(r.toString());
@@ -908,9 +994,8 @@ public class SearchUICore {
 		COMPARE_DISTANCE_TO_PARENT_SEARCH_RESULT, // makes sense only for inner subqueries
 		COMPARE_BY_NAME,
 		COMPARE_BY_DISTANCE,
-		AMENITY_LAST_AND_SORT_BY_SUBTYPE
-		;
-		
+		AMENITY_LAST_AND_SORT_BY_SUBTYPE;
+
 		// -1 - means 1st is less (higher) than 2nd
 		public int compare(SearchResult o1, SearchResult o2, SearchResultComparator c) {
 			switch(this) {
@@ -930,8 +1015,19 @@ public class SearchUICore {
 			case UNKNOWN_PHRASE_MATCH_WEIGHT:
 				// here we check how much each sub search result matches the phrase
 				// also we sort it by type house -> street/poi -> city/postcode/village/other
-				if (o1.getUnknownPhraseMatchWeight() != o2.getUnknownPhraseMatchWeight()) {
-					return -Double.compare(o1.getUnknownPhraseMatchWeight(), o2.getUnknownPhraseMatchWeight());
+				SearchPhrase ph = o1.requiredSearchPhrase;
+				double o1PhraseWeight = o1.getUnknownPhraseMatchWeight();
+				double o2PhraseWeight = o2.getUnknownPhraseMatchWeight();
+				if (o1PhraseWeight == o2PhraseWeight && o1PhraseWeight / SearchResult.MAX_PHRASE_WEIGHT_TOTAL > 1) {
+					if (!ph.getUnknownWordToSearchBuildingNameMatcher().matches(stripBraces(o1.localeName))) {
+						o1PhraseWeight--;
+					}
+					if (!ph.getUnknownWordToSearchBuildingNameMatcher().matches(stripBraces(o2.localeName))) {
+						o2PhraseWeight--;
+					}
+				}
+				if (o1PhraseWeight != o2PhraseWeight) {
+					return -Double.compare(o1PhraseWeight, o2PhraseWeight);
 				}
 				break;
 			case SEARCH_DISTANCE_IF_NOT_BY_NAME: 
@@ -1024,6 +1120,19 @@ public class SearchUICore {
 			return 0;
 		}
 	}
+	
+	private static String stripBraces(String localeName) {
+		int i = localeName.indexOf('(');
+		String retName = localeName;
+		if (i > -1) {
+			retName = localeName.substring(0, i);
+			int j = localeName.indexOf(')', i);
+			if (j > -1) {
+				retName = retName.trim() + ' ' + localeName.substring(j);
+			}
+		}
+		return retName;
+	}
 
 	public static class SearchResultComparator implements Comparator<SearchResult> {
 		private Collator collator;
@@ -1045,7 +1154,7 @@ public class SearchUICore {
 				int r = step.compare(o1, o2, this);
 				steps.add(step);
 				if (r != 0) {
-					// debug crashes and identify non-transitive comparision
+					// debug crashes and identify non-transitive comparison
 					// LOG.debug(String.format("%d: %s o1='%s' o2='%s'", r, steps, o1, o2));
 					return r;
 				}

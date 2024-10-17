@@ -11,7 +11,7 @@ public class TransportStopMenuBuilder extends MenuBuilder {
 
 	private final TransportStop transportStop;
 
-	public TransportStopMenuBuilder(MapActivity mapActivity, final TransportStop transportStop) {
+	public TransportStopMenuBuilder(MapActivity mapActivity, TransportStop transportStop) {
 		super(mapActivity);
 		this.transportStop = transportStop;
 	}
@@ -20,6 +20,7 @@ public class TransportStopMenuBuilder extends MenuBuilder {
 	public void buildInternal(View view) {
 		Amenity amenity = transportStop.getAmenity();
 		if (amenity != null) {
+			boolean light = isLightContent();
 			AmenityMenuBuilder builder = new AmenityMenuBuilder(mapActivity, amenity);
 			builder.setLatLon(getLatLon());
 			builder.setLight(light);

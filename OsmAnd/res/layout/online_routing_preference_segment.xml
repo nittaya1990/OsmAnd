@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    xmlns:osmand="http://schemas.android.com/apk/res-auto"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -29,7 +29,7 @@
             android:singleLine="true"
             android:textColor="?android:attr/textColorPrimary"
             android:textSize="@dimen/default_list_text_size"
-            osmand:typeface="@string/font_roboto_medium"
+            app:typefaceWeight="medium"
             tools:visibility="visible"
             android:visibility="gone"
             tools:text="Title" />
@@ -43,27 +43,24 @@
             android:singleLine="true"
             android:textColor="?android:attr/textColorSecondary"
             android:textSize="@dimen/default_list_text_size"
-            osmand:typeface="@string/font_roboto_regular"
+            android:textStyle="normal"
             tools:visibility="visible"
             android:visibility="gone"
             tools:text="Subtitle" />
 
     </FrameLayout>
 
-    <androidx.recyclerview.widget.RecyclerView
+    <net.osmand.plus.widgets.chips.HorizontalChipsView
         android:id="@+id/selection_menu"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:clipToPadding="false"
         android:orientation="horizontal"
-        android:paddingStart="@dimen/content_padding"
-        android:paddingLeft="@dimen/content_padding"
-        android:paddingEnd="@dimen/content_padding"
-        android:paddingRight="@dimen/content_padding"
+        android:paddingHorizontal="@dimen/content_padding"
         android:layout_marginBottom="@dimen/content_padding"
         tools:itemCount="3"
         tools:layoutManager="androidx.recyclerview.widget.LinearLayoutManager"
-        tools:listitem="@layout/point_editor_icon_category_item"
+        tools:listitem="@layout/custom_chip_view"
         tools:orientation="horizontal"
         tools:visibility="visible"
         android:visibility="gone" />
@@ -79,7 +76,7 @@
         android:paddingBottom="@dimen/content_padding"
         android:textColor="?android:attr/textColorSecondary"
         android:textSize="@dimen/default_desc_text_size"
-        osmand:typeface="@string/font_roboto_regular"
+        android:textStyle="normal"
         tools:text="Description"
         tools:visibility="visible"
         android:visibility="gone"
@@ -102,6 +99,7 @@
             android:layout_gravity="center_vertical"
             android:layout_marginLeft="@dimen/content_padding"
             android:layout_marginRight="@dimen/content_padding"
+            android:saveEnabled="false"
             android:focusable="false"
             android:clickable="false" />
 
@@ -116,7 +114,7 @@
             android:paddingEnd="@dimen/content_padding"
             android:textColor="?android:attr/textColorSecondary"
             android:textSize="@dimen/default_desc_text_size"
-            osmand:typeface="@string/font_roboto_regular"
+            android:textStyle="normal"
             android:layout_gravity="center_vertical"
             tools:text="Approximate route" />
 
@@ -140,11 +138,11 @@
             android:layout_height="wrap_content"
             android:focusable="true"
             android:focusableInTouchMode="true"
-            osmand:errorColor="@color/color_invalid"
-            osmand:helperTextColor="?android:textColorSecondary"
+            app:errorColor="@color/color_invalid"
+            app:helperTextColor="?android:textColorSecondary"
             tools:labelText="Hint"
-            osmand:primaryColor="@color/active_color_primary_dark"
-            osmand:secondaryColor="?android:textColorSecondary">
+            app:primaryColor="@color/active_color_primary_dark"
+            app:secondaryColor="?android:textColorSecondary">
 
             <studio.carbonylgroup.textfieldboxes.ExtendedEditText
                 android:id="@+id/edit_text"
@@ -166,7 +164,7 @@
             android:paddingTop="@dimen/content_padding_half"
             android:textColor="?android:attr/textColorSecondary"
             android:textSize="@dimen/default_desc_text_size"
-            osmand:typeface="@string/font_roboto_regular"
+            android:textStyle="normal"
             tools:text="Helper text"
             tools:visibility="visible"
             android:visibility="gone" />
@@ -179,7 +177,7 @@
             android:paddingTop="@dimen/content_padding_half"
             android:textColor="@color/color_invalid"
             android:textSize="@dimen/default_desc_text_size"
-            osmand:typeface="@string/font_roboto_regular"
+            android:textStyle="normal"
             tools:text="Error text"
             tools:visibility="visible"
             android:visibility="gone" />
@@ -195,15 +193,15 @@
         tools:visibility="visible"
         android:visibility="gone" />
 
-    <include
-        android:id="@+id/button"
-        layout="@layout/bottom_sheet_dialog_button"
-        android:layout_width="match_parent"
-        android:layout_height="@dimen/dialog_button_height"
-        android:layout_marginTop="@dimen/content_padding_half"
-        android:layout_marginLeft="@dimen/content_padding"
-        android:layout_marginRight="@dimen/content_padding"
-        tools:visibility="visible"
-        android:visibility="gone" />
+	<net.osmand.plus.widgets.dialogbutton.DialogButton
+		android:id="@+id/button"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content"
+		android:layout_marginHorizontal="@dimen/content_padding"
+		android:visibility="gone"
+		app:dialogButtonTopMargin="@dimen/content_padding_half"
+		app:dialogButtonType="primary"
+		tools:dialogButtonTitle="Action button"
+		tools:visibility="visible" />
 
 </LinearLayout>

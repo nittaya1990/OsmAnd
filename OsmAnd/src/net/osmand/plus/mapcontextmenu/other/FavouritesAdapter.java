@@ -1,19 +1,22 @@
 package net.osmand.plus.mapcontextmenu.other;
 
+import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
 import net.osmand.data.FavouritePoint;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities.UpdateLocationViewCache;
-import net.osmand.plus.base.PointImageDrawable;
+import net.osmand.plus.utils.UpdateLocationUtils;
+import net.osmand.plus.utils.UpdateLocationUtils.UpdateLocationViewCache;
+import net.osmand.plus.views.PointImageUtils;
 
 import java.util.List;
 
@@ -21,15 +24,15 @@ public class FavouritesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
 
 	private final List<FavouritePoint> favouritePoints;
-	private OsmandApplication app;
+	private final OsmandApplication app;
 	private View.OnClickListener listener;
 
-	private UpdateLocationViewCache cache;
+	private final UpdateLocationViewCache cache;
 
-	public FavouritesAdapter(OsmandApplication app, List<FavouritePoint> FavouritePoints) {
-		this.app = app;
+	public FavouritesAdapter(@NonNull Context context, List<FavouritePoint> FavouritePoints) {
+		this.app = (OsmandApplication) context.getApplicationContext();
 		this.favouritePoints = FavouritePoints;
-		cache = app.getUIUtilities().getUpdateLocationViewCache();
+		cache = UpdateLocationUtils.getUpdateLocationViewCache(context);
 	}
 
 	@Override
@@ -47,10 +50,10 @@ public class FavouritesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 			favouritesViewHolder.title.setText(favouritePoint.getDisplayName(app));
 			favouritesViewHolder.description.setText(favouritePoint.getCategoryDisplayName(app));
 			favouritesViewHolder.favouriteImage.setImageDrawable(
-					PointImageDrawable.getFromFavorite(app,
-							app.getFavorites().getColorWithCategory(favouritePoint,
+					PointImageUtils.getFromPoint(app,
+							app.getFavoritesHelper().getColorWithCategory(favouritePoint,
 									ContextCompat.getColor(app, R.color.color_favorite)), false, favouritePoint));
-			app.getUIUtilities().updateLocationView(cache, favouritesViewHolder.arrowImage, favouritesViewHolder.distance,
+			UpdateLocationUtils.updateLocationView(app, cache, favouritesViewHolder.arrowImage, favouritesViewHolder.distance,
 					favouritePoint.getLatitude(), favouritePoint.getLongitude());
 		}
 	}
@@ -79,11 +82,11 @@ public class FavouritesAdapter extends RecyclerView.Adapter<RecyclerView.ViewHol
 
 		public FavouritesViewHolder(View itemView) {
 			super(itemView);
-			favouriteImage = (ImageView) itemView.findViewById(R.id.favourite_icon);
-			title = (TextView) itemView.findViewById(R.id.favourite_title);
-			description = (TextView) itemView.findViewById(R.id.favourite_description);
-			distance = (TextView) itemView.findViewById(R.id.favourite_distance);
-			arrowImage = (ImageView) itemView.findViewById(R.id.favourite_direction_icon);
+			favouriteImage = itemView.findViewById(R.id.favourite_icon);
+			title = itemView.findViewById(R.id.favourite_title);
+			description = itemView.findViewById(R.id.favourite_description);
+			distance = itemView.findViewById(R.id.favourite_distance);
+			arrowImage = itemView.findViewById(R.id.favourite_direction_icon);
 		}
 	}
 }

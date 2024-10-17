@@ -6,25 +6,26 @@ import android.util.Pair;
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.IndexConstants;
 import net.osmand.data.LatLon;
 import net.osmand.data.PointDescription;
-import net.osmand.plus.GpxSelectionHelper;
-import net.osmand.plus.GpxSelectionHelper.SelectedGpxFile;
-import net.osmand.plus.OsmandPlugin;
+import net.osmand.shared.gpx.primitives.WptPt;
+import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.audionotes.AudioVideoNoteMenuController;
-import net.osmand.plus.audionotes.AudioVideoNotesPlugin;
-import net.osmand.plus.audionotes.AudioVideoNotesPlugin.Recording;
-import net.osmand.plus.base.PointImageDrawable;
 import net.osmand.plus.mapcontextmenu.MenuBuilder;
 import net.osmand.plus.mapcontextmenu.MenuController;
 import net.osmand.plus.mapcontextmenu.controllers.SelectedGpxMenuController.SelectedGpxPoint;
 import net.osmand.plus.mapmarkers.MapMarker;
 import net.osmand.plus.mapmarkers.MapMarkersHelper;
-import net.osmand.plus.track.TrackMenuFragment;
+import net.osmand.plus.plugins.PluginsHelper;
+import net.osmand.plus.plugins.audionotes.AudioVideoNoteMenuController;
+import net.osmand.plus.plugins.audionotes.AudioVideoNotesPlugin;
+import net.osmand.plus.plugins.audionotes.AudioVideoNotesPlugin.Recording;
+import net.osmand.plus.track.fragments.TrackMenuFragment;
+import net.osmand.plus.track.helpers.GpxSelectionHelper;
+import net.osmand.plus.track.helpers.SelectedGpxFile;
+import net.osmand.plus.views.PointImageUtils;
 import net.osmand.plus.wikivoyage.menu.WikivoyageWptPtMenuBuilder;
 import net.osmand.util.Algorithms;
 
@@ -38,15 +39,20 @@ public class WptPtMenuController extends MenuController {
 	private AudioVideoNoteMenuController audioVideoNoteController;
 
 	public WptPtMenuController(@NonNull MenuBuilder menuBuilder, @NonNull MapActivity mapActivity,
-							   @NonNull PointDescription pointDescription, @NonNull final WptPt wpt) {
+	                           @NonNull PointDescription pointDescription, @NonNull WptPt wpt) {
 		super(menuBuilder, pointDescription, mapActivity);
 		this.wpt = wpt;
-		MapMarkersHelper markersHelper = mapActivity.getMyApplication().getMapMarkersHelper();
+
+		OsmandApplication app = mapActivity.getMyApplication();
+		MapMarkersHelper markersHelper = app.getMapMarkersHelper();
+
 		mapMarker = markersHelper.getMapMarker(wpt);
 		if (mapMarker == null) {
-			mapMarker = markersHelper.getMapMarker(new LatLon(wpt.lat, wpt.lon));
+			mapMarker = markersHelper.getMapMarker(new LatLon(wpt.getLat(), wpt.getLon()));
 		}
-
+		if (mapMarker != null && mapMarker.history && !app.getSettings().KEEP_PASSED_MARKERS_ON_MAP.get()) {
+			mapMarker = null;
+		}
 		TitleButtonController openTrackButtonController = new TitleButtonController() {
 			@Override
 			public void buttonPressed() {
@@ -76,12 +82,12 @@ public class WptPtMenuController extends MenuController {
 			leftTitleButtonController = openTrackButtonController;
 		}
 
-		AudioVideoNotesPlugin plugin = OsmandPlugin.getActivePlugin(AudioVideoNotesPlugin.class);
+		AudioVideoNotesPlugin plugin = PluginsHelper.getActivePlugin(AudioVideoNotesPlugin.class);
 		if (plugin != null) {
 			Recording selectedRec = null;
 			for (Recording rec : plugin.getAllRecordings()) {
-				if (Math.abs(rec.getLatitude() - wpt.lat) < 0.0001
-						&& Math.abs(rec.getLongitude() - wpt.lon) < 0.0001) {
+				if (Math.abs(rec.getLatitude() - wpt.getLat()) < 0.0001
+						&& Math.abs(rec.getLongitude() - wpt.getLon()) < 0.0001) {
 					selectedRec = rec;
 					break;
 				}
@@ -110,6 +116,10 @@ public class WptPtMenuController extends MenuController {
 	protected void setObject(Object object) {
 		if (object instanceof WptPt) {
 			this.wpt = (WptPt) object;
+
+			if (builder instanceof WikivoyageWptPtMenuBuilder) {
+				((WikivoyageWptPtMenuBuilder) builder).updateDescriptionTokens(wpt);
+			}
 		}
 	}
 
@@ -132,7 +142,7 @@ public class WptPtMenuController extends MenuController {
 	public Drawable getRightIcon() {
 		MapActivity mapActivity = getMapActivity();
 		if (mapActivity != null) {
-			return PointImageDrawable.getFromWpt(mapActivity.getMyApplication(),
+			return PointImageUtils.getFromPoint(mapActivity.getMyApplication(),
 					wpt.getColor(ContextCompat.getColor(mapActivity, R.color.gpx_color_point)), false, wpt);
 		} else {
 			return null;
@@ -144,7 +154,7 @@ public class WptPtMenuController extends MenuController {
 		if (Algorithms.isEmpty(getSubtypeStr())) {
 			return null;
 		} else {
-			return getIcon(R.drawable.ic_action_group_name_16, isLight() ? R.color.icon_color_default_light : R.color.ctx_menu_bottom_view_icon_dark);
+			return getIcon(R.drawable.ic_action_group_name_16, isLight() ? R.color.icon_color_default_light : R.color.icon_color_secondary_dark);
 		}
 	}
 
@@ -164,7 +174,7 @@ public class WptPtMenuController extends MenuController {
 			sb.append(mapActivity.getString(R.string.shared_string_waypoint));
 			sb.append(", ");
 			if (selectedGpxFile != null) {
-				File file = new File(selectedGpxFile.getGpxFile().path);
+				File file = new File(selectedGpxFile.getGpxFile().getPath());
 				String gpxName = file.getName().replace(IndexConstants.GPX_FILE_EXT, "").replace("/", " ").replace("_", " ");
 				sb.append(gpxName);
 			}
@@ -177,7 +187,7 @@ public class WptPtMenuController extends MenuController {
 	@NonNull
 	@Override
 	public String getSubtypeStr() {
-		return wpt.category != null ? wpt.category : "";
+		return wpt.getCategory() != null ? wpt.getCategory() : "";
 	}
 
 	@NonNull
@@ -191,7 +201,7 @@ public class WptPtMenuController extends MenuController {
 		}
 	}
 
-	public static WptPtMenuController getInstance(@NonNull MapActivity mapActivity, @NonNull PointDescription pointDescription, @NonNull final WptPt wpt) {
+	public static WptPtMenuController getInstance(@NonNull MapActivity mapActivity, @NonNull PointDescription pointDescription, @NonNull WptPt wpt) {
 		return new WptPtMenuController(new WikivoyageWptPtMenuBuilder(mapActivity, wpt), mapActivity, pointDescription, wpt);
 	}
 }

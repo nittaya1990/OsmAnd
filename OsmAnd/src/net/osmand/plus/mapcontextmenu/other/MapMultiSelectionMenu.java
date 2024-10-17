@@ -4,18 +4,16 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 
+import net.osmand.OnCompleteCallback;
 import net.osmand.data.LatLon;
 import net.osmand.data.PointDescription;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.mapcontextmenu.BaseMenuController;
-import net.osmand.plus.mapcontextmenu.MenuController;
-import net.osmand.plus.mapcontextmenu.MenuController.MenuType;
-import net.osmand.plus.mapcontextmenu.MenuTitleController;
+import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.views.layers.ContextMenuLayer;
 import net.osmand.plus.views.layers.ContextMenuLayer.IContextMenuProvider;
 
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
@@ -24,73 +22,9 @@ import java.util.Map;
 public class MapMultiSelectionMenu extends BaseMenuController {
 
 	private LatLon latLon;
-	private LinkedList<MenuObject> objects = new LinkedList<>();
-	private Map<Object, IContextMenuProvider> selectedObjects = new HashMap<>();
-
-	public static class MenuObject extends MenuTitleController {
-
-		private LatLon latLon;
-		private PointDescription pointDescription;
-		private Object object;
-		private int order;
-
-		@Nullable
-		private MapActivity mapActivity;
-		@Nullable
-		private MenuController controller;
-
-		MenuObject(LatLon latLon, PointDescription pointDescription, Object object, @Nullable MapActivity mapActivity) {
-			this.latLon = latLon;
-			this.pointDescription = pointDescription;
-			this.object = object;
-			this.mapActivity = mapActivity;
-			init();
-		}
-
-		protected void init() {
-			MapActivity mapActivity = getMapActivity();
-			if (mapActivity != null) {
-				controller = MenuController.getMenuController(mapActivity, latLon, pointDescription, object, MenuType.MULTI_LINE);
-				controller.setActive(true);
-				initTitle();
-			}
-		}
-
-		protected void deinit() {
-			controller = null;
-		}
-
-		@Override
-		public LatLon getLatLon() {
-			return latLon;
-		}
-
-		@Override
-		public PointDescription getPointDescription() {
-			return pointDescription;
-		}
-
-		@Override
-		public Object getObject() {
-			return object;
-		}
-
-		@Nullable
-		@Override
-		public MapActivity getMapActivity() {
-			return mapActivity;
-		}
-
-		@Override
-		public MenuController getMenuController() {
-			return controller;
-		}
-
-		@Override
-		protected boolean needStreetName() {
-			return false;
-		}
-	}
+	private final LinkedList<MenuObject> objects = new LinkedList<>();
+	private final Map<Object, IContextMenuProvider> selectedObjects = new HashMap<>();
+	private final OnCompleteCallback onSearchAddressDone = this::updateDialogContent;
 
 	public MapMultiSelectionMenu(@NonNull MapActivity mapActivity) {
 		super(mapActivity);
@@ -99,7 +33,7 @@ public class MapMultiSelectionMenu extends BaseMenuController {
 	public void setMapActivity(@Nullable MapActivity mapActivity) {
 		super.setMapActivity(mapActivity);
 		for (MenuObject o : objects) {
-			o.mapActivity = mapActivity;
+			o.setMapActivity(mapActivity);
 			if (mapActivity != null) {
 				o.init();
 			} else {
@@ -124,38 +58,26 @@ public class MapMultiSelectionMenu extends BaseMenuController {
 		for (Map.Entry<Object, IContextMenuProvider> e : selectedObjects.entrySet()) {
 			Object selectedObj = e.getKey();
 			IContextMenuProvider contextObject = e.getValue();
-			LatLon ll = null;
-			PointDescription pointDescription = null;
 
-			if (contextObject != null) {
-				ll = contextObject.getObjectLocation(selectedObj);
-				pointDescription = contextObject.getObjectName(selectedObj);
+			MenuObject menuObject = MenuObjectUtils.createMenuObject(selectedObj, contextObject, latLon, getMapActivity());
+			if (menuObject.needStreetName()) {
+				menuObject.setOnSearchAddressDoneCallback(onSearchAddressDone);
 			}
-			if (ll == null) {
-				ll = latLon;
-			}
-			if (pointDescription == null) {
-				pointDescription = new PointDescription(latLon.getLatitude(), latLon.getLongitude());
-			}
-
-			MenuObject menuObject = new MenuObject(ll, pointDescription, selectedObj, getMapActivity());
 			objects.add(menuObject);
 
 			if (contextObject instanceof ContextMenuLayer.IContextMenuProviderSelection) {
-				menuObject.order = ((ContextMenuLayer.IContextMenuProviderSelection) contextObject).getOrder(selectedObj);
+				menuObject.setOrder(((ContextMenuLayer.IContextMenuProviderSelection) contextObject).getOrder(selectedObj));
 			}
 		}
+		Collections.sort(objects, new MultiSelectionMenuComparator(getAppMode()));
+	}
 
-		Collections.sort(objects, new Comparator<MenuObject>() {
-			@Override
-			public int compare(MenuObject obj1, MenuObject obj2) {
-				if (obj1.order == obj2.order) {
-					return obj1.getTitleStr().compareToIgnoreCase(obj2.getTitleStr());
-				} else {
-					return obj1.order - obj2.order;
-				}
-			}
-		});
+	private ApplicationMode getAppMode() {
+		MapActivity mapActivity = getMapActivity();
+		if (mapActivity != null) {
+			return mapActivity.getMyApplication().getSettings().getApplicationMode();
+		}
+		return null;
 	}
 
 	private void clearMenu() {
@@ -201,7 +123,7 @@ public class MapMultiSelectionMenu extends BaseMenuController {
 		Fragment fragment = getFragmentByTag();
 		if (fragment != null) {
 			MapMultiSelectionMenuFragment menuFragment = (MapMultiSelectionMenuFragment) fragment;
-			menuFragment.dismissMenu();
+			menuFragment.dismiss();
 		}
 	}
 
@@ -226,5 +148,12 @@ public class MapMultiSelectionMenu extends BaseMenuController {
 			}
 		}
 		selectedObjects.clear();
+	}
+
+	private void updateDialogContent() {
+		Fragment fragmentByTag = getFragmentByTag();
+		if (fragmentByTag instanceof MapMultiSelectionMenuFragment fragment) {
+			fragment.updateContent();
+		}
 	}
 }

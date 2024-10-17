@@ -1,20 +1,28 @@
 package net.osmand.plus.views;
 
-import androidx.annotation.NonNull;
+import static net.osmand.plus.settings.enums.TrackApproximationType.AUTOMATIC;
 
-import net.osmand.GPXUtilities.GPXFile;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import net.osmand.shared.gpx.GpxFile;
 import net.osmand.Location;
 import net.osmand.data.LatLon;
 import net.osmand.data.PointDescription;
+import net.osmand.gpx.GPXFile;
+import net.osmand.gpx.GPXUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper;
+import net.osmand.plus.helpers.TargetPointsHelper;
 import net.osmand.plus.mapmarkers.MarkersPlanRouteContext;
+import net.osmand.plus.measurementtool.GpxApproximationParams;
 import net.osmand.plus.routepreparationmenu.MapRouteInfoMenu;
-import net.osmand.plus.routing.GPXRouteParams;
+import net.osmand.plus.routing.GPXRouteParams.GPXRouteParamsBuilder;
+import net.osmand.plus.routing.RoutingHelper;
 import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.settings.backend.OsmandSettings;
 import net.osmand.router.GeneralRouter;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.MapUtils;
 
 import java.util.List;
@@ -35,22 +43,34 @@ public class MapActions {
 		return false;
 	}
 
-	public void setGPXRouteParams(GPXFile result) {
-		if (result == null) {
+	public void setGPXRouteParams(@Nullable GpxFile gpxFile) {
+		app.logRoutingEvent("setGPXRouteParams result " + (gpxFile != null ? gpxFile.getPath() : null));
+		if (gpxFile == null) {
 			app.getRoutingHelper().setGpxParams(null);
 			settings.FOLLOW_THE_GPX_ROUTE.set(null);
 		} else {
-			GPXRouteParams.GPXRouteParamsBuilder params = new GPXRouteParams.GPXRouteParamsBuilder(result, settings);
-			params.setCalculateOsmAndRouteParts(settings.GPX_ROUTE_CALC_OSMAND_PARTS.get());
-			params.setCalculateOsmAndRoute(settings.GPX_ROUTE_CALC.get());
-			params.setSelectedSegment(settings.GPX_ROUTE_SEGMENT.get());
-			List<Location> ps = params.getPoints(settings.getContext());
-			app.getRoutingHelper().setGpxParams(params);
-			settings.FOLLOW_THE_GPX_ROUTE.set(result.path);
-			if (!ps.isEmpty()) {
-				Location startLoc = ps.get(0);
-				Location finishLoc = ps.get(ps.size() - 1);
+			GPXRouteParamsBuilder builder = new GPXRouteParamsBuilder(gpxFile, settings);
+			builder.setCalculateOsmAndRouteParts(settings.GPX_ROUTE_CALC_OSMAND_PARTS.get());
+			builder.setCalculateOsmAndRoute(settings.GPX_ROUTE_CALC.get());
+			builder.setSelectedSegment(settings.GPX_SEGMENT_INDEX.get());
+			builder.setSelectedRoute(settings.GPX_ROUTE_INDEX.get());
+
+			ApplicationMode appMode = app.getRoutingHelper().getAppMode();
+			if (!gpxFile.isAttachedToRoads() && settings.DETAILED_TRACK_GUIDANCE.getModeValue(appMode) == AUTOMATIC) {
+				GpxApproximationParams params = new GpxApproximationParams();
+				params.setAppMode(appMode);
+				params.setDistanceThreshold(settings.GPX_APPROXIMATION_DISTANCE.getModeValue(appMode));
+				builder.setApproximationParams(params);
+			}
+
+			List<Location> points = builder.getPoints(settings.getContext());
+			app.getRoutingHelper().setGpxParams(builder);
+			settings.FOLLOW_THE_GPX_ROUTE.set(gpxFile.getPath());
+			if (!points.isEmpty()) {
+				Location startLoc = points.get(0);
+				Location finishLoc = points.get(points.size() - 1);
 				Location location = app.getLocationProvider().getLastKnownLocation();
+
 				TargetPointsHelper pointsHelper = app.getTargetPointsHelper();
 				pointsHelper.clearAllIntermediatePoints(false);
 				if (location == null || MapUtils.getDistance(location, startLoc) <= START_TRACK_POINT_MY_LOCATION_RADIUS_METERS) {
@@ -63,42 +83,62 @@ public class MapActions {
 		}
 	}
 
-	public void enterRoutePlanningMode(final LatLon from, final PointDescription fromName) {
+	public void enterRoutePlanningMode(LatLon from, PointDescription fromName) {
 		enterRoutePlanningModeGivenGpx(null, from, fromName, true, true);
 	}
 
-	public void enterRoutePlanningModeGivenGpx(GPXFile gpxFile, LatLon from, PointDescription fromName,
-											   boolean useIntermediatePointsByDefault, boolean showMenu) {
+	public void enterRoutePlanningModeGivenGpx(GpxFile gpxFile, LatLon from, PointDescription fromName,
+	                                           boolean useIntermediatePointsByDefault, boolean showMenu, boolean passWholeRoute) {
+		enterRoutePlanningModeGivenGpx(gpxFile, null, from, fromName, useIntermediatePointsByDefault, showMenu,
+				MapRouteInfoMenu.DEFAULT_MENU_STATE, passWholeRoute);
+	}
+
+	public void enterRoutePlanningModeGivenGpx(GpxFile gpxFile, LatLon from, PointDescription fromName,
+	                                           boolean useIntermediatePointsByDefault, boolean showMenu) {
 		enterRoutePlanningModeGivenGpx(gpxFile, from, fromName, useIntermediatePointsByDefault, showMenu,
 				MapRouteInfoMenu.DEFAULT_MENU_STATE);
 	}
 
-	public void enterRoutePlanningModeGivenGpx(GPXFile gpxFile, LatLon from, PointDescription fromName,
-											   boolean useIntermediatePointsByDefault, boolean showMenu, int menuState) {
-		enterRoutePlanningModeGivenGpx(gpxFile, null, from, fromName, useIntermediatePointsByDefault, showMenu, menuState);
+	public void enterRoutePlanningModeGivenGpx(GpxFile gpxFile, LatLon from, PointDescription fromName,
+	                                           boolean useIntermediatePointsByDefault, boolean showMenu, int menuState) {
+		enterRoutePlanningModeGivenGpx(gpxFile, null, from, fromName, useIntermediatePointsByDefault, showMenu, menuState, false);
 	}
 
-	public void enterRoutePlanningModeGivenGpx(GPXFile gpxFile, ApplicationMode appMode, LatLon from, PointDescription fromName,
-											   boolean useIntermediatePointsByDefault, boolean showMenu, int menuState) {
+	public void enterRoutePlanningModeGivenGpx(GpxFile gpxFile, ApplicationMode appMode, LatLon from, PointDescription fromName,
+	                                           boolean useIntermediatePointsByDefault, boolean showMenu, int menuState, boolean passWholeRoute) {
 		settings.USE_INTERMEDIATE_POINTS_NAVIGATION.set(useIntermediatePointsByDefault);
 		TargetPointsHelper targets = app.getTargetPointsHelper();
 
+		if (gpxFile != null && gpxFile.hasRtePt() && appMode == null) {
+			WptPt routePoint = gpxFile.getRoutePoints().get(0);
+			ApplicationMode routePointAppMode = ApplicationMode.valueOfStringKey(routePoint.getProfileType(), ApplicationMode.DEFAULT);
+			if (routePointAppMode != ApplicationMode.DEFAULT) {
+				appMode = routePointAppMode;
+			}
+		}
 		ApplicationMode mode = appMode != null ? appMode : getRouteMode();
-		//app.getSettings().setApplicationMode(mode, false);
-		app.getRoutingHelper().setAppMode(mode);
+		if (app.getSettings().getApplicationMode() != ApplicationMode.DEFAULT) {
+			app.getSettings().setApplicationMode(mode, false);
+		}
+		RoutingHelper routingHelper = app.getRoutingHelper();
+		routingHelper.setAppMode(mode);
 		initVoiceCommandPlayer(mode, showMenu);
 		// save application mode controls
 		settings.FOLLOW_THE_ROUTE.set(false);
-		app.getRoutingHelper().setFollowingMode(false);
-		app.getRoutingHelper().setRoutePlanningMode(true);
+		routingHelper.setFollowingMode(false);
+		routingHelper.setRoutePlanningMode(true);
 		// reset start point
 		targets.setStartPoint(from, false, fromName);
 		// then set gpx
 		setGPXRouteParams(gpxFile);
+		GPXRouteParamsBuilder currentGPXRoute = routingHelper.getCurrentGPXRoute();
+		if (currentGPXRoute != null) {
+			currentGPXRoute.setPassWholeRoute(passWholeRoute);
+		}
 		// then update start and destination point
 		targets.updateRouteAndRefresh(true);
 
-		app.getMapViewTrackingUtilities().switchToRoutePlanningMode();
+		app.getMapViewTrackingUtilities().switchRoutePlanningMode();
 		app.getOsmandMap().refreshMap(true);
 
 		if (targets.hasTooLongDistanceToNavigate()) {
@@ -111,6 +151,7 @@ public class MapActions {
 	}
 
 	public void recalculateRoute(boolean showDialog) {
+		app.logRoutingEvent("recalculateRoute showDialog " + showDialog);
 		settings.USE_INTERMEDIATE_POINTS_NAVIGATION.set(true);
 		TargetPointsHelper targets = app.getTargetPointsHelper();
 
@@ -128,7 +169,7 @@ public class MapActions {
 		// then update start and destination point
 		targets.updateRouteAndRefresh(true);
 
-		app.getMapViewTrackingUtilities().switchToRoutePlanningMode();
+		app.getMapViewTrackingUtilities().switchRoutePlanningMode();
 		app.getOsmandMap().refreshMap(true);
 
 		if (targets.hasTooLongDistanceToNavigate()) {
@@ -147,7 +188,12 @@ public class MapActions {
 		if (selected != ApplicationMode.DEFAULT) {
 			mode = selected;
 		} else if (mode == ApplicationMode.DEFAULT) {
-			mode = ApplicationMode.CAR;
+			for (ApplicationMode appMode : ApplicationMode.values(app)) {
+				if (appMode != ApplicationMode.DEFAULT) {
+					mode = appMode;
+					break;
+				}
+			}
 			if (settings.LAST_ROUTING_APPLICATION_MODE != null &&
 					settings.LAST_ROUTING_APPLICATION_MODE != ApplicationMode.DEFAULT) {
 				mode = settings.LAST_ROUTING_APPLICATION_MODE;
@@ -163,6 +209,7 @@ public class MapActions {
 			if (settings.FORCE_PRIVATE_ACCESS_ROUTING_ASKED.getModeValue(mode)) {
 				settings.FORCE_PRIVATE_ACCESS_ROUTING_ASKED.setModeValue(mode, false);
 				settings.getCustomRoutingBooleanProperty(GeneralRouter.ALLOW_PRIVATE, false).setModeValue(mode, false);
+				settings.getCustomRoutingBooleanProperty(GeneralRouter.ALLOW_PRIVATE_FOR_TRUCK, false).setModeValue(mode, false);
 			}
 		}
 	}

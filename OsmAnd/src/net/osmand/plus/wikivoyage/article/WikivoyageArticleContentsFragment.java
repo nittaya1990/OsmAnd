@@ -17,7 +17,7 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import net.osmand.plus.R;
-import net.osmand.plus.activities.OsmandBaseExpandableListAdapter;
+import net.osmand.plus.base.OsmandBaseExpandableListAdapter;
 import net.osmand.plus.base.MenuBottomSheetDialogFragment;
 import net.osmand.plus.base.bottomsheetmenu.SimpleBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.TitleItem;
@@ -50,7 +50,7 @@ public class WikivoyageArticleContentsFragment extends MenuBottomSheetDialogFrag
 			return;
 		}
 
-		final WikivoyageContentItem contentItem = WikivoyageJsonParser.parseJsonContents(contentsJson);
+		WikivoyageContentItem contentItem = WikivoyageJsonParser.parseJsonContents(contentsJson);
 		if (contentItem == null) {
 			return;
 		}
@@ -125,22 +125,22 @@ public class WikivoyageArticleContentsFragment extends MenuBottomSheetDialogFrag
 
 	class ExpandableListAdapter extends OsmandBaseExpandableListAdapter {
 
-		private Context context;
+		private final Context context;
 
-		private WikivoyageContentItem contentItem;
+		private final WikivoyageContentItem contentItem;
 
-		private Drawable itemGroupIcon;
-		private Drawable itemChildIcon;
+		private final Drawable itemGroupIcon;
+		private final Drawable itemChildIcon;
 
 		ExpandableListAdapter(Context context, WikivoyageContentItem contentItem) {
 			this.context = context;
 			this.contentItem = contentItem;
 
 			itemGroupIcon = getIcon(R.drawable.ic_action_list_header, nightMode
-					? R.color.wikivoyage_contents_parent_icon_dark : R.color.wikivoyage_contents_parent_icon_light);
+					? R.color.icon_color_active_dark : R.color.icon_color_active_light);
 			itemChildIcon = getIcon(R.drawable.ic_action_list_bullet, nightMode
-					? R.color.wikivoyage_contents_child_icon_dark
-					: R.color.wikivoyage_contents_child_icon_light);
+					? R.color.icon_color_default_dark
+					: R.color.icon_color_default_light);
 		}
 
 		@Override
@@ -154,18 +154,18 @@ public class WikivoyageArticleContentsFragment extends MenuBottomSheetDialogFrag
 		}
 
 		@Override
-		public View getChildView(int groupPosition, final int childPosition,
+		public View getChildView(int groupPosition, int childPosition,
 								 boolean isLastChild, View convertView, ViewGroup parent) {
 			String childText = (String) getChild(groupPosition, childPosition);
 			if (convertView == null) {
 				convertView = LayoutInflater.from(context)
 						.inflate(R.layout.wikivoyage_contents_list_item, parent, false);
 			}
-			TextView txtListChild = (TextView) convertView.findViewById(R.id.item_label);
+			TextView txtListChild = convertView.findViewById(R.id.item_label);
 			txtListChild.setText(childText);
 			txtListChild.setTextColor(ContextCompat.getColor(context, nightMode
-					? R.color.wikivoyage_contents_parent_icon_dark
-					: R.color.wikivoyage_contents_parent_icon_light));
+					? R.color.icon_color_active_dark
+					: R.color.icon_color_active_light));
 			txtListChild.setCompoundDrawablesWithIntrinsicBounds(itemChildIcon, null, null, null);
 
 			convertView.findViewById(R.id.upper_row_divider).setVisibility(View.GONE);
@@ -196,20 +196,20 @@ public class WikivoyageArticleContentsFragment extends MenuBottomSheetDialogFrag
 		}
 
 		@Override
-		public View getGroupView(final int groupPosition, final boolean isExpanded,
-								 View convertView, ViewGroup parent) {
+		public View getGroupView(int groupPosition, boolean isExpanded,
+		                         View convertView, ViewGroup parent) {
 			String headerTitle = (String) getGroup(groupPosition);
 			if (convertView == null) {
 				convertView = LayoutInflater.from(context)
 						.inflate(R.layout.wikivoyage_contents_list_item, parent, false);
 			}
-			TextView lblListHeader = (TextView) convertView.findViewById(R.id.item_label);
+			TextView lblListHeader = convertView.findViewById(R.id.item_label);
 			lblListHeader.setText(headerTitle);
-			lblListHeader.setTextColor(ContextCompat.getColor(context, nightMode ? R.color.wikivoyage_contents_parent_icon_dark : R.color.wikivoyage_contents_parent_icon_light));
+			lblListHeader.setTextColor(ContextCompat.getColor(context, nightMode ? R.color.icon_color_active_dark : R.color.icon_color_active_light));
 			lblListHeader.setCompoundDrawablesWithIntrinsicBounds(itemGroupIcon, null, null, null);
 
 			adjustIndicator(getMyApplication(), groupPosition, isExpanded, convertView, !nightMode);
-			ImageView indicator = (ImageView) convertView.findViewById(R.id.explicit_indicator);
+			ImageView indicator = convertView.findViewById(R.id.explicit_indicator);
 			indicator.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {

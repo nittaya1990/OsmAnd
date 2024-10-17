@@ -1,16 +1,18 @@
 package net.osmand.plus.settings.backend.backup.items;
 
+import static net.osmand.IndexConstants.GPX_FILE_EXT;
+
 import android.content.Context;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.plus.shared.SharedUtil;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.mapmarkers.ItineraryDataHelper;
 import net.osmand.plus.mapmarkers.ItineraryDataHelper.ItineraryGroupInfo;
+import net.osmand.plus.mapmarkers.ItineraryDataHelperKt;
 import net.osmand.plus.mapmarkers.MapMarker;
 import net.osmand.plus.mapmarkers.MapMarkersGroup;
 import net.osmand.plus.mapmarkers.MapMarkersHelper;
@@ -18,18 +20,19 @@ import net.osmand.plus.settings.backend.backup.SettingsHelper;
 import net.osmand.plus.settings.backend.backup.SettingsItemReader;
 import net.osmand.plus.settings.backend.backup.SettingsItemType;
 import net.osmand.plus.settings.backend.backup.SettingsItemWriter;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxUtilities.GpxExtensionsReader;
 import net.osmand.util.Algorithms;
 
 import org.json.JSONException;
 import org.json.JSONObject;
 
+import java.io.File;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-
-import static net.osmand.IndexConstants.GPX_FILE_EXT;
 
 public class ItinerarySettingsItem extends CollectionSettingsItem<MapMarkersGroup> {
 
@@ -113,6 +116,17 @@ public class ItinerarySettingsItem extends CollectionSettingsItem<MapMarkersGrou
 	}
 
 	@Override
+	public void delete() {
+		super.delete();
+		markersHelper.syncAllGroups();
+	}
+
+	@Override
+	protected void deleteItem(MapMarkersGroup item) {
+		markersHelper.removeMarkersGroup(item);
+	}
+
+	@Override
 	public boolean isDuplicate(@NonNull MapMarkersGroup markersGroup) {
 		for (MapMarkersGroup group : existingItems) {
 			if (group.getType() == markersGroup.getType()
@@ -140,12 +154,14 @@ public class ItinerarySettingsItem extends CollectionSettingsItem<MapMarkersGrou
 		return new SettingsItemReader<ItinerarySettingsItem>(this) {
 
 			@Override
-			public void readFromStream(@NonNull InputStream inputStream, String entryName) throws IllegalArgumentException {
+			public void readFromStream(@NonNull InputStream inputStream, @Nullable File inputFile,
+			                           @Nullable String entryName) throws IllegalArgumentException {
 				List<ItineraryGroupInfo> groupInfos = new ArrayList<>();
-				GPXFile gpxFile = GPXUtilities.loadGPXFile(inputStream, dataHelper.getGPXExtensionsReader(groupInfos));
-				if (gpxFile.error != null) {
+				GpxExtensionsReader gpxExtensionsReader = ItineraryDataHelperKt.getGpxExtensionsReader(groupInfos);
+				GpxFile gpxFile = SharedUtil.loadGpxFile(inputStream, gpxExtensionsReader, false);
+				if (gpxFile.getError() != null) {
 					warnings.add(app.getString(R.string.settings_item_read_error, String.valueOf(getType())));
-					SettingsHelper.LOG.error("Failed read gpx file", gpxFile.error);
+					SettingsHelper.LOG.error("Failed read gpx file", SharedUtil.jException(gpxFile.getError()));
 				} else {
 					Map<String, MapMarker> markers = new LinkedHashMap<>();
 					Map<String, MapMarkersGroup> groups = new LinkedHashMap<>();
@@ -159,7 +175,7 @@ public class ItinerarySettingsItem extends CollectionSettingsItem<MapMarkersGrou
 	@Nullable
 	@Override
 	public SettingsItemWriter<? extends SettingsItem> getWriter() {
-		GPXFile gpxFile = dataHelper.generateGpx(items, null);
+		GpxFile gpxFile = dataHelper.generateGpx(items, null);
 		return getGpxWriter(gpxFile);
 	}
 }

@@ -1,5 +1,7 @@
 package net.osmand.plus.quickaction.actions;
 
+import static net.osmand.plus.quickaction.QuickActionIds.MARKER_ACTION_ID;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,10 +18,10 @@ import net.osmand.plus.quickaction.QuickActionType;
 
 public class MarkerAction extends QuickAction {
 
-	public static final QuickActionType TYPE = new QuickActionType(2,
-			"marker.add", MarkerAction.class).
-			nameRes(R.string.quick_action_add_marker).iconRes(R.drawable.ic_action_flag).nonEditable().
-			category(QuickActionType.CREATE_CATEGORY);
+	public static final QuickActionType TYPE = new QuickActionType(MARKER_ACTION_ID,
+			"marker.add", MarkerAction.class)
+			.nameRes(R.string.map_marker).iconRes(R.drawable.ic_action_flag).nonEditable().
+			category(QuickActionType.MY_PLACES).nameActionRes(R.string.shared_string_add);
 
 
 	public MarkerAction() {
@@ -32,10 +34,7 @@ public class MarkerAction extends QuickAction {
 
 	@Override
 	public void execute(@NonNull MapActivity mapActivity) {
-
-		LatLon latLon = mapActivity.getMapView()
-				.getCurrentRotatedTileBox()
-				.getCenterLatLon();
+		LatLon latLon = getMapLocation(mapActivity);
 
 		PointDescription pointDescription = new PointDescription(
 				latLon.getLatitude(),

@@ -1,5 +1,7 @@
 package net.osmand.plus.quickaction.actions;
 
+import static net.osmand.plus.quickaction.QuickActionIds.NAV_DIRECTIONS_FROM_ACTION_ID;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -15,10 +17,10 @@ import net.osmand.plus.quickaction.QuickActionType;
 
 public class NavDirectionsFromAction extends QuickAction {
 
-	public static final QuickActionType TYPE = new QuickActionType(19,
-			"nav.directions", NavDirectionsFromAction.class).
-			nameRes(R.string.context_menu_item_directions_from).iconRes(R.drawable.ic_action_route_direction_from_here).nonEditable().
-			category(QuickActionType.NAVIGATION);
+	public static final QuickActionType TYPE = new QuickActionType(NAV_DIRECTIONS_FROM_ACTION_ID,
+			"nav.directions", NavDirectionsFromAction.class)
+			.nameRes(R.string.quick_action_directions_from).iconRes(R.drawable.ic_action_route_direction_from_here).nonEditable()
+			.category(QuickActionType.NAVIGATION).nameActionRes(R.string.shared_string_set);
 
 	public NavDirectionsFromAction() {
 		super(TYPE);
@@ -30,7 +32,7 @@ public class NavDirectionsFromAction extends QuickAction {
 
 	@Override
 	public void execute(@NonNull MapActivity mapActivity) {
-		LatLon latLon = mapActivity.getMapView().getCurrentRotatedTileBox().getCenterLatLon();
+		LatLon latLon = getMapLocation(mapActivity);
 		mapActivity.getMapActions().enterDirectionsFromPoint(latLon.getLatitude(), latLon.getLongitude());
 	}
 

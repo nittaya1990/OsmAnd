@@ -1,73 +1,73 @@
 package net.osmand.data;
 
+import static net.osmand.data.SpecialPointType.HOME;
+import static net.osmand.data.SpecialPointType.WORK;
+import static net.osmand.data.SpecialPointType.HOME;
+import static net.osmand.data.SpecialPointType.WORK;
+import static net.osmand.shared.gpx.GpxUtilities.DEFAULT_ICON_NAME;
 import static net.osmand.plus.mapmarkers.ItineraryDataHelper.CREATION_DATE;
 import static net.osmand.plus.mapmarkers.ItineraryDataHelper.VISITED_DATE;
+import static net.osmand.plus.myplaces.favorites.FavoriteGroup.PERSONAL_CATEGORY;
 
 import android.content.Context;
-import android.content.res.Resources;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 
-import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
-import androidx.annotation.StringRes;
 
-import net.osmand.GPXUtilities.WptPt;
-import net.osmand.Location;
-import net.osmand.ResultMatcher;
-import net.osmand.binary.RouteDataObject;
-import net.osmand.plus.FavouritesDbHelper;
-import net.osmand.plus.OsmandApplication;
+import net.osmand.shared.gpx.GpxUtilities;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.plus.R;
-import net.osmand.plus.mapmarkers.ItineraryDataHelper;
-import net.osmand.plus.parkingpoint.ParkingPositionPlugin;
+import net.osmand.plus.myplaces.favorites.FavoriteGroup;
 import net.osmand.plus.render.RenderingIcons;
-import net.osmand.plus.settings.backend.BooleanPreference;
-import net.osmand.plus.settings.backend.OsmandPreference;
 import net.osmand.util.Algorithms;
 
 import java.io.Serializable;
+import java.util.HashMap;
+import java.util.Map;
 
 
 public class FavouritePoint implements Serializable, LocationPoint {
+
 	private static final long serialVersionUID = 729654300829771466L;
 
+	private static final String DELIMITER = "__";
 	private static final String HIDDEN = "hidden";
-	private static final String ADDRESS_EXTENSION = "address";
 	private static final String CALENDAR_EXTENSION = "calendar_event";
+	private static final String PICKUP_DATE = "pickup_date";
+
 	public static final BackgroundType DEFAULT_BACKGROUND_TYPE = BackgroundType.CIRCLE;
 	public static final int DEFAULT_UI_ICON_ID = R.drawable.mx_special_star;
 
-	protected String name = "";
-	protected String description;
-	protected String category = "";
-	protected String address = "";
-	protected int iconId;
-	private String originObjectName = "";
+	private String name;
+	private String category;
+	private String description;
+	private String address;
+	private String comment;
+
 	private double latitude;
 	private double longitude;
-	private int color;
-	private boolean visible = true;
-	private SpecialPointType specialPointType = null;
-	private BackgroundType backgroundType = null;
 	private double altitude = Double.NaN;
+
+	private int color;
+	private int iconId;
+	private BackgroundType backgroundType;
+	private SpecialPointType specialPointType;
+
 	private long timestamp;
 	private long visitedDate;
-	private long creationDate;
+	private long pickupDate;
 	private boolean calendarEvent;
 
-	public FavouritePoint() {
-	}
+	private String amenityOriginName;
+	private Map<String, String> amenityExtensions = new HashMap<>();
+
+	private boolean visible = true;
 
 	public FavouritePoint(double latitude, double longitude, String name, String category) {
 		this.latitude = latitude;
 		this.longitude = longitude;
 		this.category = category;
-		if (name == null) {
-			name = "";
-		}
-		this.name = name;
+		this.name = name != null ? name : "";
 		timestamp = System.currentTimeMillis();
 		initPersonalType();
 	}
@@ -76,79 +76,55 @@ public class FavouritePoint implements Serializable, LocationPoint {
 		this.latitude = latitude;
 		this.longitude = longitude;
 		this.category = category;
-		if (name == null) {
-			name = "";
-		}
-		this.name = name;
+		this.name = name != null ? name : "";
 		this.altitude = altitude;
 		this.timestamp = timestamp != 0 ? timestamp : System.currentTimeMillis();
 		initPersonalType();
 	}
 
-	public FavouritePoint(FavouritePoint favouritePoint) {
-		this.latitude = favouritePoint.latitude;
-		this.longitude = favouritePoint.longitude;
-		this.category = favouritePoint.category;
-		this.name = favouritePoint.name;
-		this.color = favouritePoint.color;
-		this.description = favouritePoint.description;
-		this.visible = favouritePoint.visible;
-		this.originObjectName = favouritePoint.originObjectName;
-		this.address = favouritePoint.address;
-		this.iconId = favouritePoint.iconId;
-		this.backgroundType = favouritePoint.backgroundType;
-		this.altitude = favouritePoint.altitude;
-		this.timestamp = favouritePoint.timestamp;
-		this.visitedDate = favouritePoint.visitedDate;
-		this.creationDate = favouritePoint.creationDate;
+	public FavouritePoint(@NonNull FavouritePoint point) {
+		this.latitude = point.latitude;
+		this.longitude = point.longitude;
+		this.category = point.category;
+		this.name = point.name;
+		this.color = point.color;
+		this.description = point.description;
+		this.visible = point.visible;
+		this.amenityOriginName = point.amenityOriginName;
+		this.address = point.address;
+		this.comment = point.comment;
+		this.iconId = point.iconId;
+		this.backgroundType = point.backgroundType;
+		this.altitude = point.altitude;
+		this.timestamp = point.timestamp;
+		this.visitedDate = point.visitedDate;
+		this.pickupDate = point.pickupDate;
+		this.calendarEvent = point.calendarEvent;
+		this.amenityExtensions = new HashMap<>(point.amenityExtensions);
 		initPersonalType();
 	}
 
 	private void initPersonalType() {
-		if (FavouritesDbHelper.FavoriteGroup.PERSONAL_CATEGORY.equals(category)) {
-			for (SpecialPointType p : SpecialPointType.values()) {
-				if (p.typeName.equals(this.name)) {
-					this.specialPointType = p;
+		if (PERSONAL_CATEGORY.equals(category)) {
+			for (SpecialPointType pointType : SpecialPointType.values()) {
+				if (Algorithms.stringsEqual(pointType.getName(), this.name)) {
+					this.specialPointType = pointType;
 				}
 			}
 		}
 	}
 
-	public void initAltitude(OsmandApplication app) {
-		initAltitude(app, null);
-	}
-
-	public void initAltitude(OsmandApplication app, final Runnable callback) {
-		Location location = new Location("", latitude, longitude);
-		app.getLocationProvider().getRouteSegment(location, null, false,
-				new ResultMatcher<RouteDataObject>() {
-
-					@Override
-					public boolean publish(RouteDataObject routeDataObject) {
-						if (routeDataObject != null) {
-							LatLon latLon = new LatLon(latitude, longitude);
-							routeDataObject.calculateHeightArray(latLon);
-							altitude = routeDataObject.heightByCurrentLocation;
-						}
-						if (callback != null) {
-							callback.run();
-						}
-						return true;
-					}
-
-					@Override
-					public boolean isCancelled() {
-						return false;
-					}
-				});
-	}
-
+	@Nullable
 	public SpecialPointType getSpecialPointType() {
 		return specialPointType;
 	}
 
+	public void setSpecialPointType(@Nullable SpecialPointType pointType) {
+		this.specialPointType = pointType;
+	}
+
 	public boolean isHomeOrWork() {
-		return specialPointType == SpecialPointType.HOME || specialPointType == SpecialPointType.WORK;
+		return specialPointType == HOME || specialPointType == WORK;
 	}
 
 	public int getColor() {
@@ -176,7 +152,7 @@ public class FavouritePoint implements Serializable, LocationPoint {
 		return iconId == 0 ? DEFAULT_UI_ICON_ID : iconId;
 	}
 
-	public String getIconEntryName(Context ctx) {
+	public String getIconEntryName(@NonNull Context ctx) {
 		return ctx.getResources().getResourceEntryName(getOverlayIconId(ctx));
 	}
 
@@ -184,8 +160,18 @@ public class FavouritePoint implements Serializable, LocationPoint {
 		this.iconId = iconId;
 	}
 
-	public void setIconIdFromName(String iconName) {
-		this.iconId = RenderingIcons.getBigIconId(iconName);
+	public void setIconIdFromName(@NonNull String iconName) {
+		this.iconId = RenderingIcons.getBigIconResourceId(iconName);
+	}
+
+	public String getKey() {
+		return name + DELIMITER + category;
+	}
+
+	@NonNull
+	public String getIconName() {
+		String name = RenderingIcons.getBigIconName(iconId);
+		return name != null ? name : DEFAULT_ICON_NAME;
 	}
 
 	public boolean isSpecialPoint() {
@@ -209,15 +195,7 @@ public class FavouritePoint implements Serializable, LocationPoint {
 		this.visible = visible;
 	}
 
-	public String getOriginObjectName() {
-		return originObjectName;
-	}
-
-	public void setOriginObjectName(String originObjectName) {
-		this.originObjectName = originObjectName;
-	}
-
-	public int getOverlayIconId(Context ctx) {
+	public int getOverlayIconId(@NonNull Context ctx) {
 		if (isSpecialPoint()) {
 			return specialPointType.getIconId(ctx);
 		}
@@ -272,20 +250,46 @@ public class FavouritePoint implements Serializable, LocationPoint {
 		this.visitedDate = visitedDate;
 	}
 
-	public long getCreationDate() {
-		return creationDate;
+	public long getPickupDate() {
+		return pickupDate;
 	}
 
-	public void setCreationDate(long creationDate) {
-		this.creationDate = creationDate;
+	public void setPickupDate(long pickupDate) {
+		this.pickupDate = pickupDate;
 	}
 
 	public String getCategory() {
 		return category;
 	}
 
+	public String getComment() {
+		return comment;
+	}
+
+	public void setComment(String comment) {
+		this.comment = comment;
+	}
+
+	@Nullable
+	public String getAmenityOriginName() {
+		return amenityOriginName;
+	}
+
+	public void setAmenityOriginName(@Nullable String amenityOriginName) {
+		this.amenityOriginName = amenityOriginName;
+	}
+
+	@NonNull
+	public Map<String, String> getAmenityExtensions() {
+		return amenityExtensions;
+	}
+
+	public void setAmenityExtensions(@NonNull Map<String, String> extensions) {
+		amenityExtensions = extensions;
+	}
+
 	public String getCategoryDisplayName(@NonNull Context ctx) {
-		return FavouritesDbHelper.FavoriteGroup.getDisplayName(ctx, category);
+		return FavoriteGroup.getDisplayName(ctx, category);
 	}
 
 	public void setCategory(String category) {
@@ -328,49 +332,45 @@ public class FavouritePoint implements Serializable, LocationPoint {
 	@NonNull
 	@Override
 	public String toString() {
-		return "Favourite " + getName(); //$NON-NLS-1$
+		return "Favourite " + getName();
 	}
 
 	@Override
 	public boolean equals(Object o) {
-		if (this == o) return true;
-
-		if (o == null) return false;
-
-		if (getClass() != o.getClass()) return false;
-
-		FavouritePoint fp = (FavouritePoint) o;
-
-		if (name == null) {
-			if (fp.name != null)
-				return false;
-		} else if (!name.equals(fp.name))
+		if (this == o) {
+			return true;
+		}
+		if (o == null) {
 			return false;
-
-		if (category == null) {
-			if (fp.category != null)
-				return false;
-		} else if (!category.equals(fp.category))
+		}
+		if (getClass() != o.getClass()) {
 			return false;
+		}
 
-		if (description == null) {
-			if (fp.description != null)
-				return false;
-		} else if (!description.equals(fp.description))
+		FavouritePoint point = (FavouritePoint) o;
+		if (!Algorithms.stringsEqual(name, point.name)) {
 			return false;
-
-		if (originObjectName == null) {
-			if (fp.originObjectName != null)
-				return false;
-		} else if (!originObjectName.equals(fp.originObjectName))
+		}
+		if (!Algorithms.stringsEqual(category, point.category)) {
 			return false;
+		}
+		if (!Algorithms.stringsEqual(description, point.description)) {
+			return false;
+		}
+		if (!Algorithms.stringsEqual(amenityOriginName, point.amenityOriginName)) {
+			return false;
+		}
 
-		return (this.latitude == fp.latitude)
-				&& (this.longitude == fp.longitude)
-				&& (this.altitude == fp.altitude)
-				&& (this.timestamp == fp.timestamp)
-				&& (this.visitedDate == fp.visitedDate)
-				&& (this.creationDate == fp.creationDate);
+		return Double.compare(this.latitude, point.latitude) == 0
+				&& Double.compare(this.longitude, point.longitude) == 0
+				&& Double.compare(this.altitude, point.altitude) == 0
+				&& (this.timestamp == point.timestamp)
+				&& (this.visitedDate == point.visitedDate)
+				&& (this.pickupDate == point.pickupDate)
+				&& (this.color == point.color)
+				&& (this.iconId == point.iconId)
+				&& (this.backgroundType == point.backgroundType)
+				&& (this.specialPointType == point.specialPointType);
 	}
 
 	@Override
@@ -382,193 +382,107 @@ public class FavouritePoint implements Serializable, LocationPoint {
 		result = prime * result + (int) Math.floor(altitude * 10000);
 		result = prime * result + (int) (timestamp ^ (timestamp >>> 32));
 		result = prime * result + (int) (visitedDate ^ (visitedDate >>> 32));
-		result = prime * result + (int) (creationDate ^ (creationDate >>> 32));
+		result = prime * result + (int) (pickupDate ^ (pickupDate >>> 32));
 		result = prime * result + ((name == null) ? 0 : name.hashCode());
 		result = prime * result + ((category == null) ? 0 : category.hashCode());
 		result = prime * result + ((description == null) ? 0 : description.hashCode());
-		result = prime * result + ((originObjectName == null) ? 0 : originObjectName.hashCode());
+		result = prime * result + ((amenityOriginName == null) ? 0 : amenityOriginName.hashCode());
 		return result;
 	}
 
-	public enum SpecialPointType {
-		HOME("home", R.string.home_button, R.drawable.mx_special_house),
-		WORK("work", R.string.work_button, R.drawable.mx_special_building),
-		PARKING("parking", R.string.osmand_parking_position_name, R.drawable.mx_parking);
+	public static FavouritePoint fromWpt(@NonNull WptPt pt) {
+		return fromWpt(pt, null);
+	}
 
-		private String typeName;
-		@StringRes
-		private int resId;
-		@DrawableRes
-		private int iconId;
-
-		SpecialPointType(@NonNull String typeName, @StringRes int resId, @DrawableRes int iconId) {
-			this.typeName = typeName;
-			this.resId = resId;
-			this.iconId = iconId;
+	public static FavouritePoint fromWpt(@NonNull WptPt wptPt, @Nullable String category) {
+		String name = wptPt.getName() != null ? wptPt.getName() : "";
+		if (category == null) {
+			category = wptPt.getCategory() != null ? wptPt.getCategory() : "";
 		}
+		FavouritePoint point = new FavouritePoint(wptPt.getLat(), wptPt.getLon(), name, category, wptPt.getEle(), wptPt.getTime());
+		point.setDescription(wptPt.getDesc());
+		point.setComment(wptPt.getComment());
+		point.setAmenityOriginName(wptPt.getAmenityOriginName());
+		point.setAmenityExtensions(wptPt.getExtensionsToRead());
 
-		public String getCategory() {
-			return FavouritesDbHelper.FavoriteGroup.PERSONAL_CATEGORY;
-		}
-
-		public String getName() {
-			return typeName;
-		}
-
-		public int getIconId(@NonNull Context ctx) {
-			if (this == PARKING) {
-				OsmandApplication app = (OsmandApplication) ctx.getApplicationContext();
-				OsmandPreference parkingType = app.getSettings().getPreference(ParkingPositionPlugin.PARKING_TYPE);
-				if (parkingType instanceof BooleanPreference && ((BooleanPreference) parkingType).get()) {
-					return R.drawable.mx_special_parking_time_limited;
-				}
-				return iconId;
+		Map<String, String> extensions = wptPt.getExtensionsToWrite();
+		if (extensions.containsKey(VISITED_DATE)) {
+			String time = extensions.get(VISITED_DATE);
+			if (!Algorithms.isEmpty(time)) {
+				point.setVisitedDate(GpxUtilities.INSTANCE.parseTime(time));
 			}
-			return iconId;
 		}
-
-		public String getHumanString(@NonNull Context ctx) {
-			return ctx.getString(resId);
+		String time = extensions.get(PICKUP_DATE);
+		if (time == null) {
+			time = extensions.get(CREATION_DATE);
 		}
-	}
-
-	public enum BackgroundType {
-		CIRCLE("circle", R.string.shared_string_circle, R.drawable.bg_point_circle),
-		OCTAGON("octagon", R.string.shared_string_octagon, R.drawable.bg_point_octagon),
-		SQUARE("square", R.string.shared_string_square, R.drawable.bg_point_square),
-		COMMENT("comment", R.string.poi_dialog_comment, R.drawable.bg_point_comment);
-		private String typeName;
-		@StringRes
-		private int nameId;
-		@DrawableRes
-		private int iconId;
-
-		BackgroundType(@NonNull String typeName, @StringRes int nameId, @DrawableRes int iconId) {
-			this.typeName = typeName;
-			this.nameId = nameId;
-			this.iconId = iconId;
+		if (!Algorithms.isEmpty(time)) {
+			point.setPickupDate(GpxUtilities.INSTANCE.parseTime(time));
 		}
-
-		public int getNameId() {
-			return nameId;
+		if (extensions.containsKey(CALENDAR_EXTENSION)) {
+			String calendarEvent = extensions.get(CALENDAR_EXTENSION);
+			point.setCalendarEvent(Boolean.parseBoolean(calendarEvent));
 		}
-
-		public int getIconId() {
-			return iconId;
-		}
-
-		public String getTypeName() {
-			return typeName;
-		}
-
-		public static BackgroundType getByTypeName(String typeName, BackgroundType defaultValue) {
-			for (BackgroundType type : BackgroundType.values()) {
-				if (type.typeName.equals(typeName)) {
-					return type;
-				}
-			}
-			return defaultValue;
-		}
-
-		public boolean isSelected() {
-			return this != COMMENT;
-		}
-
-		public int getOffsetY(Context ctx, float textScale) {
-			return this == COMMENT ? Math.round(ctx.getResources()
-					.getDimensionPixelSize(R.dimen.point_background_comment_offset_y) * textScale) : 0;
-		}
-
-		public Bitmap getTouchBackground(Context ctx, boolean isSmall) {
-			return getMapBackgroundIconId(ctx, "center", isSmall);
-		}
-
-		public Bitmap getMapBackgroundIconId(Context ctx, String layer, boolean isSmall) {
-			Resources res = ctx.getResources();
-			String iconName = res.getResourceEntryName(getIconId());
-			String suffix = isSmall ? "_small" : "";
-			return BitmapFactory.decodeResource(res, res.getIdentifier("ic_" + iconName + "_" + layer + suffix,
-					"drawable", ctx.getPackageName()));
-		}
-	}
-
-	public static FavouritePoint fromWpt(@NonNull WptPt pt, @NonNull Context ctx) {
-		return fromWpt(pt, ctx, null);
-	}
-
-	public static FavouritePoint fromWpt(@NonNull WptPt pt, @NonNull Context ctx, String category) {
-		String name = pt.name;
-		String categoryName = category != null ? category :
-				(pt.category != null ? pt.category : "");
-		if (name == null) {
-			name = "";
-		}
-		FavouritePoint fp = new FavouritePoint(pt.lat, pt.lon, name, categoryName, pt.ele, pt.time);
-		fp.setDescription(pt.desc);
-		if (pt.comment != null) {
-			fp.setOriginObjectName(pt.comment);
-		}
-		if (pt.getExtensionsToWrite().containsKey(VISITED_DATE)) {
-			String time = pt.getExtensionsToWrite().get(VISITED_DATE);
-			fp.setVisitedDate(ItineraryDataHelper.parseTime(time));
-		}
-		if (pt.getExtensionsToWrite().containsKey(CREATION_DATE)) {
-			String time = pt.getExtensionsToWrite().get(CREATION_DATE);
-			fp.setCreationDate(ItineraryDataHelper.parseTime(time));
-		}
-		if (pt.getExtensionsToWrite().containsKey(CALENDAR_EXTENSION)) {
-			String calendarEvent = pt.getExtensionsToWrite().get(CALENDAR_EXTENSION);
-			fp.setCalendarEvent(calendarEvent.equals("true"));
-		}
-		fp.setColor(pt.getColor(0));
-		fp.setVisible(!pt.getExtensionsToRead().containsKey(HIDDEN));
-		fp.setAddress(pt.getExtensionsToRead().get(ADDRESS_EXTENSION));
-		String iconName = pt.getIconName();
+		point.setColor(wptPt.getColor(0));
+		point.setVisible(!wptPt.getExtensionsToRead().containsKey(HIDDEN));
+		point.setAddress(wptPt.getAddress());
+		String iconName = wptPt.getIconName();
 		if (iconName != null) {
-			fp.setIconIdFromName(iconName);
+			point.setIconIdFromName(iconName);
 		}
-		BackgroundType backgroundType = BackgroundType.getByTypeName(pt.getBackgroundType(), null);
-		fp.setBackgroundType(backgroundType);
-		return fp;
+		point.setSpecialPointType(SpecialPointType.getByName(wptPt.getSpecialPointType()));
+		point.setBackgroundType(BackgroundType.getByTypeName(wptPt.getBackgroundType(), null));
+
+		return point;
 	}
 
 	public WptPt toWpt(@NonNull Context ctx) {
-		WptPt pt = new WptPt();
-		pt.lat = getLatitude();
-		pt.lon = getLongitude();
-		pt.ele = getAltitude();
-		pt.time = getTimestamp();
-		if (!isVisible()) {
-			pt.getExtensionsToWrite().put(HIDDEN, "true");
+		WptPt point = new WptPt();
+		point.setLat(getLatitude());
+		point.setLon(getLongitude());
+		point.setEle(getAltitude());
+		point.setTime(getTimestamp());
+		point.setName(getName());
+		point.setDesc(getDescription());
+		point.setComment(getComment());
+
+		if (!Algorithms.isEmpty(getCategory())) {
+			point.setCategory(getCategory());
+		}
+		Map<String, String> extensions = point.getExtensionsToWrite();
+		extensions.putAll(getAmenityExtensions());
+		if (isVisible()) {
+			extensions.remove(HIDDEN);
+		} else {
+			extensions.put(HIDDEN, "true");
 		}
 		if (isAddressSpecified()) {
-			pt.getExtensionsToWrite().put(ADDRESS_EXTENSION, getAddress());
+			point.setAddress(getAddress());
 		}
-		if (getVisitedDate() != 0) {
-			pt.getExtensionsToWrite().put(VISITED_DATE, ItineraryDataHelper.formatTime(getVisitedDate()));
+		if (getVisitedDate() > 0) {
+			extensions.put(VISITED_DATE, GpxUtilities.INSTANCE.formatTime(getVisitedDate()));
 		}
-		if (getCreationDate() != 0) {
-			pt.getExtensionsToWrite().put(CREATION_DATE, ItineraryDataHelper.formatTime(getCreationDate()));
+		if (getPickupDate() > 0) {
+			extensions.put(PICKUP_DATE, GpxUtilities.INSTANCE.formatTime(getPickupDate()));
 		}
 		if (getCalendarEvent()) {
-			pt.getExtensionsToWrite().put(CALENDAR_EXTENSION, "true");
+			extensions.put(CALENDAR_EXTENSION, "true");
 		}
 		if (iconId != 0) {
-			pt.setIconName(getIconEntryName(ctx).substring(3));
+			point.setIconName(getIconEntryName(ctx).substring(3));
 		}
 		if (backgroundType != null) {
-			pt.setBackgroundType(backgroundType.typeName);
+			point.setBackgroundType(backgroundType.getTypeName());
+		}
+		if (specialPointType != null) {
+			point.setSpecialPointType(specialPointType.getName());
 		}
 		if (getColor() != 0) {
-			pt.setColor(getColor());
+			point.setColor(getColor());
 		}
-		pt.name = getName();
-		pt.desc = getDescription();
-		if (getCategory().length() > 0)
-			pt.category = getCategory();
-		if (getOriginObjectName().length() > 0) {
-			pt.comment = getOriginObjectName();
+		if (!Algorithms.isEmpty(amenityOriginName)) {
+			point.setAmenityOriginName(amenityOriginName);
 		}
-		return pt;
+		return point;
 	}
 }

@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="download_hillshade_maps">Տարածքի մգեցված ռելիեֆով քարտեզներ (Hillshades)</string>
     <string name="local_indexes_cat_av">Ձայնա/Տեսանյութեր</string>
@@ -92,7 +92,6 @@
     <string name="local_indexes_cat_srtm">Կոնտուրային գծերի/եզրագծերի տվյալներ</string>
     <string name="precise_routing_mode_descr">Միացնել ճշգրիտ երթուղիների հաշվարկի ռեժիմը։ Այս ռեժիմը դեր սահմանափակված է հեռավորությամբ և դանդախ է։</string>
     <string name="dropbox_plugin_name">Dropbox փլագին</string>
-    <string name="av_def_action_choose">Ընտրել ըստ հարցման\?</string>
     <string name="av_widget_action_descr">Ընտրել default Widget գործողություն՝</string>
     <string name="av_widget_action">Default վիդջետի գործողություն</string>
     <string name="recording_is_recorded">Կատարվում է աուդիո/վիդեո ձայնագրում, դադարեցնելու համար սեխմեք AV վիջետը։</string>
@@ -168,8 +167,6 @@
     <string name="date_added">Ավելացված է</string>
     <string name="order_by">Դասավորել ըստ:</string>
     <string name="marker_show_distance_descr">Ընտրեք, թե ինչպես ցույց տա քարտեզի վրա մարկերները քարտեզագրելու հեռավորությունը եւ ուղղությունը:</string>
-    <string name="map_orientation_change_in_accordance_with_speed">Քարտեզի կողմնորոշման շեմը</string>
-    <string name="map_orientation_change_in_accordance_with_speed_descr">Ընտրեք, թե ինչ արագության հասնելուց քարտեզի կողմնորոշումը կպոխվի \"Շարժման ուղղություն\" դեպի «Կողմնացույց»։</string>
     <string name="all_markers_moved_to_history">Բոլոր Մարկերները տեղափոխվել են պատմություն</string>
     <string name="marker_moved_to_history">Քարտեզի Մարկերները տեղափոխվել են պատմություն</string>
     <string name="marker_moved_to_active">Քարտեզի Մարկերները տեղափոխվեցին ակտիվ</string>
@@ -219,7 +216,7 @@
     <string name="shared_string_to">Մինչև</string>
     <string name="mapillary_menu_date_from">Սկսած</string>
     <string name="mapillary_menu_descr_dates">Ցույց տալ միայն ավելացրած լուսանկարներ</string>
-    <string name="mapillary_menu_title_dates">Ամսաթիվ</string>
+    <string name="shared_string_date">Ամսաթիվ</string>
     <string name="mapillary_menu_edit_text_hint">Մուտքագրեք օգտատերի անունը</string>
     <string name="mapillary_menu_descr_username">Դիտել լուսանկարները ավելացրած օգտագործողի կողմից</string>
     <string name="mapillary_menu_title_username">Օգտատերի անունը</string>
@@ -278,9 +275,6 @@
     <string name="quick_action_auto_zoom_desc">Այս կոճակը ակտիվացնում է ավտոմասշտաբի on/off համաձայն ձեր արագությանը:</string>
     <string name="quick_action_auto_zoom_on">Միացնել ավտոմասշտաբ</string>
     <string name="quick_action_auto_zoom_off">Անջատել ավտոմաստաբ</string>
-    <string name="quick_action_add_destination">Տեղադրեք նպատակակետը</string>
-    <string name="quick_action_replace_destination">Փոխարինել նպատակակետը</string>
-    <string name="quick_action_add_first_intermediate">Ավելացնել առաջին միջանկյալ կետը</string>
     <string name="quick_action_add_destination_desc">Այս կոճակը, նպատակակետ է ավելացննում էկրանի կենտրոնում։ Մինչ այդ ընտրած նպատակակետը կդառնա միջանկյալ կետ։</string>
     <string name="quick_action_replace_destination_desc">Այս գործողությունների կոճակը, նպատակակետը տեղափոխում է կրանի կենտրոն։</string>
     <string name="quick_action_add_first_intermediate_desc">Այս գործողությունների կոճակը, ավելացննում է առաջին միջանկյալ կետ էկրանի կենտրոնում։</string>
@@ -298,7 +292,7 @@
     <string name="restore_purchases">Գնումների վերականգնում</string>
     <string name="fonts_header">Տառատեսակ քարտեզների համար</string>
     <string name="right_side_navigation">Աջակողմյա երթևեկություն</string>
-    <string name="driving_region_automatic">Ավտոմատ</string>
+    <string name="shared_string_automatic">Ավտոմատ</string>
     <string name="do_not_send_anonymous_app_usage">Չհավաքել օգտագործման վիճակագրությունը</string>
     <string name="do_not_show_startup_messages">Չցուցադրել հաղորդագրությունները մեկնարկին</string>
     <string name="parking_options">Ավտոկանգառի ընտրանքներ</string>
@@ -338,7 +332,6 @@
     <string name="total_distance">Ընդհանուր հեռավորությունը</string>
     <string name="routing_attr_relief_smoothness_factor_name">Ընտրել բարձունքների տատանումը</string>
     <string name="routing_attr_height_obstacles_name">Օգտագործել բարձրության տվյալները</string>
-
     <string name="rendering_attr_depthContours_description">Ցույց տալ խորության տվյալները։</string>
     <string name="rendering_attr_depthContours_name">Ծովային խորքային ուրվագծեր</string>
     <string name="rendering_attr_contourDensity_description">Եզրագծերի խտությունը</string>
@@ -420,7 +413,6 @@
     <string name="rendering_value_light_brown_name">Բաց-շագանակագույն</string>
     <string name="rendering_value_dark_brown_name">Մուգ շագանակագույն</string>
     <string name="rendering_attr_contourColorScheme_name">Contour lines գունային սխեման</string>
-    <string name="translit_name_if_miss">Transliterate եթե %1$s անունը բացակայում է</string>
     <string name="translit_names">Transliterate անունները</string>
     <string name="first_usage_greeting">Ստացեք երթուղիներ և հայտնաբերեք նոր վայրեր առանց ինտերնետ կապի</string>
     <string name="search_my_location">Գտնել իմ դիրքը</string>
@@ -662,7 +654,7 @@
     <string name="lang_als">Ալբաներեն (Tosk)</string>
     <string name="read_more">Ավելին</string>
     <string name="whats_new">Ինչ է նորը</string>
-    <string name="rendering_attr_hideProposed_name">Պլանավորված օբյեկտներ</string>
+    <string name="rendering_attr_showProposed_name">Պլանավորված օբյեկտներ</string>
     <string name="shared_string_update">Թարմացնել</string>
     <string name="shared_string_upload">Վերբեռնել</string>
     <string name="osm_edit_created_poi">Ստեղծեք OSM POI</string>
@@ -835,7 +827,7 @@
     <string name="action_delete">Ջնջել գործողությունը</string>
     <string name="osm_edits">OSM-ի խմբագրումները</string>
     <string name="osmand_parking_hour">ժ</string>
-    <string name="osmand_parking_minute">րոպե</string>
+    <string name="shared_string_minute_lowercase">րոպե</string>
     <string name="parking_place_limited">Ավտոկանգառի ժամանակը սահմանափակ է</string>
     <string name="osmand_parking_time_left">մնաց</string>
     <string name="your_edits">Ձեր խմբագրումները</string>
@@ -905,7 +897,6 @@
     <string name="shared_string_my_location">Իմ դիրքը</string>
     <string name="shared_string_my_places">Իմ վայրերը</string>
     <string name="shared_string_my_favorites">Սիրածները</string>
-    <string name="srtm_plugin_disabled">Եզրագծերը(բարձունքների) անջատված են</string>
     <string name="favourites_edit_dialog_title">Տեղեկատվություն ընտրված կետի մասին</string>
     <string name="lang_pms">Պյեմոնտերեն</string>
     <string name="shared_string_tracks">Տրեկները</string>
@@ -1088,7 +1079,6 @@
     <string name="save_track_to_gpx_globally_descr">Ընդհանուր դիրքի գրանցումը GPX ֆայլի տեսքով կարող եք միացնել կամ անջատել GPX վիջետի միջոցով քարտեզի վրա։</string>
     <string name="save_current_track_descr">Պահպանել ընթացիկ տրեկը որպես GPX ֆայլ։</string>
     <string name="save_current_track">Պահպանել ընթացիկ տրեկը</string>
-    <string name="save_track_to_gpx_descrp">Նավիգացիայի ընթացքում GPX տրեկները ինքնաբերաբար կպահպանվեն տրեկների թղթապանակում։</string>
     <string name="save_track_interval_globally">Մուտքագրման ժամանակի ընդմիջումը</string>
     <string name="save_track_interval">Նավիգացիայի ընթացքում մուտքագրման ժամանակի ընդմիջումը</string>
     <string name="save_track_interval_descr">Ընտրեք մուտքագրման ժամանակի ընդմիջումը նավիգացիայի ընթացքում</string>
@@ -1321,14 +1311,12 @@
     <string name="edit_tilesource_url_to_load">URL</string>
     <string name="edit_tilesource_choose_existing">Ընտրեք առկա…</string>
     <string name="maps_define_edit">Սահմանել/Խմբագրել …</string>
-    <string name="map_widget_fps_info">Կարգավորման տեղեկություններ</string>
     <string name="driving_region_descr">Ընտրեք վարելու տարածաշրջանը՝ ԱՄՆ, Եվրոպա, Մեծ Բրիտանիա, Ասիա և այլն։</string>
     <string name="driving_region">Վարելու տարածաշրջանը</string>
     <string name="driving_region_japan">Ճապոնիա</string>
     <string name="driving_region_us">Ամերիկայի Միացյալ Նահանգներ</string>
     <string name="driving_region_canada">Կանադա</string>
     <string name="driving_region_europe_asia">Եվրոպա, Ասիա, Լատինական Ամերիկայում և նմանատիպ</string>
-    <string name="driving_region_uk">Մեծ Բրիտանիան, Հնդկաստանը և այլն</string>
     <string name="driving_region_australia">Ավստրալիա</string>
     <string name="speak_title">Հայտարարել…</string>
     <string name="speak_descr">Նշեք հնչեցումը՝ Փողոցների անվանումների, նախազգուշացումների (պառկած ոստիկանների, «Շարժումը առանց դադարեցնելու արգելված է»), արագության տեսախցիկներ, արագության սահմանափակումներ։</string>
@@ -1363,15 +1351,11 @@
     <string name="map_widget_distancemeasurement">Հեռավորության չափում</string>
     <string name="audionotes_location_not_defined">Դիրքը դեռ հայտնի չէ, որպեսզի կապել նշումի հետ:«Օգտագործեք դիրղը...» նշումը նշված դիրքին նշանակելու համար։</string>
     <string name="map_widget_audionotes">Աուդիո նշումներ</string>
-    <string name="index_srtm_parts">մասեր</string>
-    <string name="index_srtm_ele">Բարձունքների գծեր</string>
     <string name="download_select_map_types">Այլ քարտեզներ</string>
     <string name="download_roads_only_item">Միայն ճանապարհները</string>
     <string name="download_srtm_maps">Քարտեզ SRTM (բարձունքների գծեր)</string>
     <string name="download_regular_maps">Ստանդարտ քարտեզ</string>
     <string name="download_roads_only_maps">Ճանապարհների քարտեզը</string>
-    <string name="rendering_attr_alpineHiking_name">Լեռնաշղթայի զբոսնում մասշտաբով (SAC)</string>
-    <string name="rendering_attr_alpineHiking_description">Պատկերացնել ճանապարհը SAC մասշտաբով։</string>
     <string name="rendering_attr_hikingRoutesOSMC_name">Ճանապարհի արտացոլումը ըստ OSMC երթուղիների</string>
     <string name="rendering_attr_hikingRoutesOSMC_description">Ճանապարհի արտացոլումը ըստ OSMC երթուղիների։</string>
     <string name="rendering_attr_noAdminboundaries_name">Սահմանները</string>
@@ -1637,9 +1621,6 @@
     <string name="map_widget_compass">Կողմնացույց</string>
     <string name="map_widget_reset">Վերականգնել սկզբնական պարամետրերը</string>
     <string name="map_widget_parking">Կայանատեղ</string>
-    <string name="map_widget_speed">Արագություն</string>
-    <string name="map_widget_distance">Նպատակակետ</string>
-    <string name="map_widget_altitude">Բարձրություն</string>
     <string name="map_widget_time">Ուղևորության ժամանակը</string>
     <string name="map_widget_next_turn">Հաջորդ շրջադարձը</string>
     <string name="map_widget_next_turn_small">Հաջորդ շրջադարձը (փոքր)</string>
@@ -1845,7 +1826,6 @@
     <string name="routing_settings">Նավիգացիա</string>
     <string name="routing_settings_descr">Նշեք նավարկության ընտրանքները։</string>
     <string name="global_settings">Ընդհանուր «Կարգավորումներ»</string>
-    <string name="index_settings">Քարտեզների կառավարում</string>
     <string name="general_settings">Ընդհանուր</string>
     <string name="general_settings_descr">Էկրանի պարամետրերը, տեղայնացում, միավորներ և այլն։</string>
     <string name="global_app_settings">Հավելվածի ընդհանուր կարգավորումները</string>
@@ -2091,9 +2071,9 @@
     <string name="poi_context_menu_delete">Ջնջել POI</string>
     <string name="rotate_map_compass_opt">Կողմնացույցի ուղղությամբ</string>
     <string name="rotate_map_bearing_opt">Շարժման ուղղությամբ</string>
-    <string name="rotate_map_none_opt">Չպտտել (հյուսիսը վերեվում)</string>
-    <string name="rotate_map_to_bearing_descr">Ընտրեք քարտեզի պտտման ձևը՝</string>
-    <string name="rotate_map_to_bearing">Քարտեզի կողմնորոշումը</string>
+    <string name="rotate_map_north_opt">Չպտտել (հյուսիսը վերեվում)</string>
+    <string name="rotate_map_to_descr">Ընտրեք քարտեզի պտտման ձևը՝</string>
+    <string name="rotate_map_to">Քարտեզի կողմնորոշումը</string>
     <string name="show_route">Ցույց տալ երթուղին</string>
     <string name="fav_imported_sucessfully">«Սիրվածները» ներմուծվել են</string>
     <string name="no_fav_to_save">«Սիրված» կետեր չկան պահպանելու համար</string>
@@ -2336,7 +2316,7 @@
     <string name="av_camera_pic_size_descr">Ընտրեք տեսախցիկի և պատկերի չափը</string>
     <string name="navigation_intent_invalid">Սխալ ձևաչափ՝ %s</string>
     <string name="plugin_install_needs_network">Անհրաժեշտ է ինտերնետ կապ այս plugin-ը տեղադրելու համար:</string>
-    <string name="get_plugin">Ստանալ</string>
+    <string name="shared_string_get">Ստանալ</string>
     <string name="use_fast_recalculation">Երթուղու խելացի վերահաշվարկ</string>
     <string name="use_fast_recalculation_desc">Երկար ուղեւորությունների ժամանակ միայն վերահաշվարկել երթուղու նախնական մասը:</string>
     <string name="do_you_like_osmand">Ձեզ դուր է գալիս OsmAnd?</string>
@@ -2381,7 +2361,7 @@
     <string name="unsaved_changes_will_be_lost">Ցանկացած չպահպնված փոփոխություն կկորցնեք: Շարունակել?</string>
     <string name="downloads_left_template">Մնաց %1$s ներբեռնումներ</string>
     <string name="roads">Ճանապարհներ</string>
-    <string name="downloading_number_of_files">Ֆայլի ներբեռնում - %1$d</string>
+    <string name="downloading_number_of_files">Ֆայլի ներբեռնում %1$d…</string>
     <string name="show_free_version_banner">Ցույց տալ անվճար տարբերակների պաստառը</string>
     <string name="show_free_version_banner_description">Ցույց տալ անվճար տարբերակների պաստառը նաև վճարովի տարբերակում։</string>
     <string name="buy">Գնել</string>
@@ -2413,7 +2393,7 @@
     <string name="techical_articles_item">Տեխնիկական հոդվածներ</string>
     <string name="versions_item">Տարբերակներ</string>
     <string name="feedback">Արձագանք</string>
-    <string name="contact_us">Կապ մեզ հետ</string>
+    <string name="shared_string_contact">Կապ մեզ հետ</string>
     <string name="map_legend">Քարտեզի նշումներ</string>
     <string name="save_poi_too_many_uppercase">Անունը պարունակում է չափազանց շատ մեծ տառեր: Շարունակել\?</string>
     <string name="save_poi_without_poi_type_message">Վստահ եք, որ ցանկանում եք POI-ին պահպանել առանց տեսակը նշելու?</string>
@@ -2443,21 +2423,12 @@
     <string name="configure_screen_quick_action">Արագ գործողություն</string>
     <string name="quick_action_item_action">Գործողություն %d</string>
     <string name="quick_action_item_screen">Էկրան %d</string>
-    <string name="quick_action_add_marker">Ավելացնել մարկեր</string>
-    <string name="quick_action_add_poi">Ավելացնել POI</string>
-    <string name="quick_action_map_style">Փոխել քարտեզի ոճը</string>
     <string name="quick_action_map_style_switch">Քարտեզի ոճը փոխվել է «%s»։</string>
-    <string name="quick_action_take_audio_note">Ձայնագրել նոր աուդիո նշում</string>
-    <string name="quick_action_take_video_note">Ձայնագրել նոր վիդեո նշում</string>
-    <string name="quick_action_take_photo_note">Անել նոր լուսանկար-նշում</string>
-    <string name="quick_action_add_osm_bug">Ավելացնել OSM Նշում</string>
     <string name="quick_action_navigation_voice">Ձայնը on/off</string>
     <string name="quick_action_navigation_voice_off">Միացնել ձայնը</string>
     <string name="quick_action_navigation_voice_on">Անջատել ձայնը</string>
-    <string name="quick_action_add_parking">Ավելացնել ավտոկայանատեղ</string>
     <string name="quick_action_new_action">Ավելացնել գործողություն</string>
     <string name="quick_action_edit_action">խմբագրել գործողությունը</string>
-    <string name="quick_action_add_favorite">Ավելացնել «Սիրված»-ին</string>
     <string name="dialog_add_action_title">Ավելացնել գործողություն</string>
     <string name="quick_actions_delete">Ջնջել գործողությունը</string>
     <string name="quick_actions_delete_text">Վստահ եք, որ ցանկանում եք ջնջել գործողությունըվ «%s»?</string>
@@ -2483,7 +2454,6 @@
     <string name="quick_action_add_category">Ավելացնել կատեգորիա</string>
     <string name="quick_action_add_create_items">Ստեղծել գործողություններ</string>
     <string name="quick_action_add_configure_map">Կարգավորել քարտեզը</string>
-    <string name="quick_action_add_navigation">Նավիգացիա</string>
     <string name="quick_action_fav_name_descr">Թողնել դատարկ, որ օգտագործել հասցե կամ վայրի անվանումը.</string>
     <string name="quick_action_bug_descr">Այս հաղորդագրությունը ներառված է մեկնաբանության դաշտում:</string>
     <string name="quick_action_bug_message">Հաղորդագրություն</string>
@@ -2495,15 +2465,12 @@
     <string name="quick_action_map_style_action">Ավելացնել քարտեզի ոճը</string>
     <string name="quick_action_empty_param_error">Լրացրեք բոլոր պարամետրերը</string>
     <string name="quick_action_map_styles">Քարտեզների ոճը</string>
-    <string name="quick_action_map_overlay">Փոխել արտեզը</string>
     <string name="quick_action_map_overlay_title">Քարտեզներ</string>
     <string name="quick_action_map_overlay_action">Ավելացնել քարտեզ</string>
     <string name="quick_action_map_overlay_switch">Քարտեզը փոխվել է «%s»։</string>
     <string name="quick_action_map_underlay_switch">Քարտեզի նեքին շերտը փոխվում է «%s»։</string>
-    <string name="quick_action_map_underlay">Փոխել քարտեզի նեքեվի շերտը</string>
     <string name="quick_action_map_underlay_title">Քարտեզի նեքեվի շերտը</string>
     <string name="quick_action_map_underlay_action">Ավելացնել քարտեզի նեքեվի շերտը</string>
-    <string name="quick_action_map_source">Փոխել քարտեզի աղբյուրը</string>
     <string name="quick_action_map_source_title">Քարտեզի աղբյուրները</string>
     <string name="quick_action_map_source_action">Ավելացնել քարտեզի աղբյուրները</string>
     <string name="quick_action_map_source_switch">Քարտեզի աղբյուրը փոխվել է «%s»։</string>
@@ -2652,7 +2619,6 @@
     <string name="ski_map_render_descr">Դահուկային ոճ: Ցուցադրում է - երթուղիների, լեռնադահուկային վերելակների և այլ լեռնադահուկային առանձնահատկություններ: Ավելի քիչ շեղող երկրորդային օբյեկտներ:</string>
     <string name="light_rs_render_descr">Պարզ ոճը ավտոմեքենաների նավարկության համար: Աչքերի համար հարմար է գիշերային ռեժիմում: Հիմնական առանձնահատկությունները. Եզրագծերը, հակապատկեր նարնջագույն ճանապարհներ, ավելի քիչ շեղող երկրորդային օբյեկտներ:</string>
     <string name="topo_render_descr">Հակապատկեր ոճը, որը նախատեսված է հիմնականում արշավային զբոսանքի, հետիոտն և հեծանվային զբոսանքի համար։ Լավ ընթեռնելիություն բարդ արտաքին լուսավորման ժամանակ։ Հիմնական առանձնահատկությունները: Հակապատկեր ճանապարհներ և բնական օբյեկտներ, տարբեր տեսակի երթուղիներ, ուրվագծային գծի առաջադեմ պարամետրերով, ավելի մանրամասն տեղեկատվություններ ներկայացված են համապատասխան մակարդակների չափման, քան հիմնական ոճում։ Ճանապարհային որակի ծածկույթը տարբերակը թույլ է տալիս տարբերակել ճանապարհի տարբեր որակի մակերեսին։ Չկան գիշերային ռեժիմ։</string>
-    <string name="mapnik_render_descr">Հին ցուցադրման ոճը «Mapnik» է: Գույները նման են «Mapnik» ոճին:</string>
     <string name="touring_view_render_descr">Բարձր մանրամասն ոճ շրջագայության համար: Ներառում է կանխադրված ոճի բոլոր կազմաձևային տարբերակները, բացի այդ, ցուցադրվում է որքան հնարավոր է մանրամասն, մասնավորապես, բոլոր ճանապարհները, ճանապարհները և ճանապարհորդելու այլ ուղիներ: Հստակ տեսողական տարբերություն բոլոր տեսակների ճանապարհների միջև, բազմաթիվ զբոսաշրջային ատլասների հիշեցում: Արտաքին օգտագործման, ցերեկային և գիշերային ռեժիմի բարձր հակադրություն գունային սխեման:</string>
     <string name="default_render_descr">Ընդհանուր ոճ: Խիտ բնակեցված քաղաքներում պարզեցված ռենդերինգ: Եզրագծային գծեր, երթուղիներ, ճանապարհերի մակերեսային որակնը, մուտքի սահմանափակումներ, ճանապարհային նշաններ, SAC սանդղակի երթուղիների արտացոլում, սպորտային համաձուլվածքների բնութագրեր:</string>
     <string name="open_wikipedia_link_online">Բացել Wikipedia հղումը առցանց</string>
@@ -2769,7 +2735,6 @@
     <string name="quick_action_edit_actions">Խմբագրել գործողությունը</string>
     <string name="get_osmand_live">Ձեռք բերեք OsmAnd Live, որպեսզի կարողանաք օգտվել բոլոր հնարավորություններից՝ քարտեզների օրական թարմացում անսահմանափակ ներբեռնում, բոլոր plugin-րը Wikipedia, Wikivoyage և շատ ավելին։</string>
     <string name="unirs_render_descr">Հիմնական ոճի ձևափոխում, հետիոտնային և հեծանվավազք ճանապարհների հակադրությունը ավելացնելու համար։ Օգտագործում է ժառանգական Mapnik գույները։</string>
-    <string name="contour_lines_hillshade_maps">Contour lines &amp; Hillshade Քարտեզներ</string>
     <string name="rendering_value_black_name">Սև</string>
     <string name="access_intermediate_arrival_time">Միջանկյալ նպատակակետ ժամանելու ժամը</string>
     <string name="map_widget_intermediate_time">Միջանկյալ նպատակակետ ժամանելու ժամը</string>
@@ -2781,7 +2746,6 @@
     <string name="app_mode_monowheel">Մոնոանիվ</string>
     <string name="app_mode_scooter">Սկուտեր</string>
     <string name="routing_attr_max_num_changes_name">Փոփոխությունների թիվը</string>
-    <string name="gpx_join_gaps">Միացնել բացերը</string>
     <string name="app_mode_camper">Կցասայլակ</string>
     <string name="app_mode_wagon">Սայլակ</string>
     <string name="days_2_4">Օրեր</string>
@@ -2962,7 +2926,6 @@
     <string name="routing_attr_length_name">Երկարության սահմանապակումը</string>
     <string name="speed_cameras_removed_descr">Այս սարքը չունի արագության վերահսկման տեսախցիկներ:</string>
     <string name="app_mode_inline_skates">Անվաչմուշկներ</string>
-    <string name="quick_action_remove_next_destination">Ջնջել հաջորդ նպատակակետը</string>
     <string name="please_provide_point_name_error">Խնդրում ենք մուտքագրել կետի անունը</string>
     <string name="quick_action_remove_next_destination_descr">Երթուղու ընթացիկ նպատակակետը կջնջվի: Եթե դա նպատակակետն է, նավարկումը կդադարի։</string>
     <string name="search_download_wikipedia_maps">Ներբեռնել Վիքիպեդիայի քարտեզները</string>

@@ -5,7 +5,7 @@ import android.content.Context;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.android.billingclient.api.SkuDetails;
+import com.android.billingclient.api.ProductDetails;
 
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
@@ -76,9 +76,9 @@ public class InAppPurchasesImpl extends InAppPurchases {
 		for (InAppSubscription s : subscriptions.getAllSubscriptions()) {
 			if (s instanceof InAppPurchaseMonthlySubscription) {
 				if (s.isLegacy()) {
-					legacyMonthlyLiveUpdates = s;
+					legacyMonthlySubscription = s;
 				} else {
-					monthlyLiveUpdates = s;
+					monthlySubscription = s;
 				}
 			}
 		}
@@ -443,10 +443,10 @@ public class InAppPurchasesImpl extends InAppPurchases {
 
 	public static class InAppPurchaseLiveUpdatesOldSubscription extends InAppSubscription {
 
-		private final SkuDetails details;
+		private final ProductDetails details;
 
-		InAppPurchaseLiveUpdatesOldSubscription(@NonNull SkuDetails details) {
-			super(LIVE_UPDATES_ID, details.getSku());
+		InAppPurchaseLiveUpdatesOldSubscription(@NonNull ProductDetails details) {
+			super(LIVE_UPDATES_ID, details.getProductId());
 			this.details = details;
 		}
 
@@ -692,12 +692,6 @@ public class InAppPurchasesImpl extends InAppPurchases {
 				}
 			}
 			return 0;
-		}
-
-		@Override
-		public String getRegularPrice(@NonNull Context ctx, @NonNull InAppSubscription monthlyLiveUpdates) {
-			double regularPrice = getPriceValue();
-			return getFormattedPrice(ctx, regularPrice, getPriceCurrencyCode());
 		}
 
 		@Nullable

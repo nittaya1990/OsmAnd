@@ -1,10 +1,11 @@
 package net.osmand.plus.auto;
 
+import android.app.Service;
 import android.content.Intent;
 
+import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
-import net.osmand.plus.NavigationService;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
@@ -12,14 +13,10 @@ import net.osmand.plus.notifications.OsmandNotification;
 
 public class CarAppNotification extends OsmandNotification {
 
-	private final static String GROUP_NAME = "CAR_APP";
+	private static final String GROUP_NAME = "CAR_APP";
 
 	public CarAppNotification(OsmandApplication app) {
 		super(app, GROUP_NAME);
-	}
-
-	@Override
-	public void init() {
 	}
 
 	@Override
@@ -34,13 +31,12 @@ public class CarAppNotification extends OsmandNotification {
 
 	@Override
 	public boolean isActive() {
-		NavigationService service = app.getNavigationService();
-		return isEnabled() && service != null;
+		return app.getNavigationCarAppService() != null;
 	}
 
 	@Override
-	public boolean isEnabled() {
-		return app.getCarNavigationSession() != null;
+	public boolean isUsedByService(@Nullable Service service) {
+		return service instanceof NavigationCarAppService;
 	}
 
 	@Override
@@ -49,7 +45,7 @@ public class CarAppNotification extends OsmandNotification {
 	}
 
 	@Override
-	public NotificationCompat.Builder buildNotification(boolean wearable) {
+	public NotificationCompat.Builder buildNotification(@Nullable Service service, boolean wearable) {
 		String notificationTitle;
 		String notificationText;
 		icon = R.drawable.ic_action_osmand_logo;

@@ -22,15 +22,18 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.ConcurrentHashMap;
+
+import androidx.annotation.Nullable;
 
 public class IncrementalChangesManager {
 	private static final Log LOG = PlatformUtil.getLog(IncrementalChangesManager.class);
 	private static final String URL = "https://osmand.net/check_live";
 	private static final org.apache.commons.logging.Log log = PlatformUtil.getLog(IncrementalChangesManager.class);
-	private ResourceManager resourceManager;
+	private final ResourceManager resourceManager;
 	private final Map<String, RegionUpdateFiles> regions = new ConcurrentHashMap<String, IncrementalChangesManager.RegionUpdateFiles>();
 
 	public IncrementalChangesManager(ResourceManager resourceManager) {
@@ -47,7 +50,7 @@ public class IncrementalChangesManager {
 			for (File f : files) {
 				if (!f.getName().endsWith(IndexConstants.BINARY_WIKI_MAP_INDEX_EXT) &&
 						!SrtmDownloadItem.isSrtmFile(f.getName())) {
-					existingFiles.add(Algorithms.getFileNameWithoutExtension(f));
+					existingFiles.add(Algorithms.getFileNameWithoutExtensionAndRoadSuffix(f.getName()));
 				}
 			}
 			for (File f : lf) {
@@ -67,7 +70,7 @@ public class IncrementalChangesManager {
 	}
 
 	public synchronized void indexMainMap(File f, long dateCreated) {
-		String nm = Algorithms.getFileNameWithoutExtension(f).toLowerCase();
+		String nm = Algorithms.getFileNameWithoutExtensionAndRoadSuffix(f.getName()).toLowerCase();
 		RegionUpdateFiles regionUpdateFiles = regions.get(nm);
 		if (regionUpdateFiles == null) {
 			regionUpdateFiles = new RegionUpdateFiles(nm);
@@ -114,7 +117,7 @@ public class IncrementalChangesManager {
 	}
 
 	public synchronized boolean index(File f, long dateCreated, BinaryMapIndexReader mapReader) {
-		String index = Algorithms.getFileNameWithoutExtension(f).toLowerCase();
+		String index = Algorithms.getFileNameWithoutExtensionAndRoadSuffix(f.getName()).toLowerCase();
 		if (index.length() <= 9 || index.charAt(index.length() - 9) != '_') {
 			return false;
 		}
@@ -144,6 +147,19 @@ public class IncrementalChangesManager {
 		protected File file;
 		protected String date;
 		protected long obfCreated;
+
+		@Override
+		public boolean equals(Object o) {
+			if (this == o) return true;
+			if (o == null || getClass() != o.getClass()) return false;
+			RegionUpdate that = (RegionUpdate) o;
+			return obfCreated == that.obfCreated && Objects.equals(file, that.file) && Objects.equals(date, that.date);
+		}
+
+		@Override
+		public int hashCode() {
+			return Objects.hash(file, date, obfCreated);
+		}
 	}
 
 	protected class RegionUpdateFiles {
@@ -159,23 +175,24 @@ public class IncrementalChangesManager {
 
 		public boolean addUpdate(String date, File file, long dateCreated) {
 			String monthYear = date.substring(0, 5);
-			RegionUpdate ru = new RegionUpdate();
-			ru.date = date;
-			ru.file = file;
-			ru.obfCreated = dateCreated;
+			RegionUpdate regionUpdate = new RegionUpdate();
+			regionUpdate.date = date;
+			regionUpdate.file = file;
+			regionUpdate.obfCreated = dateCreated;
 			if (date.endsWith("00")) {
-				monthUpdates.put(monthYear, ru);
+				monthUpdates.put(monthYear, regionUpdate);
 			} else {
-				List<RegionUpdate> list = dayUpdates.get(monthYear);
-				if (list == null) {
-					list = new ArrayList<IncrementalChangesManager.RegionUpdate>();
+				List<RegionUpdate> regionUpdates = dayUpdates.get(monthYear);
+				if (regionUpdates == null) {
+					regionUpdates = new ArrayList<>();
 				}
-				list.add(ru);
-				dayUpdates.put(monthYear, list);
+				if (!regionUpdates.contains(regionUpdate)) {
+					regionUpdates.add(regionUpdate);
+					dayUpdates.put(monthYear, regionUpdates);
+				}
 			}
 			return true;
 		}
-
 	}
 
 	public class IncrementalUpdateList {
@@ -186,12 +203,10 @@ public class IncrementalChangesManager {
 
 		public boolean isPreferrableLimitForDayUpdates(String monthYearPart, List<IncrementalUpdate> dayUpdates) {
 			List<RegionUpdate> lst = updateFiles.dayUpdates.get(monthYearPart);
-			if (lst == null || lst.size() < 10) {
-				return true;
-			}
-			return false;
+			return lst == null || lst.size() < 10;
 		}
 
+		@Nullable
 		public List<IncrementalUpdate> getItemsForUpdate() {
 			Iterator<IncrementalUpdateGroupByMonth> it = updateByMonth.values().iterator();
 			List<IncrementalUpdate> ll = new ArrayList<IncrementalUpdate>();
@@ -251,10 +266,7 @@ public class IncrementalChangesManager {
 
 		public boolean isDayUpdateApplicable() {
 			boolean inLimits = dayUpdates.size() > 0 && dayUpdates.size() < 4;
-			if (!inLimits) {
-				return false;
-			}
-			return true;
+			return inLimits;
 		}
 
 		public List<IncrementalUpdate> getMonthUpdate() {
@@ -298,9 +310,10 @@ public class IncrementalChangesManager {
 		}
 	}
 
-	private List<IncrementalUpdate> getIncrementalUpdates(String file, long timestamp) throws IOException,
+	private List<IncrementalUpdate> getIncrementalUpdates(String fileName, long timestamp) throws IOException,
 			XmlPullParserException {
-		String url = URL + "?aosmc=true&timestamp=" + timestamp + "&file=" + URLEncoder.encode(file);
+		fileName = Algorithms.getFileNameWithoutExtensionAndRoadSuffix(fileName);
+		String url = URL + "?aosmc=true&timestamp=" + timestamp + "&file=" + URLEncoder.encode(fileName);
 
 		HttpURLConnection conn = NetworkUtils.getHttpURLConnection(url);
 		conn.setUseCaches(false);

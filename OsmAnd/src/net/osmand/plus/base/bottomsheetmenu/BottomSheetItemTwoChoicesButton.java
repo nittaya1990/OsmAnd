@@ -16,8 +16,8 @@ import androidx.annotation.ColorRes;
 import androidx.annotation.LayoutRes;
 import androidx.annotation.StringRes;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.R;
 import net.osmand.plus.helpers.AndroidUiHelper;
 
@@ -31,11 +31,11 @@ public class BottomSheetItemTwoChoicesButton extends BottomSheetItemWithCompound
 	private TextView rightBtn;
 
 	@StringRes
-	private int leftBtnTitleRes;
+	private final int leftBtnTitleRes;
 	@StringRes
-	private int rightBtnTitleRes;
+	private final int rightBtnTitleRes;
 	private boolean isLeftBtnSelected;
-	private OnBottomBtnClickListener onBottomBtnClickListener;
+	private final OnBottomBtnClickListener onBottomBtnClickListener;
 	private int bottomBtnBgRadius;
 	private int bottomBtnTextColor;
 	private int activeColor;
@@ -108,28 +108,22 @@ public class BottomSheetItemTwoChoicesButton extends BottomSheetItemWithCompound
 		AndroidUiHelper.updateVisibility(bottomButtons, isChecked());
 		if (leftBtn != null) {
 			leftBtn.setText(leftBtnTitleRes);
-			leftBtn.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View view) {
-					isLeftBtnSelected = true;
-					if (onBottomBtnClickListener != null) {
-						onBottomBtnClickListener.onBottomBtnClick(true);
-					}
-					updateBottomButtons();
+			leftBtn.setOnClickListener(view -> {
+				isLeftBtnSelected = true;
+				if (onBottomBtnClickListener != null) {
+					onBottomBtnClickListener.onBottomBtnClick(true);
 				}
+				updateBottomButtons();
 			});
 		}
 		if (rightBtn != null) {
 			rightBtn.setText(rightBtnTitleRes);
-			rightBtn.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View view) {
-					isLeftBtnSelected = false;
-					if (onBottomBtnClickListener != null) {
-						onBottomBtnClickListener.onBottomBtnClick(false);
-					}
-					updateBottomButtons();
+			rightBtn.setOnClickListener(view -> {
+				isLeftBtnSelected = false;
+				if (onBottomBtnClickListener != null) {
+					onBottomBtnClickListener.onBottomBtnClick(false);
 				}
+				updateBottomButtons();
 			});
 		}
 		updateBottomButtons();
@@ -155,11 +149,11 @@ public class BottomSheetItemTwoChoicesButton extends BottomSheetItemWithCompound
 			bottomBtnBg.setCornerRadii(new float[]{bottomBtnBgRadius, bottomBtnBgRadius, 0, 0, 0, 0, bottomBtnBgRadius, bottomBtnBgRadius});
 			rightBtnContainer.setBackgroundColor(Color.TRANSPARENT);
 			rightBtn.setTextColor(activeColor);
-			leftBtnContainer.setBackgroundDrawable(bottomBtnBg);
+			leftBtnContainer.setBackground(bottomBtnBg);
 			leftBtn.setTextColor(bottomBtnTextColor);
 		} else {
 			bottomBtnBg.setCornerRadii(new float[]{0, 0, bottomBtnBgRadius, bottomBtnBgRadius, bottomBtnBgRadius, bottomBtnBgRadius, 0, 0});
-			rightBtnContainer.setBackgroundDrawable(bottomBtnBg);
+			rightBtnContainer.setBackground(bottomBtnBg);
 			rightBtn.setTextColor(bottomBtnTextColor);
 			leftBtnContainer.setBackgroundColor(Color.TRANSPARENT);
 			leftBtn.setTextColor(activeColor);

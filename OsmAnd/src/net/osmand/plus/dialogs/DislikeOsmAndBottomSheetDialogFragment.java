@@ -12,19 +12,20 @@ import androidx.appcompat.view.ContextThemeWrapper;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 
-import net.osmand.AndroidUtils;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.PlatformUtil;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.base.MenuBottomSheetDialogFragment;
 import net.osmand.plus.base.bottomsheetmenu.SimpleBottomSheetItem;
-import net.osmand.plus.helpers.RateUsHelper;
-import net.osmand.plus.helpers.RateUsHelper.RateUsState;
+import net.osmand.plus.feedback.RateUsHelper;
+import net.osmand.plus.feedback.RateUsState;
 
 import org.apache.commons.logging.Log;
 
 public class DislikeOsmAndBottomSheetDialogFragment extends MenuBottomSheetDialogFragment {
-	public static final String TAG = "DislikeOsmAndBottomSheetDialogFragment";
+
+	public static final String TAG = DislikeOsmAndBottomSheetDialogFragment.class.getSimpleName();
 	private static final Log LOG = PlatformUtil.getLog(DislikeOsmAndBottomSheetDialogFragment.class);
 
 	private RateUsHelper rateUsHelper;
@@ -38,8 +39,8 @@ public class DislikeOsmAndBottomSheetDialogFragment extends MenuBottomSheetDialo
 
 		rateUsHelper = new RateUsHelper();
 
-		final View titleView = View.inflate(new ContextThemeWrapper(context, themeRes), R.layout.dislike_title, null);
-		final SimpleBottomSheetItem titleItem = (SimpleBottomSheetItem) new SimpleBottomSheetItem.Builder()
+		View titleView = View.inflate(new ContextThemeWrapper(context, themeRes), R.layout.dislike_title, null);
+		SimpleBottomSheetItem titleItem = (SimpleBottomSheetItem) new SimpleBottomSheetItem.Builder()
 				.setCustomView(titleView)
 				.create();
 		items.add(titleItem);
@@ -87,9 +88,9 @@ public class DislikeOsmAndBottomSheetDialogFragment extends MenuBottomSheetDialo
 
 	public static void showInstance(@NonNull FragmentManager fm) {
 		try {
-			if (fm.findFragmentByTag(DislikeOsmAndBottomSheetDialogFragment.TAG) == null) {
+			if (fm.findFragmentByTag(TAG) == null) {
 				DislikeOsmAndBottomSheetDialogFragment fragment = new DislikeOsmAndBottomSheetDialogFragment();
-				fragment.show(fm, DislikeOsmAndBottomSheetDialogFragment.TAG);
+				fragment.show(fm, TAG);
 			}
 		} catch (RuntimeException e) {
 			LOG.error("showInstance", e);

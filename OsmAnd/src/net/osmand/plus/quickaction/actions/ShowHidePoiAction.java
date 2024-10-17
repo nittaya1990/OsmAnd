@@ -1,5 +1,7 @@
 package net.osmand.plus.quickaction.actions;
 
+import static net.osmand.plus.quickaction.QuickActionIds.SHOW_HIDE_POI_ACTION_ID;
+
 import android.content.Context;
 import android.content.DialogInterface;
 import android.graphics.drawable.Drawable;
@@ -13,14 +15,16 @@ import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.recyclerview.widget.RecyclerView;
 
-import net.osmand.plus.ContextMenuAdapter;
-import net.osmand.plus.ContextMenuItem;
+import net.osmand.plus.widgets.ctxmenu.ContextMenuAdapter;
+import net.osmand.plus.widgets.ctxmenu.ViewCreator;
+import net.osmand.plus.widgets.ctxmenu.data.ContextMenuItem;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.poi.PoiFiltersHelper;
 import net.osmand.plus.poi.PoiUIFilter;
@@ -39,11 +43,12 @@ import java.util.List;
 import java.util.Set;
 
 public class ShowHidePoiAction extends QuickAction {
+	private static final int defaultActionNameId = R.string.poi;
 
-	public static final QuickActionType TYPE = new QuickActionType(5,
+	public static final QuickActionType TYPE = new QuickActionType(SHOW_HIDE_POI_ACTION_ID,
 			"poi.showhide", ShowHidePoiAction.class)
-			.nameActionRes(R.string.quick_action_show_hide_title)
-			.nameRes(R.string.poi)
+			.nameActionRes(R.string.quick_action_verb_show_hide)
+			.nameRes(defaultActionNameId)
 			.iconRes(R.drawable.ic_action_info_dark)
 			.category(QuickActionType.CONFIGURE_MAP);
 
@@ -60,15 +65,14 @@ public class ShowHidePoiAction extends QuickAction {
 	}
 
 	@Override
-	public String getActionText(OsmandApplication application) {
-		String actionName = isActionWithSlash(application) ? application.getString(R.string.shared_string_hide) : application.getString(R.string.shared_string_show);
-		return application.getString(R.string.ltr_or_rtl_combine_via_dash, actionName, getName(application));
+	public String getActionText(@NonNull OsmandApplication app) {
+		String actionName = isActionWithSlash(app) ? app.getString(R.string.shared_string_hide) : app.getString(R.string.shared_string_show);
+		return app.getString(R.string.ltr_or_rtl_combine_via_dash, actionName, getName(app));
 	}
 
 	@Override
-	public boolean isActionWithSlash(OsmandApplication application) {
-
-		return isCurrentFilters(application);
+	public boolean isActionWithSlash(@NonNull OsmandApplication app) {
+		return isCurrentFilters(app);
 	}
 
 	@Override
@@ -81,69 +85,66 @@ public class ShowHidePoiAction extends QuickAction {
 		String filtersIdsJson = getParams().get(KEY_FILTERS);
 		List<String> filtersIds = tryParseFiltersIds(filtersIdsJson);
 		if (Algorithms.isEmpty(filtersIds)) {
-			return super.getIconRes();
+			return getIconRes();
 		}
 
 		OsmandApplication app = (OsmandApplication) context.getApplicationContext();
 		PoiUIFilter filter = app.getPoiFilters().getFilterById(filtersIds.get(0));
 		if (filter == null) {
-			return super.getIconRes();
+			return getIconRes();
 		}
 
 		Object iconRes = filter.getIconResource();
 		return (iconRes instanceof String && RenderingIcons.containsBigIcon(iconRes.toString()))
 				? RenderingIcons.getBigIconResourceId(iconRes.toString())
-				: super.getIconRes();
+				: getIconRes();
 	}
 
 	@Override
 	public void execute(@NonNull MapActivity mapActivity) {
+		OsmandApplication app = mapActivity.getMyApplication();
+		PoiFiltersHelper helper = app.getPoiFilters();
+		List<PoiUIFilter> poiFilters = loadPoiFilters(helper);
+		boolean currentFilters = isCurrentFilters(app, poiFilters);
 
-		mapActivity.closeQuickSearch();
-
-		PoiFiltersHelper pf = mapActivity.getMyApplication().getPoiFilters();
-		List<PoiUIFilter> poiFilters = loadPoiFilters(mapActivity.getMyApplication().getPoiFilters());
-
-		if (!isCurrentFilters(pf.getSelectedPoiFilters(), poiFilters)) {
-
-			pf.clearSelectedPoiFilters();
-
+		mapActivity.getFragmentsHelper().closeQuickSearch();
+		helper.clearGeneralSelectedPoiFilters();
+		if (!currentFilters) {
 			for (PoiUIFilter filter : poiFilters) {
 				if (filter.isStandardFilter()) {
 					filter.removeUnsavedFilterByName();
 				}
-				pf.addSelectedPoiFilter(filter);
+				helper.addSelectedPoiFilter(filter);
 			}
-		} else {
-			pf.clearSelectedPoiFilters();
 		}
 
 		mapActivity.getMapLayers().updateLayers(mapActivity);
 	}
 
-	private boolean isCurrentFilters(OsmandApplication application) {
-
-		PoiFiltersHelper pf = application.getPoiFilters();
-		List<PoiUIFilter> poiFilters = loadPoiFilters(application.getPoiFilters());
-
-		return isCurrentFilters(pf.getSelectedPoiFilters(), poiFilters);
+	private boolean isCurrentFilters(@NonNull OsmandApplication app) {
+		return isCurrentFilters(app, null);
 	}
 
-	private boolean isCurrentFilters(Set<PoiUIFilter> currentPoiFilters, List<PoiUIFilter> poiFilters) {
-		return currentPoiFilters.size() == poiFilters.size() && currentPoiFilters.containsAll(poiFilters);
+	private boolean isCurrentFilters(@NonNull OsmandApplication app,
+	                                 @Nullable List<PoiUIFilter> poiFilters) {
+		PoiFiltersHelper helper = app.getPoiFilters();
+		if (poiFilters == null) {
+			poiFilters = loadPoiFilters(helper);
+		}
+		return helper.isPoiFiltersSelected(poiFilters);
 	}
 
 	@Override
-	public void drawUI(@NonNull ViewGroup parent, @NonNull final MapActivity mapActivity) {
+	public void drawUI(@NonNull ViewGroup parent, @NonNull MapActivity mapActivity) {
 		boolean nightMode = mapActivity.getMyApplication().getDaynightHelper().isNightModeForMapControls();
 		View view = UiUtilities.getInflater(mapActivity, nightMode).inflate(R.layout.quick_action_show_hide_poi, parent, false);
 
-		RecyclerView list = (RecyclerView) view.findViewById(R.id.list);
+		RecyclerView list = view.findViewById(R.id.list);
 		List<PoiUIFilter> poiFilters = loadPoiFilters(mapActivity.getMyApplication().getPoiFilters());
-		final Adapter adapter = new Adapter(poiFilters);
+		Adapter adapter = new Adapter(poiFilters);
 		list.setAdapter(adapter);
 
-		Button addFilter = (Button) view.findViewById(R.id.btnAddCategory);
+		Button addFilter = view.findViewById(R.id.btnAddCategory);
 		addFilter.setOnClickListener(v -> showSingleChoicePoiFilterDialog(mapActivity, adapter));
 
 		parent.addView(view);
@@ -151,7 +152,7 @@ public class ShowHidePoiAction extends QuickAction {
 
 	public class Adapter extends RecyclerView.Adapter<Adapter.Holder> {
 
-		private List<PoiUIFilter> filters;
+		private final List<PoiUIFilter> filters;
 
 		public Adapter(List<PoiUIFilter> filters) {
 			this.filters = filters;
@@ -176,9 +177,9 @@ public class ShowHidePoiAction extends QuickAction {
 		}
 
 		@Override
-		public void onBindViewHolder(final Adapter.Holder holder, final int position) {
+		public void onBindViewHolder(Adapter.Holder holder, int position) {
 
-			final PoiUIFilter filter = filters.get(position);
+			PoiUIFilter filter = filters.get(position);
 
 			Object res = filter.getIconResource();
 			if (res instanceof String && RenderingIcons.containsBigIcon(res.toString())) {
@@ -188,22 +189,18 @@ public class ShowHidePoiAction extends QuickAction {
 			}
 
 			holder.title.setText(filter.getName());
-			holder.delete.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View view) {
+			holder.delete.setOnClickListener(view -> {
+				String oldTitle = getTitle(filters);
 
-					String oldTitle = getTitle(filters);
+				filters.remove(position);
+				savePoiFilters(filters);
 
-					filters.remove(position);
-					savePoiFilters(filters);
+				notifyDataSetChanged();
 
-					notifyDataSetChanged();
-
-					String titleContent = title.getText().toString();
-					if (oldTitle.equals(titleContent) || titleContent.equals(getName(holder.title.getContext()))) {
-						String newTitle = getTitle(filters);
-						title.setText(newTitle);
-					}
+				String titleContent = title.getText().toString();
+				if (oldTitle.equals(titleContent) || titleContent.equals(view.getContext().getString(defaultActionNameId))) {
+					String newTitle = getTitle(filters);
+					title.setText(newTitle);
 				}
 			});
 		}
@@ -215,16 +212,16 @@ public class ShowHidePoiAction extends QuickAction {
 
 		class Holder extends RecyclerView.ViewHolder {
 
-			private TextView title;
-			private ImageView icon;
-			private ImageView delete;
+			private final TextView title;
+			private final ImageView icon;
+			private final ImageView delete;
 
 			public Holder(View itemView) {
 				super(itemView);
 
-				title = (TextView) itemView.findViewById(R.id.title);
-				icon = (ImageView) itemView.findViewById(R.id.icon);
-				delete = (ImageView) itemView.findViewById(R.id.delete);
+				title = itemView.findViewById(R.id.title);
+				icon = itemView.findViewById(R.id.icon);
+				delete = itemView.findViewById(R.id.delete);
 			}
 		}
 	}
@@ -273,48 +270,43 @@ public class ShowHidePoiAction extends QuickAction {
 		}
 	}
 
-	private void showSingleChoicePoiFilterDialog(final MapActivity mapActivity, final Adapter filtersAdapter) {
-		final OsmandApplication app = mapActivity.getMyApplication();
-		final PoiFiltersHelper poiFilters = app.getPoiFilters();
-		final ContextMenuAdapter adapter = new ContextMenuAdapter(app);
+	private void showSingleChoicePoiFilterDialog(MapActivity mapActivity, Adapter filtersAdapter) {
+		OsmandApplication app = mapActivity.getMyApplication();
+		PoiFiltersHelper poiFilters = app.getPoiFilters();
+		ContextMenuAdapter adapter = new ContextMenuAdapter(app);
 
-		final List<PoiUIFilter> list = new ArrayList<>();
+		List<PoiUIFilter> list = new ArrayList<>();
 
 		for (PoiUIFilter f : poiFilters.getSortedPoiFilters(true)) {
-			addFilterToList(adapter, list, f);
+			if (!f.isCustomPoiFilter()) {
+				addFilterToList(adapter, list, f);
+			}
 		}
 
 		boolean nightMode = app.getDaynightHelper().isNightModeForMapControls();
-		final ArrayAdapter<ContextMenuItem> listAdapter = adapter.createListAdapter(mapActivity, !nightMode);
+		ViewCreator viewCreator = new ViewCreator(mapActivity, nightMode);
+		ArrayAdapter<ContextMenuItem> listAdapter = adapter.toListAdapter(mapActivity, viewCreator);
 		AlertDialog.Builder builder = new AlertDialog.Builder(UiUtilities.getThemedContext(mapActivity, nightMode));
-		builder.setAdapter(listAdapter, new DialogInterface.OnClickListener() {
-			@Override
-			public void onClick(DialogInterface dialog, int which) {
+		builder.setAdapter(listAdapter, (dialog, which) -> {
+			String oldTitle = getTitle(filtersAdapter.filters);
 
-				String oldTitle = getTitle(filtersAdapter.filters);
+			filtersAdapter.addItem(list.get(which));
 
-				filtersAdapter.addItem(list.get(which));
-
-				String titleContent = title.getText().toString();
-				if (oldTitle.equals(titleContent) || titleContent.equals(getName(mapActivity))) {
-					String newTitle = getTitle(filtersAdapter.filters);
-					title.setText(newTitle);
-				}
+			String titleContent = title.getText().toString();
+			if (oldTitle.equals(titleContent) || titleContent.equals(mapActivity.getString(defaultActionNameId))) {
+				String newTitle = getTitle(filtersAdapter.filters);
+				title.setText(newTitle);
 			}
-
 		});
 		builder.setTitle(R.string.show_poi_over_map);
 		builder.setNegativeButton(R.string.shared_string_dismiss, null);
 
-		final AlertDialog alertDialog = builder.create();
+		AlertDialog alertDialog = builder.create();
 
-		alertDialog.setOnShowListener(new DialogInterface.OnShowListener() {
-			@Override
-			public void onShow(DialogInterface dialog) {
-				Button neutralButton = alertDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
-				Drawable drawable = app.getUIUtilities().getThemedIcon(R.drawable.ic_action_multiselect);
-				neutralButton.setCompoundDrawablesWithIntrinsicBounds(drawable, null, null, null);
-			}
+		alertDialog.setOnShowListener(dialog -> {
+			Button neutralButton = alertDialog.getButton(DialogInterface.BUTTON_NEUTRAL);
+			Drawable drawable = app.getUIUtilities().getThemedIcon(R.drawable.ic_action_multiselect);
+			neutralButton.setCompoundDrawablesWithIntrinsicBounds(drawable, null, null, null);
 		});
 
 		alertDialog.show();
@@ -329,22 +321,22 @@ public class ShowHidePoiAction extends QuickAction {
 				: filters.get(0).getName();
 	}
 
-	private void addFilterToList(final ContextMenuAdapter adapter,
-								 final List<PoiUIFilter> list,
-								 final PoiUIFilter f) {
+	private void addFilterToList(ContextMenuAdapter adapter,
+	                             List<PoiUIFilter> list,
+	                             PoiUIFilter f) {
 		list.add(f);
-		ContextMenuItem.ItemBuilder builder = new ContextMenuItem.ItemBuilder();
+		ContextMenuItem item = new ContextMenuItem(null);
 
-		builder.setTitle(f.getName());
+		item.setTitle(f.getName());
 
 		if (RenderingIcons.containsBigIcon(f.getIconId())) {
-			builder.setIcon(RenderingIcons.getBigIconResourceId(f.getIconId()));
+			item.setIcon(RenderingIcons.getBigIconResourceId(f.getIconId()));
 		} else {
-			builder.setIcon(R.drawable.mx_special_custom_category);
+			item.setIcon(R.drawable.mx_special_custom_category);
 		}
 
-		builder.setSkipPaintingWithoutColor(true);
-		adapter.addItem(builder.createItem());
+		item.setUseNaturalIconColor(true);
+		adapter.addItem(item);
 	}
 
 	@Override

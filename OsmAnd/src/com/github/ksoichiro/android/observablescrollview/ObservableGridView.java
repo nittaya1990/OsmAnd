@@ -51,7 +51,7 @@ public class ObservableGridView extends GridView implements Scrollable {
     private ViewGroup mTouchInterceptionViewGroup;
 
     private OnScrollListener mOriginalScrollListener;
-    private OnScrollListener mScrollListener = new OnScrollListener() {
+    private final OnScrollListener mScrollListener = new OnScrollListener() {
         @Override
         public void onScrollStateChanged(AbsListView view, int scrollState) {
             if (mOriginalScrollListener != null) {
@@ -155,7 +155,7 @@ public class ObservableGridView extends GridView implements Scrollable {
                         }
 
                         // Apps can set the interception target other than the direct parent.
-                        final ViewGroup parent;
+                        ViewGroup parent;
                         if (mTouchInterceptionViewGroup == null) {
                             parent = (ViewGroup) getParent();
                         } else {
@@ -170,7 +170,7 @@ public class ObservableGridView extends GridView implements Scrollable {
                             offsetX += v.getLeft() - v.getScrollX();
                             offsetY += v.getTop() - v.getScrollY();
                         }
-                        final MotionEvent event = MotionEvent.obtainNoHistory(ev);
+                        MotionEvent event = MotionEvent.obtainNoHistory(ev);
                         event.offsetLocation(offsetX, offsetY);
 
                         if (parent.onInterceptTouchEvent(event)) {
@@ -183,12 +183,7 @@ public class ObservableGridView extends GridView implements Scrollable {
 
                             // Return this onTouchEvent() first and set ACTION_DOWN event for parent
                             // to the queue, to keep events sequence.
-                            post(new Runnable() {
-                                @Override
-                                public void run() {
-                                    parent.dispatchTouchEvent(event);
-                                }
-                            });
+                            post(() -> parent.dispatchTouchEvent(event));
                             return false;
                         }
                         // Even when this can't be scrolled anymore,
@@ -340,11 +335,11 @@ public class ObservableGridView extends GridView implements Scrollable {
             prevScrollY = in.readInt();
             scrollY = in.readInt();
             childrenHeights = new SparseIntArray();
-            final int numOfChildren = in.readInt();
+            int numOfChildren = in.readInt();
             if (0 < numOfChildren) {
                 for (int i = 0; i < numOfChildren; i++) {
-                    final int key = in.readInt();
-                    final int value = in.readInt();
+                    int key = in.readInt();
+                    int value = in.readInt();
                     childrenHeights.put(key, value);
                 }
             }
@@ -358,7 +353,7 @@ public class ObservableGridView extends GridView implements Scrollable {
             out.writeInt(prevScrolledChildrenHeight);
             out.writeInt(prevScrollY);
             out.writeInt(scrollY);
-            final int numOfChildren = childrenHeights == null ? 0 : childrenHeights.size();
+            int numOfChildren = childrenHeights == null ? 0 : childrenHeights.size();
             out.writeInt(numOfChildren);
             if (0 < numOfChildren) {
                 for (int i = 0; i < numOfChildren; i++) {

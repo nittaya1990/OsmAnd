@@ -15,25 +15,26 @@ import java.util.Set;
 public class WorldRegion implements Serializable {
 
 	public static final String WORLD_BASEMAP = "world_basemap";
+	public static final String WORLD_BASEMAP_MINI = "world_basemap_mini";
 	public static final String ANTARCTICA_REGION_ID = "antarctica";
 	public static final String AFRICA_REGION_ID = "africa";
 	public static final String ASIA_REGION_ID = "asia";
-	public static final String AUSTRALIA_AND_OCEANIA_REGION_ID = "australia-oceania";
+	public static final String AUSTRALIA_AND_OCEANIA_REGION_ID = "australia-oceania-all";
 	public static final String CENTRAL_AMERICA_REGION_ID = "centralamerica";
 	public static final String EUROPE_REGION_ID = "europe";
 	public static final String NORTH_AMERICA_REGION_ID = "northamerica";
 	public static final String RUSSIA_REGION_ID = "russia";
 	public static final String JAPAN_REGION_ID = "japan_asia";
+	public static final String GERMANY_REGION_ID = "europe_germany";
+	public static final String FRANCE_REGION_ID = "europe_france";
 	public static final String SOUTH_AMERICA_REGION_ID = "southamerica";
-	protected static final String WORLD = "world";
-
-	// Just a string constant
-	public static final String UNITED_KINGDOM_REGION_ID = "gb_europe";
+	public static final String WORLD = "world";
+	public static final String UNITED_KINGDOM_REGION_ID = "europe_gb";
 
 	// Hierarchy
 	protected WorldRegion superregion;
 	protected List<WorldRegion> subregions;
-	
+
 	// filled by osmand regions
 	protected RegionParams params = new RegionParams();
 	protected String regionFullName;
@@ -48,6 +49,7 @@ public class WorldRegion implements Serializable {
 	protected LatLon regionCenter;
 	protected QuadRect boundingBox;
 	protected List<LatLon> polygon;
+	protected List<List<LatLon>> additionalPolygons = new ArrayList<>();
 
 	public static class RegionParams {
 		protected String regionLeftHandDriving;
@@ -91,13 +93,13 @@ public class WorldRegion implements Serializable {
 	}
 
 	public String getLocaleName() {
-		if(!Algorithms.isEmpty(regionNameLocale)) {
+		if (!Algorithms.isEmpty(regionNameLocale)) {
 			return regionNameLocale;
 		}
-		if(!Algorithms.isEmpty(regionNameEn)) {
+		if (!Algorithms.isEmpty(regionNameEn)) {
 			return regionNameEn;
 		}
-		if(!Algorithms.isEmpty(regionName)) {
+		if (!Algorithms.isEmpty(regionName)) {
 			return regionName;
 		}
 
@@ -128,6 +130,19 @@ public class WorldRegion implements Serializable {
 		return superregion;
 	}
 
+	public List<WorldRegion> getSuperRegions() {
+		List<WorldRegion> regions = new ArrayList<>();
+		collectSuperRegions(regions, superregion);
+		return regions;
+	}
+
+	private void collectSuperRegions(List<WorldRegion> regions, WorldRegion region) {
+		if (region != null) {
+			regions.add(region);
+			collectSuperRegions(regions, region.getSuperregion());
+		}
+	}
+
 	public List<WorldRegion> getSubregions() {
 		return subregions;
 	}
@@ -139,7 +154,7 @@ public class WorldRegion implements Serializable {
 
 		WorldRegion that = (WorldRegion) o;
 
-		return !(regionFullName != null ? !regionFullName.toLowerCase().equals(that.regionFullName.toLowerCase()) : that.regionFullName != null);
+		return !(regionFullName != null ? !regionFullName.equalsIgnoreCase(that.regionFullName) : that.regionFullName != null);
 	}
 
 	@Override
@@ -154,6 +169,7 @@ public class WorldRegion implements Serializable {
 		subregions = new LinkedList<>();
 
 	}
+
 	public WorldRegion(String id) {
 		this(id, null);
 	}
@@ -204,9 +220,9 @@ public class WorldRegion implements Serializable {
 		}
 
 		// Finally check inner point
-		boolean isInnerPoint = Algorithms.isPointInsidePolygon(another.regionCenter, another.polygon);
+		boolean isInnerPoint = another.containsPoint(another.regionCenter);
 		if (isInnerPoint) {
-			return Algorithms.isPointInsidePolygon(another.regionCenter, this.polygon);
+			return containsPoint(another.regionCenter);
 		} else {
 			// in this case we should find real inner point and check it
 		}
@@ -221,6 +237,10 @@ public class WorldRegion implements Serializable {
 	private boolean containsPolygon(List<LatLon> another) {
 		return (polygon != null && another != null) &&
 				Algorithms.isFirstPolygonInsideSecond(another, polygon);
+	}
+
+	public boolean containsPoint(LatLon latLon) {
+		return polygon != null && Algorithms.isPointInsidePolygon(latLon, polygon);
 	}
 
 	public boolean isContinent() {
@@ -276,5 +296,21 @@ public class WorldRegion implements Serializable {
 		} else {
 			return obfFileName.toLowerCase();
 		}
+	}
+
+	public QuadRect getBoundingBox() {
+		return boundingBox;
+	}
+
+	public List<List<LatLon>> getPolygons() {
+		List<List<LatLon>> polygons = new ArrayList<>();
+		polygons.add(polygon);
+		polygons.addAll(additionalPolygons);
+		return polygons;
+	}
+
+	@Override
+	public String toString() {
+		return getRegionId();
 	}
 }

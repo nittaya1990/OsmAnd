@@ -1,30 +1,34 @@
 package net.osmand.plus.views.mapwidgets.widgetstates;
 
 import net.osmand.plus.OsmandApplication;
+import net.osmand.plus.settings.backend.ApplicationMode;
+import net.osmand.plus.settings.backend.OsmandSettings;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 public abstract class WidgetState {
 
-	private OsmandApplication ctx;
+	protected final OsmandApplication app;
+	protected final OsmandSettings settings;
 
-	public OsmandApplication getCtx() {
-		return ctx;
+	public WidgetState(@NonNull OsmandApplication app) {
+		this.app = app;
+		this.settings = app.getSettings();
 	}
 
-	public WidgetState(OsmandApplication ctx) {
-		this.ctx = ctx;
+	@NonNull
+	public OsmandApplication getApp() {
+		return app;
 	}
 
-	public abstract int getMenuTitleId();
+	@NonNull
+	public abstract String getTitle();
 
-	public abstract int getMenuIconId();
+	public abstract int getSettingsIconId(boolean nightMode);
 
-	public abstract int getMenuItemId();
+	public abstract void changeToNextState();
 
-	public abstract int[] getMenuTitleIds();
-
-	public abstract int[] getMenuIconIds();
-
-	public abstract int[] getMenuItemIds();
-
-	public abstract void changeState(int stateId);
+	public abstract void copyPrefs(@NonNull ApplicationMode appMode, @Nullable String customId);
+	public abstract void copyPrefsFromMode(@NonNull ApplicationMode sourceAppMode, @NonNull ApplicationMode appMode, @Nullable String customId);
 }

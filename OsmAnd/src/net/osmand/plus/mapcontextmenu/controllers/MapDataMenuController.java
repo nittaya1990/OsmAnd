@@ -1,6 +1,11 @@
 package net.osmand.plus.mapcontextmenu.controllers;
 
-import android.content.DialogInterface;
+import static net.osmand.IndexConstants.BINARY_WIKI_MAP_INDEX_EXT;
+import static net.osmand.IndexConstants.TIF_EXT;
+import static net.osmand.plus.download.DownloadActivityType.HILLSHADE_FILE;
+import static net.osmand.plus.download.DownloadActivityType.SLOPE_FILE;
+import static net.osmand.plus.download.DownloadActivityType.SRTM_COUNTRY_FILE;
+
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
@@ -10,29 +15,30 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AlertDialog;
 
-import net.osmand.AndroidUtils;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
 import net.osmand.data.LatLon;
 import net.osmand.data.PointDescription;
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
 import net.osmand.plus.R;
-import net.osmand.plus.activities.LocalIndexHelper;
-import net.osmand.plus.activities.LocalIndexHelper.LocalIndexType;
-import net.osmand.plus.activities.LocalIndexInfo;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.activities.PluginsFragment;
 import net.osmand.plus.download.DownloadActivityType;
 import net.osmand.plus.download.DownloadIndexesThread;
-import net.osmand.plus.download.DownloadValidationManager;
 import net.osmand.plus.download.IndexItem;
+import net.osmand.plus.download.local.LocalIndexHelper;
+import net.osmand.plus.download.local.LocalItemType;
+import net.osmand.plus.download.local.LocalItem;
+import net.osmand.plus.download.SrtmDownloadItem;
 import net.osmand.plus.helpers.FileNameTranslationHelper;
-import net.osmand.plus.inapp.InAppPurchaseHelper;
+import net.osmand.plus.inapp.InAppPurchaseUtils;
 import net.osmand.plus.liveupdates.LiveUpdatesHelper;
 import net.osmand.plus.mapcontextmenu.MenuController;
 import net.osmand.plus.mapcontextmenu.builders.MapDataMenuBuilder;
-import net.osmand.plus.srtmplugin.SRTMPlugin;
+import net.osmand.plus.plugins.OsmandPlugin;
+import net.osmand.plus.plugins.PluginsFragment;
+import net.osmand.plus.plugins.PluginsHelper;
+import net.osmand.plus.plugins.srtm.SRTMPlugin;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.plus.views.layers.ContextMenuLayer.IContextMenuProvider;
 import net.osmand.plus.views.layers.DownloadedRegionsLayer.DownloadMapObject;
 import net.osmand.util.Algorithms;
@@ -48,45 +54,47 @@ import java.util.List;
 import java.util.Map;
 
 public class MapDataMenuController extends MenuController {
+
 	private DownloadMapObject mapObject;
 	private List<IndexItem> otherIndexItems;
-	private LocalIndexInfo localIndexInfo;
-	private List<LocalIndexInfo> otherLocalIndexInfos;
-	private boolean srtmDisabled;
-	private boolean srtmNeedsInstallation;
+	private final LocalItem localItem;
+	private List<LocalItem> otherLocalItems;
+
+	private final boolean srtmDisabled;
+	private final boolean srtmNeedsInstallation;
 	private boolean backuped;
 
-	private DownloadIndexesThread downloadThread;
+	private final DownloadIndexesThread downloadThread;
 
-	public MapDataMenuController(@NonNull MapActivity mapActivity, @NonNull PointDescription pointDescription, final @NonNull DownloadMapObject mapObject) {
+	public MapDataMenuController(@NonNull MapActivity mapActivity, @NonNull PointDescription pointDescription, @NonNull DownloadMapObject mapObject) {
 		super(new MapDataMenuBuilder(mapActivity), pointDescription, mapActivity);
 		this.mapObject = mapObject;
 		indexItem = mapObject.getIndexItem();
-		localIndexInfo = mapObject.getLocalIndexInfo();
-		final OsmandApplication app = mapActivity.getMyApplication();
+		localItem = mapObject.getLocalItem();
+		OsmandApplication app = mapActivity.getMyApplication();
 		downloadThread = app.getDownloadThread();
 		if (indexItem != null) {
 			downloaded = indexItem.isDownloaded();
 			backuped = indexItem.getBackupFile(app).exists();
 			otherIndexItems = new LinkedList<>(downloadThread.getIndexes().getIndexItems(mapObject.getWorldRegion()));
 			otherIndexItems.remove(indexItem);
-		} else if (localIndexInfo != null) {
+		} else if (localItem != null) {
 			downloaded = true;
-			backuped = localIndexInfo.isBackupedData();
+			backuped = localItem.isBackuped(app);
 			LocalIndexHelper helper = new LocalIndexHelper(app);
-			otherLocalIndexInfos = helper.getLocalIndexInfos(mapObject.getWorldRegion().getRegionDownloadName());
-			for (Iterator<LocalIndexInfo> iterator = otherLocalIndexInfos.iterator(); iterator.hasNext(); ) {
-				LocalIndexInfo info = iterator.next();
-				if (info.getPathToData().equals(localIndexInfo.getPathToData())) {
+			otherLocalItems = helper.getLocalItems(mapObject.getWorldRegion().getRegionDownloadName());
+			for (Iterator<LocalItem> iterator = otherLocalItems.iterator(); iterator.hasNext(); ) {
+				LocalItem info = iterator.next();
+				if (info.getPath().equals(localItem.getPath())) {
 					iterator.remove();
 					break;
 				}
 			}
 		}
 
-		srtmDisabled = !OsmandPlugin.isActive(SRTMPlugin.class)
-				&& !InAppPurchaseHelper.isContourLinesPurchased(app);
-		OsmandPlugin srtmPlugin = OsmandPlugin.getPlugin(SRTMPlugin.class);
+		srtmDisabled = !PluginsHelper.isActive(SRTMPlugin.class)
+				&& !InAppPurchaseUtils.isContourLinesAvailable(app);
+		OsmandPlugin srtmPlugin = PluginsHelper.getPlugin(SRTMPlugin.class);
 		srtmNeedsInstallation = srtmPlugin == null || srtmPlugin.needsInstallation();
 
 		leftDownloadButtonController = new TitleButtonController() {
@@ -96,16 +104,17 @@ public class MapDataMenuController extends MenuController {
 				if (backuped) {
 					restoreFromBackup();
 				} else if (indexItem != null && activity != null) {
-					if ((indexItem.getType() == DownloadActivityType.SRTM_COUNTRY_FILE
-							|| indexItem.getType() == DownloadActivityType.HILLSHADE_FILE
-							|| indexItem.getType() == DownloadActivityType.SLOPE_FILE)
+					if ((indexItem.getType() == SRTM_COUNTRY_FILE
+							|| indexItem.getType() == HILLSHADE_FILE
+							|| indexItem.getType() == SLOPE_FILE)
 							&& srtmDisabled) {
 						activity.getContextMenu().close();
 
 						if (srtmNeedsInstallation) {
-							OsmandPlugin plugin = OsmandPlugin.getPlugin(SRTMPlugin.class);
+							OsmandPlugin plugin = PluginsHelper.getPlugin(SRTMPlugin.class);
 							if (plugin != null) {
-								activity.startActivity(new Intent(Intent.ACTION_VIEW, Uri.parse(plugin.getInstallURL())));
+								Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(plugin.getInstallURL()));
+								AndroidUtils.startActivityIfSafe(activity, intent);
 							} else {
 								Toast.makeText(activity.getApplicationContext(),
 										activity.getString(R.string.activate_srtm_plugin), Toast.LENGTH_LONG).show();
@@ -116,7 +125,7 @@ public class MapDataMenuController extends MenuController {
 									Toast.LENGTH_SHORT).show();
 						}
 					} else if (!downloaded || indexItem.isOutdated()) {
-						new DownloadValidationManager(app).startDownload(activity, indexItem);
+						startDownload(mapActivity, indexItem);
 					} else if (isLiveUpdatesOn()) {
 						LiveUpdatesHelper.runLiveUpdate(activity, indexItem.getTargetFileName(), true, null);
 					}
@@ -141,8 +150,8 @@ public class MapDataMenuController extends MenuController {
 									new DownloadMapObject(mapObject.getDataObject(), mapObject.getWorldRegion(), item, null),
 									provider);
 						}
-					} else if (otherLocalIndexInfos != null && otherLocalIndexInfos.size() > 0) {
-						for (LocalIndexInfo info : otherLocalIndexInfos) {
+					} else if (otherLocalItems != null && otherLocalItems.size() > 0) {
+						for (LocalItem info : otherLocalItems) {
 							selectedObjects.put(
 									new DownloadMapObject(mapObject.getDataObject(), mapObject.getWorldRegion(), null, info),
 									provider);
@@ -165,8 +174,8 @@ public class MapDataMenuController extends MenuController {
 					} else {
 						deleteItem(indexItem.getTargetFile(app));
 					}
-				} else if (localIndexInfo != null) {
-					deleteItem(new File(localIndexInfo.getPathToData()));
+				} else if (localItem != null) {
+					deleteItem(new File(localItem.getPath()));
 				}
 			}
 		};
@@ -214,8 +223,8 @@ public class MapDataMenuController extends MenuController {
 	public CharSequence getAdditionalInfoStr() {
 		double mb = 0;
 		if (backuped) {
-			if (localIndexInfo != null) {
-				mb = localIndexInfo.getSize();
+			if (localItem != null) {
+				mb = localItem.getSize();
 			} else if (indexItem != null) {
 				mb = indexItem.getArchiveSizeMB();
 			}
@@ -280,12 +289,29 @@ public class MapDataMenuController extends MenuController {
 			} else {
 				res = mapActivity.getString(R.string.shared_string_map);
 			}
-			DownloadActivityType downloadActivityType = getDownloadActivityType();
-			if (downloadActivityType != null) {
-				res += ", " + downloadActivityType.getString(mapActivity);
+			String mapType = getMapType();
+			if (!Algorithms.isEmpty(mapType)) {
+				res += ", " + mapType;
 			}
 		}
 		return res;
+	}
+
+	@NonNull
+	private String getMapType() {
+		String type = "";
+		MapActivity mapActivity = getMapActivity();
+		DownloadActivityType downloadActivityType = getDownloadActivityType();
+		if (downloadActivityType != null && mapActivity != null) {
+			type = downloadActivityType.getString(mapActivity);
+			if (downloadActivityType == SRTM_COUNTRY_FILE) {
+				Object object = indexItem != null ? indexItem : localItem;
+				if (object != null) {
+					type += " " + SrtmDownloadItem.getAbbreviationInScopes(mapActivity, object);
+				}
+			}
+		}
+		return type;
 	}
 
 	@Override
@@ -300,26 +326,26 @@ public class MapDataMenuController extends MenuController {
 			return;
 		}
 		if (indexItem != null) {
-			addPlainMenuItem(R.drawable.ic_action_info_dark, null, indexItem.getType().getString(mapActivity), false, false, null);
+			addPlainMenuItem(R.drawable.ic_action_info_dark, null, getMapType(), false, false, null);
 			StringBuilder sizeStr = new StringBuilder();
 			sizeStr.append(indexItem.getSizeDescription(mapActivity));
 			if (backuped) {
-				sizeStr.append(" — ").append(LocalIndexType.DEACTIVATED.getHumanString(mapActivity));
+				sizeStr.append(" — ").append(mapActivity.getString(R.string.local_indexes_cat_backup));
 			}
 			addPlainMenuItem(R.drawable.ic_action_info_dark, null, sizeStr.toString(), false, false, null);
-		} else if (localIndexInfo != null) {
+		} else if (localItem != null) {
 			if (getDownloadActivityType() != null) {
-				addPlainMenuItem(R.drawable.ic_action_info_dark, null, getDownloadActivityType().getString(mapActivity), false, false, null);
+				addPlainMenuItem(R.drawable.ic_action_info_dark, null, getMapType(), false, false, null);
 			}
 			StringBuilder sizeStr = new StringBuilder();
-			if (localIndexInfo.getSize() >= 0) {
-				sizeStr.append(AndroidUtils.formatSize(mapActivity, localIndexInfo.getSize() * 1024l));
+			if (localItem.getSize() >= 0) {
+				sizeStr.append(AndroidUtils.formatSize(mapActivity, localItem.getSize() * 1024L));
 			}
 			if (backuped) {
 				if (sizeStr.length() > 0) {
-					sizeStr.append(" — ").append(LocalIndexType.DEACTIVATED.getHumanString(mapActivity));
+					sizeStr.append(" — ").append(mapActivity.getString(R.string.local_indexes_cat_backup));
 				} else {
-					sizeStr.append(LocalIndexType.DEACTIVATED.getHumanString(mapActivity));
+					sizeStr.append(mapActivity.getString(R.string.local_indexes_cat_backup));
 				}
 			}
 			addPlainMenuItem(R.drawable.ic_action_info_dark, null, sizeStr.toString(), false, false, null);
@@ -352,8 +378,8 @@ public class MapDataMenuController extends MenuController {
 		if (indexItem != null) {
 			DateFormat dateFormat = android.text.format.DateFormat.getMediumDateFormat(mapActivity);
 			addPlainMenuItem(R.drawable.ic_action_data, null, indexItem.getRemoteDate(dateFormat), false, false, null);
-		} else if (localIndexInfo != null) {
-			addPlainMenuItem(R.drawable.ic_action_data, null, localIndexInfo.getDescription(), false, false, null);
+		} else if (localItem != null) {
+			addPlainMenuItem(R.drawable.ic_action_data, null, localItem.getDescription(mapActivity.getMyApplication()), false, false, null);
 		}
 	}
 
@@ -400,11 +426,11 @@ public class MapDataMenuController extends MenuController {
 		if (backuped) {
 			leftDownloadButtonController.caption = mapActivity.getString(R.string.local_index_mi_restore);
 		} else if (indexItem != null) {
-			if ((indexItem.getType() == DownloadActivityType.SRTM_COUNTRY_FILE
-					|| indexItem.getType() == DownloadActivityType.HILLSHADE_FILE
-					|| indexItem.getType() == DownloadActivityType.SLOPE_FILE)
+			if ((indexItem.getType() == SRTM_COUNTRY_FILE
+					|| indexItem.getType() == HILLSHADE_FILE
+					|| indexItem.getType() == SLOPE_FILE)
 					&& srtmDisabled) {
-				leftDownloadButtonController.caption = mapActivity.getString(R.string.get_plugin);
+				leftDownloadButtonController.caption = mapActivity.getString(R.string.shared_string_get);
 				leftDownloadButtonController.clearIcon(true);
 			} else if (indexItem.isOutdated()) {
 				leftDownloadButtonController.caption = mapActivity.getString(R.string.shared_string_update);
@@ -421,7 +447,7 @@ public class MapDataMenuController extends MenuController {
 
 		bottomTitleButtonController.visible = downloaded;
 		rightDownloadButtonController.visible = (otherIndexItems != null && otherIndexItems.size() > 0)
-				|| (otherLocalIndexInfos != null && otherLocalIndexInfos.size() > 0);
+				|| (otherLocalItems != null && otherLocalItems.size() > 0);
 
 		boolean internetConnectionAvailable =
 				mapActivity.getMyApplication().getSettings().isInternetConnectionAvailable();
@@ -431,7 +457,7 @@ public class MapDataMenuController extends MenuController {
 			titleProgressController.setMapDownloadMode();
 			if (downloadThread.getCurrentDownloadingItem() == indexItem) {
 				titleProgressController.indeterminate = false;
-				titleProgressController.progress = downloadThread.getCurrentDownloadingItemProgress();
+				titleProgressController.progress = downloadThread.getCurrentDownloadProgress();
 			} else {
 				titleProgressController.indeterminate = true;
 				titleProgressController.progress = 0;
@@ -460,19 +486,16 @@ public class MapDataMenuController extends MenuController {
 		}
 	}
 
-	private void deleteItem(final File file) {
+	private void deleteItem(File file) {
 		MapActivity mapActivity = getMapActivity();
 		if (mapActivity != null) {
 			OsmandApplication app = mapActivity.getMyApplication();
 			if (file.exists()) {
 				AlertDialog.Builder confirm = new AlertDialog.Builder(getMapActivity());
-				confirm.setPositiveButton(R.string.shared_string_yes, new DialogInterface.OnClickListener() {
-					@Override
-					public void onClick(DialogInterface dialog, int which) {
-						MapActivity activity = getMapActivity();
-						if (activity != null) {
-							new DeleteFileTask(activity, file).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, (Void) null);
-						}
+				confirm.setPositiveButton(R.string.shared_string_yes, (dialog, which) -> {
+					MapActivity activity = getMapActivity();
+					if (activity != null) {
+						new DeleteFileTask(activity, file).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, (Void) null);
 					}
 				});
 				confirm.setNegativeButton(R.string.shared_string_no, null);
@@ -493,8 +516,8 @@ public class MapDataMenuController extends MenuController {
 		MapActivity mapActivity = getMapActivity();
 		if (mapActivity != null) {
 			RestoreFromBackupTask restoreFromBackupTask = null;
-			if (localIndexInfo != null) {
-				restoreFromBackupTask = new RestoreFromBackupTask(mapActivity, localIndexInfo);
+			if (localItem != null) {
+				restoreFromBackupTask = new RestoreFromBackupTask(mapActivity, localItem);
 			} else if (indexItem != null) {
 				restoreFromBackupTask = new RestoreFromBackupTask(mapActivity, indexItem);
 			}
@@ -507,37 +530,40 @@ public class MapDataMenuController extends MenuController {
 	private DownloadActivityType getDownloadActivityType() {
 		if (indexItem != null) {
 			return indexItem.getType();
-		} else if (localIndexInfo != null) {
-			if (localIndexInfo.getOriginalType() == LocalIndexType.MAP_DATA) {
-				if (localIndexInfo.getFileName().endsWith(IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)) {
-					return DownloadActivityType.ROADS_FILE;
-				} else {
-					return DownloadActivityType.NORMAL_FILE;
+		} else if (localItem != null) {
+			if (localItem.getType() == LocalItemType.MAP_DATA) {
+				return DownloadActivityType.NORMAL_FILE;
+			} else if (localItem.getType() == LocalItemType.ROAD_DATA) {
+				return DownloadActivityType.ROADS_FILE;
+			} else if (localItem.getType() == LocalItemType.TERRAIN_DATA) {
+				if (SrtmDownloadItem.isSrtmFile(localItem.getFileName())) {
+					return SRTM_COUNTRY_FILE;
+				} else if (localItem.getFileName().endsWith(TIF_EXT)) {
+					return DownloadActivityType.GEOTIFF_FILE;
 				}
-			} else if (localIndexInfo.getOriginalType() == LocalIndexType.SRTM_DATA) {
-				return DownloadActivityType.SRTM_COUNTRY_FILE;
-			} else if (localIndexInfo.getOriginalType() == LocalIndexType.WIKI_DATA) {
-				return DownloadActivityType.WIKIPEDIA_FILE;
-			} else if (localIndexInfo.getOriginalType() == LocalIndexType.TRAVEL_DATA) {
-				return DownloadActivityType.WIKIVOYAGE_FILE;
-			} else if (localIndexInfo.getOriginalType() == LocalIndexType.TTS_VOICE_DATA
-					|| localIndexInfo.getOriginalType() == LocalIndexType.VOICE_DATA) {
+			} else if (localItem.getType() == LocalItemType.WIKI_AND_TRAVEL_MAPS) {
+				if (localItem.getFileName().endsWith(BINARY_WIKI_MAP_INDEX_EXT)) {
+					return DownloadActivityType.WIKIPEDIA_FILE;
+				} else {
+					return DownloadActivityType.WIKIVOYAGE_FILE;
+				}
+			} else if (localItem.getType() == LocalItemType.TTS_VOICE_DATA
+					|| localItem.getType() == LocalItemType.VOICE_DATA) {
 				return DownloadActivityType.VOICE_FILE;
-			} else if (localIndexInfo.getOriginalType() == LocalIndexType.FONT_DATA) {
+			} else if (localItem.getType() == LocalItemType.FONT_DATA) {
 				return DownloadActivityType.FONT_FILE;
-			} else {
-				return null;
+			} else if (localItem.getType() == LocalItemType.DEPTH_DATA) {
+				return DownloadActivityType.DEPTH_MAP_FILE;
 			}
-		} else {
-			return null;
 		}
+		return null;
 	}
 
 	private static class DeleteFileTask extends AsyncTask<Void, Void, Void> {
 
-		private File file;
-		private WeakReference<MapActivity> mapActivityRef;
-		private OsmandApplication app;
+		private final File file;
+		private final WeakReference<MapActivity> mapActivityRef;
+		private final OsmandApplication app;
 
 		DeleteFileTask(@NonNull MapActivity mapActivity, @NonNull File file) {
 			this.file = file;
@@ -574,16 +600,16 @@ public class MapDataMenuController extends MenuController {
 
 	private static class RestoreFromBackupTask extends AsyncTask<Void, Void, Void> {
 
-		private WeakReference<MapActivity> mapActivityRef;
-		private OsmandApplication app;
+		private final WeakReference<MapActivity> mapActivityRef;
+		private final OsmandApplication app;
 
-		private LocalIndexInfo localIndexInfo;
+		private LocalItem localItem;
 		private IndexItem indexItem;
 
-		RestoreFromBackupTask(@NonNull MapActivity mapActivity, @NonNull LocalIndexInfo localIndexInfo) {
+		RestoreFromBackupTask(@NonNull MapActivity mapActivity, @NonNull LocalItem LocalItem) {
 			this.mapActivityRef = new WeakReference<>(mapActivity);
 			this.app = mapActivity.getMyApplication();
-			this.localIndexInfo = localIndexInfo;
+			this.localItem = LocalItem;
 		}
 
 		RestoreFromBackupTask(@NonNull MapActivity mapActivity, @NonNull IndexItem indexItem) {
@@ -602,15 +628,15 @@ public class MapDataMenuController extends MenuController {
 
 		@Override
 		protected Void doInBackground(Void... params) {
-			if (localIndexInfo != null) {
-				LocalIndexInfo info = localIndexInfo;
-				if (move(new File(info.getPathToData()), getFileToRestore(info))) {
-					app.getResourceManager().reloadIndexes(IProgress.EMPTY_PROGRESS, new ArrayList<String>());
+			if (localItem != null) {
+				LocalItem info = localItem;
+				if (move(new File(info.getPath()), getFileToRestore(info))) {
+					app.getResourceManager().reloadIndexes(IProgress.EMPTY_PROGRESS, new ArrayList<>());
 					app.getDownloadThread().updateLoadedFiles();
 				}
 			} else if (indexItem != null) {
 				if (move(indexItem.getBackupFile(app), indexItem.getTargetFile(app))) {
-					app.getResourceManager().reloadIndexes(IProgress.EMPTY_PROGRESS, new ArrayList<String>());
+					app.getResourceManager().reloadIndexes(IProgress.EMPTY_PROGRESS, new ArrayList<>());
 					app.getDownloadThread().updateLoadedFiles();
 				}
 			}
@@ -625,31 +651,42 @@ public class MapDataMenuController extends MenuController {
 		}
 
 		@NonNull
-		private File getFileToRestore(LocalIndexInfo i) {
-			if (i.isBackupedData()) {
-				File parent = new File(i.getPathToData()).getParentFile();
-				if (i.getOriginalType() == LocalIndexType.MAP_DATA) {
-					if (i.getFileName().endsWith(IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)) {
-						parent = app.getAppPath(IndexConstants.ROADS_INDEX_DIR);
+		private File getFileToRestore(@NonNull LocalItem item) {
+			String fileName = item.getFileName();
+			if (item.isBackuped(app)) {
+				File parent = new File(item.getPath()).getParentFile();
+				if (item.getType() == LocalItemType.MAP_DATA) {
+					parent = app.getAppPath(IndexConstants.MAPS_PATH);
+				} else if (item.getType() == LocalItemType.ROAD_DATA) {
+					parent = app.getAppPath(IndexConstants.ROADS_INDEX_DIR);
+				} else if (item.getType() == LocalItemType.TILES_DATA) {
+					 if (fileName.endsWith(IndexConstants.TIF_EXT)) {
+						parent = app.getAppPath(IndexConstants.GEOTIFF_DIR);
 					} else {
-						parent = app.getAppPath(IndexConstants.MAPS_PATH);
+						parent = app.getAppPath(IndexConstants.TILES_INDEX_DIR);
 					}
-				} else if (i.getOriginalType() == LocalIndexType.TILES_DATA) {
-					parent = app.getAppPath(IndexConstants.TILES_INDEX_DIR);
-				} else if (i.getOriginalType() == LocalIndexType.SRTM_DATA) {
-					parent = app.getAppPath(IndexConstants.SRTM_INDEX_DIR);
-				} else if (i.getOriginalType() == LocalIndexType.WIKI_DATA) {
-					parent = app.getAppPath(IndexConstants.WIKI_INDEX_DIR);
-				} else if (i.getOriginalType() == LocalIndexType.TRAVEL_DATA) {
-					parent = app.getAppPath(IndexConstants.WIKIVOYAGE_INDEX_DIR);
-				} else if (i.getOriginalType() == LocalIndexType.TTS_VOICE_DATA) {
+				} else if (item.getType() == LocalItemType.TERRAIN_DATA) {
+					if (SrtmDownloadItem.isSrtmFile(localItem.getFileName())) {
+						parent = app.getAppPath(IndexConstants.SRTM_INDEX_DIR);
+					} else if (localItem.getFileName().endsWith(TIF_EXT)) {
+						parent = app.getAppPath(IndexConstants.GEOTIFF_DIR);
+					}
+				} else if (item.getType() == LocalItemType.WIKI_AND_TRAVEL_MAPS) {
+					if (fileName.endsWith(BINARY_WIKI_MAP_INDEX_EXT)) {
+						parent = app.getAppPath(IndexConstants.WIKI_INDEX_DIR);
+					} else {
+						parent = app.getAppPath(IndexConstants.WIKIVOYAGE_INDEX_DIR);
+					}
+				} else if (item.getType() == LocalItemType.TTS_VOICE_DATA) {
 					parent = app.getAppPath(IndexConstants.VOICE_INDEX_DIR);
-				} else if (i.getOriginalType() == LocalIndexType.VOICE_DATA) {
+				} else if (item.getType() == LocalItemType.VOICE_DATA) {
 					parent = app.getAppPath(IndexConstants.VOICE_INDEX_DIR);
+				} else if (item.getType() == LocalItemType.DEPTH_DATA) {
+					parent = app.getAppPath(IndexConstants.NAUTICAL_INDEX_DIR);
 				}
-				return new File(parent, i.getFileName());
+				return new File(parent, fileName);
 			}
-			return new File(i.getPathToData());
+			return new File(item.getPath());
 		}
 
 		private boolean move(File from, File to) {

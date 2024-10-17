@@ -13,25 +13,27 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.helpers.AndroidUiHelper;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.UiUtilities;
 
 import java.util.List;
 
 public class PopUpMenuArrayAdapter extends ArrayAdapter<PopUpMenuItem> {
 
-	private List<PopUpMenuItem> items;
-	private boolean nightMode;
+	private final List<PopUpMenuItem> items;
+	private final boolean nightMode;
+	private final int layoutId;
 
 	public PopUpMenuArrayAdapter(@NonNull Context context,
-	                             int resource,
+	                             int layoutId,
 	                             List<PopUpMenuItem> items,
 	                             boolean nightMode) {
-		super(context, resource);
+		super(context, layoutId);
 		this.items = items;
+		this.layoutId = layoutId;
 		this.nightMode = nightMode;
 	}
 
@@ -45,12 +47,16 @@ public class PopUpMenuArrayAdapter extends ArrayAdapter<PopUpMenuItem> {
 	public View getView(int position, @Nullable View convertView, @NonNull ViewGroup parent) {
 		LayoutInflater inflater = LayoutInflater.from(getContext());
 		if (convertView == null) {
-			convertView = inflater.inflate(R.layout.popup_menu_item, parent, false);
+			convertView = inflater.inflate(layoutId, parent, false);
 		}
 		PopUpMenuItem item = getItem(position);
 		if (item != null) {
 			TextView tvTitle = convertView.findViewById(R.id.title);
 			tvTitle.setText(item.getTitle());
+			Integer titleColor = item.getTitleColor();
+			if (titleColor != null) {
+				tvTitle.setTextColor(titleColor);
+			}
 			ImageView ivIcon = convertView.findViewById(R.id.icon);
 			Drawable icon = item.getIcon();
 			if (icon != null) {
@@ -58,13 +64,11 @@ public class PopUpMenuArrayAdapter extends ArrayAdapter<PopUpMenuItem> {
 			} else {
 				ivIcon.setVisibility(View.GONE);
 			}
-			CompoundButton radio = convertView.findViewById(R.id.radio);
+			CompoundButton radio = convertView.findViewById(R.id.compound_button);
 			if (item.isShowCompoundBtn()) {
 				UiUtilities.setupCompoundButton(nightMode, item.getCompoundBtnColor(), radio);
-				radio.setVisibility(View.VISIBLE);
-			} else {
-				radio.setVisibility(View.GONE);
 			}
+			AndroidUiHelper.updateVisibility(radio, item.isShowCompoundBtn());
 			if (item.isSelected()) {
 				if (item.isShowCompoundBtn()) {
 					radio.setChecked(true);

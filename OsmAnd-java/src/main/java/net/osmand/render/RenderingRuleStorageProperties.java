@@ -23,8 +23,9 @@ public class RenderingRuleStorageProperties {
 	public static final String ATTR_STRING_VALUE = "attrStringValue";
 	public static final String TEST = "test";
 	public static final String DISABLE = "disable";
-	
-	
+
+	public static final String ASSOCIATION = "association";
+
 	
 	public static final String INTERSECTION_MARGIN = "intersectionMargin";
 	public static final String INTERSECTION_SIZE_FACTOR = "intersectionSizeFactor";
@@ -98,8 +99,10 @@ public class RenderingRuleStorageProperties {
 	public static final String TEXT_WRAP_WIDTH = "textWrapWidth";
 	public static final String SHADOW_LEVEL = "shadowLevel";
 	public static final String ADD_POINT = "addPoint";
+	public static final String ORDER_BY_DENSITY = "orderByDensity";
 
-	
+	public RenderingRuleProperty R_ASSOCIATION;
+
 	public RenderingRuleProperty R_TEST;
 	public RenderingRuleProperty R_DISABLE;
 	public RenderingRuleProperty R_ATTR_INT_VALUE;
@@ -185,6 +188,7 @@ public class RenderingRuleStorageProperties {
 	public RenderingRuleProperty R_TEXT_HALO_COLOR;
 	public RenderingRuleProperty R_TEXT_WRAP_WIDTH;
 	public RenderingRuleProperty R_ADD_POINT;
+	public RenderingRuleProperty R_ORDER_BY_DENSITY;
 
 	final Map<String, RenderingRuleProperty> properties;
 	// C++
@@ -226,6 +230,7 @@ public class RenderingRuleStorageProperties {
 		R_NAME_TAG = registerRuleInternal(RenderingRuleProperty.createInputStringProperty(NAME_TAG));
 		R_NAME_TAG2 = registerRuleInternal(RenderingRuleProperty.createOutputStringProperty(NAME_TAG2));
 
+		R_ASSOCIATION = registerRuleInternal(RenderingRuleProperty.createOutputIntProperty(ASSOCIATION));
 		R_DISABLE = registerRuleInternal(RenderingRuleProperty.createOutputBooleanProperty(DISABLE));
 		R_ATTR_INT_VALUE = registerRuleInternal(RenderingRuleProperty.createOutputIntProperty(ATTR_INT_VALUE));
 		R_ATTR_BOOL_VALUE = registerRuleInternal(RenderingRuleProperty.createOutputBooleanProperty(ATTR_BOOL_VALUE));
@@ -311,6 +316,8 @@ public class RenderingRuleStorageProperties {
 		R_ONEWAY_ARROWS_COLOR = registerRuleInternal(RenderingRuleProperty.createOutputColorProperty(ONEWAY_ARROWS_COLOR));
 		R_ADD_POINT = registerRuleInternal(RenderingRuleProperty.createOutputBooleanProperty(ADD_POINT));
 		R_IGNORE_POLYGON_AS_POINT_AREA = registerRuleInternal(RenderingRuleProperty.createOutputBooleanProperty(IGNORE_POLYGON_AS_POINT_AREA));
+
+		R_ORDER_BY_DENSITY = registerRuleInternal(RenderingRuleProperty.createOutputIntProperty(ORDER_BY_DENSITY));
 	}
 
 	public RenderingRuleProperty get(String name) {

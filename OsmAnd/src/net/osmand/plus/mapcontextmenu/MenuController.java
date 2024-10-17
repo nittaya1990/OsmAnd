@@ -6,46 +6,39 @@ import android.os.AsyncTask;
 import android.text.SpannableString;
 import android.text.style.ForegroundColorSpan;
 import android.util.Pair;
-import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.widget.LinearLayout;
 
-import androidx.annotation.ColorRes;
-import androidx.annotation.DrawableRes;
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-import androidx.appcompat.content.res.AppCompatResources;
-
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.Location;
 import net.osmand.NativeLibrary.RenderedObject;
-import net.osmand.PlatformUtil;
+import net.osmand.OnResultCallback;
 import net.osmand.aidl.AidlMapPointWrapper;
 import net.osmand.binary.BinaryMapDataObject;
+import net.osmand.core.android.MapRendererView;
 import net.osmand.data.Amenity;
 import net.osmand.data.FavouritePoint;
 import net.osmand.data.LatLon;
 import net.osmand.data.PointDescription;
+import net.osmand.data.QuadRect;
+import net.osmand.data.SpecialPointType;
 import net.osmand.data.TransportStop;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.map.OsmandRegions;
 import net.osmand.map.WorldRegion;
-import net.osmand.plus.ColorUtilities;
-import net.osmand.plus.GpxSelectionHelper.GpxDisplayItem;
-import net.osmand.plus.OsmAndFormatter;
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
 import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper.TargetPoint;
+import net.osmand.plus.Version;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.audionotes.AudioVideoNoteMenuController;
-import net.osmand.plus.audionotes.AudioVideoNotesPlugin.Recording;
+import net.osmand.plus.chooseplan.ChoosePlanFragment;
+import net.osmand.plus.chooseplan.OsmAndFeature;
 import net.osmand.plus.download.DownloadActivityType;
 import net.osmand.plus.download.DownloadIndexesThread;
 import net.osmand.plus.download.DownloadValidationManager;
 import net.osmand.plus.download.IndexItem;
-import net.osmand.plus.helpers.AvoidSpecificRoads;
+import net.osmand.plus.avoidroads.AvoidRoadInfo;
 import net.osmand.plus.helpers.SearchHistoryHelper;
+import net.osmand.plus.helpers.TargetPointsHelper.TargetPoint;
 import net.osmand.plus.mapcontextmenu.MenuBuilder.CollapseExpandListener;
 import net.osmand.plus.mapcontextmenu.controllers.AMapPointMenuController;
 import net.osmand.plus.mapcontextmenu.controllers.AmenityMenuController;
@@ -56,6 +49,7 @@ import net.osmand.plus.mapcontextmenu.controllers.ImpassibleRoadsMenuController;
 import net.osmand.plus.mapcontextmenu.controllers.MapDataMenuController;
 import net.osmand.plus.mapcontextmenu.controllers.MapMarkerMenuController;
 import net.osmand.plus.mapcontextmenu.controllers.MyLocationMenuController;
+import net.osmand.plus.mapcontextmenu.controllers.NetworkRouteMenuController;
 import net.osmand.plus.mapcontextmenu.controllers.PointDescriptionMenuController;
 import net.osmand.plus.mapcontextmenu.controllers.RenderedObjectMenuController;
 import net.osmand.plus.mapcontextmenu.controllers.SelectedGpxMenuController;
@@ -65,27 +59,41 @@ import net.osmand.plus.mapcontextmenu.controllers.TransportRouteController;
 import net.osmand.plus.mapcontextmenu.controllers.TransportStopController;
 import net.osmand.plus.mapcontextmenu.controllers.WptPtMenuController;
 import net.osmand.plus.mapcontextmenu.other.ShareMenu;
-import net.osmand.plus.mapillary.MapillaryImage;
-import net.osmand.plus.mapillary.MapillaryMenuController;
 import net.osmand.plus.mapmarkers.MapMarker;
-import net.osmand.plus.osmedit.EditPOIMenuController;
-import net.osmand.plus.osmedit.OsmBugMenuController;
-import net.osmand.plus.osmedit.OsmBugsLayer.OpenStreetNote;
-import net.osmand.plus.osmedit.OsmPoint;
-import net.osmand.plus.parkingpoint.ParkingPositionMenuController;
-import net.osmand.plus.resources.OsmandRegionSearcher;
+import net.osmand.plus.plugins.OsmandPlugin;
+import net.osmand.plus.plugins.PluginsHelper;
+import net.osmand.plus.plugins.audionotes.AudioVideoNoteMenuController;
+import net.osmand.plus.plugins.audionotes.AudioVideoNotesPlugin.Recording;
+import net.osmand.plus.plugins.mapillary.MapillaryImage;
+import net.osmand.plus.plugins.mapillary.MapillaryMenuController;
+import net.osmand.plus.plugins.osmedit.OsmBugsLayer.OpenStreetNote;
+import net.osmand.plus.plugins.osmedit.data.OsmPoint;
+import net.osmand.plus.plugins.osmedit.menu.EditPOIMenuController;
+import net.osmand.plus.plugins.osmedit.menu.OsmBugMenuController;
+import net.osmand.plus.plugins.parking.ParkingPositionMenuController;
+import net.osmand.plus.plugins.srtm.SRTMPlugin;
+import net.osmand.plus.resources.SearchOsmandRegionTask;
+import net.osmand.plus.track.helpers.GpxDisplayItem;
 import net.osmand.plus.transport.TransportStopRoute;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.NativeUtilities;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.plus.views.OsmandMapTileView;
 import net.osmand.plus.views.layers.DownloadedRegionsLayer.DownloadMapObject;
-import net.osmand.plus.views.mapwidgets.MapInfoWidgetsFactory.TopToolbarController;
-import net.osmand.plus.views.mapwidgets.MapInfoWidgetsFactory.TopToolbarControllerType;
+import net.osmand.plus.views.mapwidgets.TopToolbarController;
+import net.osmand.router.network.NetworkRouteSelector.RouteKey;
 import net.osmand.util.OpeningHoursParser.OpeningHours;
 
-import org.apache.commons.logging.Log;
-
-import java.lang.ref.WeakReference;
 import java.util.LinkedList;
 import java.util.List;
+
+import androidx.annotation.ColorRes;
+import androidx.annotation.DrawableRes;
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.content.res.AppCompatResources;
+
+import static net.osmand.plus.download.DownloadValidationManager.MAXIMUM_AVAILABLE_FREE_DOWNLOADS;
 
 public abstract class MenuController extends BaseMenuController implements CollapseExpandListener {
 
@@ -127,8 +135,6 @@ public abstract class MenuController extends BaseMenuController implements Colla
 
 	protected List<OpeningHours.Info> openingHoursInfo;
 
-	private static final Log LOG = PlatformUtil.getLog(MenuController.class);
-
 	public MenuController(MenuBuilder builder, PointDescription pointDescription, MapActivity mapActivity) {
 		super(mapActivity);
 		this.pointDescription = pointDescription;
@@ -148,6 +154,10 @@ public abstract class MenuController extends BaseMenuController implements Colla
 		}
 	}
 
+	public String getPreferredMapLangLC() {
+		return getPreferredMapLang().toLowerCase();
+	}
+
 	public String getPreferredMapLang() {
 		return builder.getPreferredMapLang();
 	}
@@ -165,27 +175,35 @@ public abstract class MenuController extends BaseMenuController implements Colla
 		builder.setMapContextMenu(mapContextMenu);
 	}
 
-	public void build(View rootView) {
-		for (OsmandPlugin plugin : OsmandPlugin.getEnabledPlugins()) {
+	public void build(ViewGroup rootView) {
+		for (OsmandPlugin plugin : PluginsHelper.getEnabledPlugins()) {
 			if (plugin.isMenuControllerSupported(this.getClass())) {
 				builder.addMenuPlugin(plugin);
 			}
 		}
-		builder.build((ViewGroup) rootView);
+		builder.build(rootView, getObject());
+	}
+
+	@Override
+	public void updateNightMode() {
+		super.updateNightMode();
+		if (builder != null) {
+			builder.setLight(!nightMode);
+		}
 	}
 
 	public static MenuController getMenuController(@NonNull MapActivity mapActivity,
-												   @NonNull LatLon latLon,
-												   @NonNull PointDescription pointDescription,
-												   @Nullable Object object,
-												   @NonNull MenuType menuType) {
+	                                               @NonNull LatLon latLon,
+	                                               @NonNull PointDescription pointDescription,
+	                                               @Nullable Object object,
+	                                               @NonNull MenuType menuType) {
 		MenuController menuController = null;
 		if (object != null) {
 			if (object instanceof Amenity) {
 				menuController = new AmenityMenuController(mapActivity, pointDescription, (Amenity) object);
 			} else if (object instanceof FavouritePoint) {
 				if (pointDescription.isParking()
-						|| (FavouritePoint.SpecialPointType.PARKING.equals(((FavouritePoint) object).getSpecialPointType()))) {
+						|| (SpecialPointType.PARKING.equals(((FavouritePoint) object).getSpecialPointType()))) {
 					menuController = new ParkingPositionMenuController(mapActivity, pointDescription, (FavouritePoint) object);
 				} else {
 					menuController = new FavouritePointMenuController(mapActivity, pointDescription, (FavouritePoint) object);
@@ -218,16 +236,22 @@ public abstract class MenuController extends BaseMenuController implements Colla
 				if (pointDescription.isMyLocation()) {
 					menuController = new MyLocationMenuController(mapActivity, pointDescription);
 				}
-			} else if (object instanceof AvoidSpecificRoads.AvoidRoadInfo) {
-				menuController = new ImpassibleRoadsMenuController(mapActivity, pointDescription, (AvoidSpecificRoads.AvoidRoadInfo) object);
+			} else if (object instanceof AvoidRoadInfo) {
+				menuController = new ImpassibleRoadsMenuController(mapActivity, pointDescription, (AvoidRoadInfo) object);
 			} else if (object instanceof RenderedObject) {
 				menuController = new RenderedObjectMenuController(mapActivity, pointDescription, (RenderedObject) object);
 			} else if (object instanceof MapillaryImage) {
 				menuController = new MapillaryMenuController(mapActivity, pointDescription, (MapillaryImage) object);
 			} else if (object instanceof SelectedGpxPoint) {
 				menuController = new SelectedGpxMenuController(mapActivity, pointDescription, (SelectedGpxPoint) object);
-			} else if (object instanceof Pair && ((Pair<?, ?>) object).second instanceof SelectedGpxPoint) {
-				menuController = new SelectedGpxMenuController(mapActivity, pointDescription, (SelectedGpxPoint) ((Pair<?, ?>) object).second);
+			} else if (object instanceof Pair) {
+				Pair<?, ?> pair = (Pair<?, ?>) object;
+				if (pair.second instanceof SelectedGpxPoint) {
+					menuController = new SelectedGpxMenuController(mapActivity, pointDescription,
+							(SelectedGpxPoint) ((Pair<?, ?>) object).second);
+				} else if (pair.first instanceof RouteKey && pair.second instanceof QuadRect) {
+					menuController = new NetworkRouteMenuController(mapActivity, pointDescription, pair);
+				}
 			}
 		}
 		if (menuController == null) {
@@ -269,12 +293,6 @@ public abstract class MenuController extends BaseMenuController implements Colla
 		builder.addPlainMenuItem(iconId, buttonText, text, needLinks, isUrl, onClickListener);
 	}
 
-	public void addPlainMenuItem(int iconId, String text, boolean needLinks, boolean isUrl,
-		boolean collapsable, CollapsableView collapsableView, OnClickListener onClickListener) {
-
-		builder.addPlainMenuItem(iconId, text, needLinks, isUrl, collapsable, collapsableView, onClickListener);
-	}
-
 	public void clearPlainMenuItems() {
 		builder.clearPlainMenuItems();
 	}
@@ -288,9 +306,9 @@ public abstract class MenuController extends BaseMenuController implements Colla
 	}
 
 	protected void addSpeedToPlainItems() {
-		final MapActivity mapActivity = getMapActivity();
+		MapActivity mapActivity = getMapActivity();
 		if (mapActivity != null) {
-			final OsmandApplication app = mapActivity.getMyApplication();
+			OsmandApplication app = mapActivity.getMyApplication();
 			Location l = app.getLocationProvider().getLastKnownLocation();
 			if (l != null && l.hasSpeed() && l.getSpeed() > 0f) {
 				String speed = OsmAndFormatter.getFormattedSpeed(l.getSpeed(), app);
@@ -300,9 +318,9 @@ public abstract class MenuController extends BaseMenuController implements Colla
 	}
 
 	protected void addAltitudeToPlainItems() {
-		final MapActivity mapActivity = getMapActivity();
+		MapActivity mapActivity = getMapActivity();
 		if (mapActivity != null) {
-			final OsmandApplication app = mapActivity.getMyApplication();
+			OsmandApplication app = mapActivity.getMyApplication();
 			Location l = app.getLocationProvider().getLastKnownLocation();
 			if (l != null && l.hasAltitude()) {
 				String alt = OsmAndFormatter.getFormattedAlt(l.getAltitude(), app);
@@ -312,19 +330,19 @@ public abstract class MenuController extends BaseMenuController implements Colla
 	}
 
 	protected void addPrecisionToPlainItems() {
-		final MapActivity mapActivity = getMapActivity();
-		if (mapActivity != null ) {
-			final OsmandApplication app = mapActivity.getMyApplication();
+		MapActivity mapActivity = getMapActivity();
+		if (mapActivity != null) {
+			OsmandApplication app = mapActivity.getMyApplication();
 			Location l = app.getLocationProvider().getLastKnownLocation();
 			if (l != null && l.hasAccuracy()) {
 				String acc;
 				if (l.hasVerticalAccuracy()) {
 					acc = String.format(app.getString(R.string.precision_hdop_and_vdop),
-						OsmAndFormatter.getFormattedDistance(l.getAccuracy(), app),
-						OsmAndFormatter.getFormattedDistance(l.getVerticalAccuracy(), app));
+							OsmAndFormatter.getFormattedDistance(l.getAccuracy(), app),
+							OsmAndFormatter.getFormattedDistance(l.getVerticalAccuracy(), app));
 				} else {
 					acc = String.format(app.getString(R.string.precision_hdop),
-						OsmAndFormatter.getFormattedDistance(l.getAccuracy(), app));
+							OsmAndFormatter.getFormattedDistance(l.getAccuracy(), app));
 				}
 
 				addPlainMenuItem(R.drawable.ic_action_ruler_circle, null, acc, false, false, null);
@@ -476,6 +494,25 @@ public abstract class MenuController extends BaseMenuController implements Colla
 		return false;
 	}
 
+	public void getFormattedAltitude(@NonNull OnResultCallback<String> callback) {
+		MapActivity activity = getMapActivity();
+		SRTMPlugin srtmPlugin = PluginsHelper.getActivePlugin(SRTMPlugin.class);
+		if (activity != null && srtmPlugin != null && srtmPlugin.is3DReliefAllowed()) {
+			OsmandApplication app = activity.getMyApplication();
+			OsmandMapTileView mapView = activity.getMapView();
+			MapRendererView mapRenderer = mapView.getMapRenderer();
+			NativeUtilities.getAltitudeForLatLon(mapRenderer, getLatLon(), altitude -> {
+				if (altitude != null) {
+					callback.onResult(OsmAndFormatter.getFormattedAlt(altitude, app));
+				} else {
+					callback.onResult(null);
+				}
+			});
+		} else {
+			callback.onResult(null);
+		}
+	}
+
 	public int getRightIconId() {
 		return 0;
 	}
@@ -547,7 +584,7 @@ public abstract class MenuController extends BaseMenuController implements Colla
 					break;
 				}
 			}
-			return open ? R.color.ctx_menu_amenity_opened_text_color : R.color.ctx_menu_amenity_closed_text_color;
+			return open ? R.color.text_color_positive : R.color.text_color_negative;
 		} else if (shouldShowMapSize()) {
 			return R.color.icon_color_default_light;
 		}
@@ -558,8 +595,8 @@ public abstract class MenuController extends BaseMenuController implements Colla
 		MapActivity mapActivity = getMapActivity();
 		if (mapActivity != null) {
 			if (openingHoursInfo != null) {
-				int colorOpen = mapActivity.getResources().getColor(R.color.ctx_menu_amenity_opened_text_color);
-				int colorClosed = mapActivity.getResources().getColor(R.color.ctx_menu_amenity_closed_text_color);
+				int colorOpen = mapActivity.getColor(R.color.text_color_positive);
+				int colorClosed = mapActivity.getColor(R.color.text_color_negative);
 				return getSpannableOpeningHours(openingHoursInfo, colorOpen, colorClosed);
 			} else if (shouldShowMapSize()) {
 				return mapActivity.getString(R.string.file_size_in_mb, indexItem.getArchiveSizeMB());
@@ -579,8 +616,8 @@ public abstract class MenuController extends BaseMenuController implements Colla
 	}
 
 	public static SpannableString getSpannableOpeningHours(List<OpeningHours.Info> openingHoursInfo,
-														   int colorOpen,
-														   int colorClosed) {
+	                                                       int colorOpen,
+	                                                       int colorClosed) {
 		StringBuilder sb = new StringBuilder();
 		int[] pos = new int[openingHoursInfo.size()];
 		for (int i = 0; i < openingHoursInfo.size(); i++) {
@@ -595,7 +632,9 @@ public abstract class MenuController extends BaseMenuController implements Colla
 		int k = 0;
 		for (int i = 0; i < openingHoursInfo.size(); i++) {
 			OpeningHours.Info info = openingHoursInfo.get(i);
-			infoStr.setSpan(new ForegroundColorSpan(info.isOpened() ? colorOpen : colorClosed), k, pos[i], 0);
+			boolean opened = info.isFallback() ? openingHoursInfo.get(i - 1).isOpened() : info.isOpened();
+			int color = opened ? colorOpen : colorClosed;
+			infoStr.setSpan(new ForegroundColorSpan(color), k, pos[i], 0);
 			k = pos[i];
 		}
 		return infoStr;
@@ -675,7 +714,7 @@ public abstract class MenuController extends BaseMenuController implements Colla
 				titleProgressController.setMapDownloadMode();
 				if (downloadThread.getCurrentDownloadingItem() == indexItem) {
 					titleProgressController.indeterminate = false;
-					titleProgressController.progress = downloadThread.getCurrentDownloadingItemProgress();
+					titleProgressController.progress = downloadThread.getCurrentDownloadProgress();
 				} else {
 					titleProgressController.indeterminate = true;
 					titleProgressController.progress = 0;
@@ -715,9 +754,9 @@ public abstract class MenuController extends BaseMenuController implements Colla
 
 	public abstract class TitleButtonController {
 		public String caption = "";
-		public int startIconId = 0;
-		public int endIconId = 0;
-		public boolean needRightText = false;
+		public int startIconId;
+		public int endIconId;
+		public boolean needRightText;
 		public String rightTextCaption = "";
 		public boolean visible = true;
 		public boolean tintIcon = true;
@@ -775,7 +814,7 @@ public abstract class MenuController extends BaseMenuController implements Colla
 
 	public abstract static class TitleProgressController {
 		public String caption = "";
-		public int progress = 0;
+		public float progress;
 		public boolean indeterminate;
 		public boolean visible;
 		public boolean progressVisible;
@@ -847,11 +886,11 @@ public abstract class MenuController extends BaseMenuController implements Colla
 		public ContextMenuToolbarController(MenuController menuController) {
 			super(TopToolbarControllerType.CONTEXT_MENU);
 			this.menuController = menuController;
-			setBgIds(R.color.app_bar_color_light, R.color.app_bar_color_dark,
-					R.color.app_bar_color_light, R.color.app_bar_color_dark);
-			setBackBtnIconClrIds(R.color.color_white, R.color.color_white);
-			setCloseBtnIconClrIds(R.color.color_white, R.color.color_white);
-			setTitleTextClrIds(R.color.color_white, R.color.color_white);
+			setBgIds(R.color.app_bar_main_light, R.color.app_bar_main_dark,
+					R.color.app_bar_main_light, R.color.app_bar_main_dark);
+			setBackBtnIconClrIds(R.color.card_and_list_background_light, R.color.card_and_list_background_light);
+			setCloseBtnIconClrIds(R.color.card_and_list_background_light, R.color.card_and_list_background_light);
+			setTitleTextClrIds(R.color.card_and_list_background_light, R.color.card_and_list_background_light);
 		}
 
 		public MenuController getMenuController() {
@@ -859,7 +898,7 @@ public abstract class MenuController extends BaseMenuController implements Colla
 		}
 	}
 
-	public void requestMapDownloadInfo(final LatLon latLon) {
+	public void requestMapDownloadInfo(LatLon latLon) {
 		MapActivity mapActivity = getMapActivity();
 		OsmandMapTileView mapView = mapActivity != null ? mapActivity.getMapView() : null;
 		if (mapView != null) {
@@ -868,7 +907,19 @@ public abstract class MenuController extends BaseMenuController implements Colla
 		}
 	}
 
-	private void createMapDownloadControls(BinaryMapDataObject binaryMapDataObject, String selectedFullName) {
+	protected void startDownload(MapActivity mapActivity, IndexItem indexItem) {
+		OsmandApplication app = mapActivity.getMyApplication();
+		if (!Version.isPaidVersion(app)
+				&& DownloadActivityType.isCountedInDownloads(indexItem)
+				&& app.getSettings().NUMBER_OF_FREE_DOWNLOADS.get() >= MAXIMUM_AVAILABLE_FREE_DOWNLOADS) {
+			ChoosePlanFragment.showInstance(mapActivity, OsmAndFeature.UNLIMITED_MAP_DOWNLOADS);
+		} else {
+			new DownloadValidationManager(mapActivity.getMyApplication())
+					.startDownload(mapActivity, indexItem);
+		}
+	}
+
+	public void createMapDownloadControls(BinaryMapDataObject binaryMapDataObject, String selectedFullName) {
 		MapActivity mapActivity = getMapActivity();
 		if (mapActivity != null) {
 			OsmandRegions osmandRegions = mapActivity.getMyApplication().getResourceManager().getOsmandRegions();
@@ -893,8 +944,7 @@ public abstract class MenuController extends BaseMenuController implements Colla
 						MapActivity mapActivity = getMapActivity();
 						if (indexItem != null && mapActivity != null) {
 							if (indexItem.getType() == DownloadActivityType.NORMAL_FILE) {
-								new DownloadValidationManager(mapActivity.getMyApplication())
-										.startDownload(mapActivity, indexItem);
+								startDownload(mapActivity, indexItem);
 							}
 						}
 					}
@@ -921,56 +971,6 @@ public abstract class MenuController extends BaseMenuController implements Colla
 				if (mapContextMenu != null) {
 					mapContextMenu.updateMenuUI();
 				}
-			}
-		}
-	}
-
-	private static class SearchOsmandRegionTask extends AsyncTask<Void, Void, BinaryMapDataObject> {
-
-		private final WeakReference<MenuController> controllerRef;
-		private final LatLon latLon;
-		private final int zoom;
-		private OsmandRegionSearcher regionSearcher;
-
-		SearchOsmandRegionTask(@NonNull MenuController controller, @NonNull LatLon latLon, int zoom) {
-			this.controllerRef = new WeakReference<>(controller);
-			this.latLon = latLon;
-			this.zoom = zoom;
-		}
-
-		@Nullable
-		private MenuController getController() {
-			return controllerRef.get();
-		}
-
-		@Nullable
-		private MapActivity getMapActivity() {
-			MenuController controller = getController();
-			return controller != null ? controller.getMapActivity() : null;
-		}
-
-		@Override
-		protected void onPreExecute() {
-			MapActivity mapActivity = getMapActivity();
-			if (mapActivity != null) {
-				regionSearcher = new OsmandRegionSearcher(mapActivity.getMyApplication(), latLon, zoom);
-			}
-		}
-
-		@Override
-		protected BinaryMapDataObject doInBackground(Void... voids) {
-			if (regionSearcher == null) {
-				return null;
-			}
-			regionSearcher.search();
-			return regionSearcher.getBinaryMapDataObject();
-		}
-
-		@Override
-		protected void onPostExecute(BinaryMapDataObject binaryMapDataObject) {
-			MenuController controller = getController();
-			if (controller != null && regionSearcher != null) {
-				controller.createMapDownloadControls(binaryMapDataObject, regionSearcher.getRegionFullName());
 			}
 		}
 	}

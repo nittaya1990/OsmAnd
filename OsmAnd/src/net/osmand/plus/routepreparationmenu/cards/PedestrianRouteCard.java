@@ -2,7 +2,6 @@ package net.osmand.plus.routepreparationmenu.cards;
 
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
-import android.os.Build;
 import android.text.SpannableString;
 import android.text.Spanned;
 import android.text.style.StyleSpan;
@@ -13,14 +12,14 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.OsmAndFormatter;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
 
 public class PedestrianRouteCard extends MapBaseCard {
 
-	private int approxPedestrianTime;
+	private final int approxPedestrianTime;
 
 	public PedestrianRouteCard(@NonNull MapActivity mapActivity, int approxPedestrianTime) {
 		super(mapActivity);
@@ -34,7 +33,7 @@ public class PedestrianRouteCard extends MapBaseCard {
 
 	@Override
 	protected void updateContent() {
-		TextView titleView = (TextView) view.findViewById(R.id.title);
+		TextView titleView = view.findViewById(R.id.title);
 		String text = app.getString(R.string.public_transport_ped_route_title);
 		String formattedDuration = OsmAndFormatter.getFormattedDuration(approxPedestrianTime, app);
 		int start = text.indexOf("%1$s");
@@ -46,24 +45,13 @@ public class PedestrianRouteCard extends MapBaseCard {
 
 		FrameLayout button = view.findViewById(R.id.button);
 		View buttonDescr = view.findViewById(R.id.button_descr);
-		button.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				CardListener listener = getListener();
-				if (listener != null) {
-					listener.onCardButtonPressed(PedestrianRouteCard.this, 0);
-				}
-			}
-		});
-		if (Build.VERSION.SDK_INT > Build.VERSION_CODES.LOLLIPOP) {
-			AndroidUtils.setBackground(app, button, nightMode, R.drawable.btn_border_light, R.drawable.btn_border_dark);
-			AndroidUtils.setBackground(app, buttonDescr, nightMode, R.drawable.ripple_light, R.drawable.ripple_dark);
-		} else {
-			AndroidUtils.setBackground(app, buttonDescr, nightMode, R.drawable.btn_border_trans_light, R.drawable.btn_border_trans_dark);
-		}
+		button.setOnClickListener(v -> notifyButtonPressed(0));
+		AndroidUtils.setBackground(app, button, nightMode, R.drawable.btn_border_light, R.drawable.btn_border_dark);
+		AndroidUtils.setBackground(app, buttonDescr, nightMode, R.drawable.ripple_light, R.drawable.ripple_dark);
+
 		Drawable icPedestrian = app.getUIUtilities().getIcon(
 				R.drawable.ic_action_pedestrian_dark,
-				R.color.description_font_and_bottom_sheet_icons);
+				R.color.icon_color_default_light);
 		((ImageView) view.findViewById(R.id.image)).setImageDrawable(
 				AndroidUtils.getDrawableForDirection(app, icPedestrian));
 		view.findViewById(R.id.card_divider).setVisibility(View.VISIBLE);

@@ -1,5 +1,6 @@
 package net.osmand.plus.routepreparationmenu;
 
+
 import android.Manifest;
 import android.app.Activity;
 import android.content.Intent;
@@ -19,39 +20,41 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
-import androidx.fragment.app.FragmentManager;
 import androidx.recyclerview.widget.RecyclerView;
 
-import net.osmand.AndroidUtils;
 import net.osmand.Location;
+import net.osmand.data.BackgroundType;
 import net.osmand.data.FavouritePoint;
-import net.osmand.data.FavouritePoint.BackgroundType;
 import net.osmand.data.LatLon;
 import net.osmand.data.PointDescription;
-import net.osmand.plus.ColorUtilities;
-import net.osmand.plus.FavouritesDbHelper;
+import net.osmand.data.SpecialPointType;
 import net.osmand.plus.OsmAndLocationProvider;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper;
-import net.osmand.plus.TargetPointsHelper.TargetPoint;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.MenuBottomSheetDialogFragment;
-import net.osmand.plus.base.PointImageDrawable;
 import net.osmand.plus.base.bottomsheetmenu.BaseBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.HorizontalRecyclerBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.SimpleBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.DividerHalfItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.TitleItem;
 import net.osmand.plus.helpers.AndroidUiHelper;
-import net.osmand.plus.helpers.FontCache;
 import net.osmand.plus.helpers.MapMarkerDialogHelper;
+import net.osmand.plus.helpers.TargetPointsHelper;
+import net.osmand.plus.helpers.TargetPointsHelper.TargetPoint;
 import net.osmand.plus.helpers.WaypointDialogHelper;
-import net.osmand.plus.mapcontextmenu.other.FavouritesBottomSheetMenuFragment;
+import net.osmand.plus.mapcontextmenu.other.SelectFavouriteToGoBottomSheet;
 import net.osmand.plus.mapmarkers.MapMarker;
 import net.osmand.plus.mapmarkers.MapMarkersHelper;
+import net.osmand.plus.myplaces.favorites.FavoritesListener;
+import net.osmand.plus.myplaces.favorites.FavouritesHelper;
 import net.osmand.plus.routepreparationmenu.MapRouteInfoMenu.PointType;
-import net.osmand.plus.search.QuickSearchDialogFragment;
+import net.osmand.plus.search.ShowQuickSearchMode;
+import net.osmand.plus.search.dialogs.QuickSearchDialogFragment;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.FontCache;
+import net.osmand.plus.views.PointImageUtils;
 import net.osmand.plus.widgets.style.CustomTypefaceSpan;
 import net.osmand.util.Algorithms;
 
@@ -165,10 +168,10 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 
 	private void createSearchItem() {
 		View searchView = View.inflate(new ContextThemeWrapper(getContext(), themeRes), R.layout.bottom_sheet_double_item, null);
-		TextView firstTitle = (TextView) searchView.findViewById(R.id.first_title);
-		TextView secondTitle = (TextView) searchView.findViewById(R.id.second_title);
-		ImageView firstIcon = (ImageView) searchView.findViewById(R.id.first_icon);
-		ImageView secondIcon = (ImageView) searchView.findViewById(R.id.second_icon);
+		TextView firstTitle = searchView.findViewById(R.id.first_title);
+		TextView secondTitle = searchView.findViewById(R.id.second_title);
+		ImageView firstIcon = searchView.findViewById(R.id.first_icon);
+		ImageView secondIcon = searchView.findViewById(R.id.second_icon);
 
 		firstTitle.setText(R.string.shared_string_search);
 		secondTitle.setText(R.string.shared_string_address);
@@ -184,7 +187,7 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 			public void onClick(View v) {
 				MapActivity mapActivity = (MapActivity) getActivity();
 				if (mapActivity != null) {
-					mapActivity.showQuickSearch(getSearchMode(), QuickSearchDialogFragment.QuickSearchTab.HISTORY);
+					mapActivity.getFragmentsHelper().showQuickSearch(getSearchMode(), QuickSearchDialogFragment.QuickSearchTab.HISTORY);
 				}
 				dismiss();
 			}
@@ -194,7 +197,7 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 			public void onClick(View v) {
 				MapActivity mapActivity = (MapActivity) getActivity();
 				if (mapActivity != null) {
-					mapActivity.showQuickSearch(getSearchMode(), false);
+					mapActivity.getFragmentsHelper().showQuickSearch(getSearchMode(), false);
 				}
 				dismiss();
 			}
@@ -202,27 +205,27 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 		items.add(new BaseBottomSheetItem.Builder().setCustomView(searchView).create());
 	}
 
-	private MapActivity.ShowQuickSearchMode getSearchMode() {
+	private ShowQuickSearchMode getSearchMode() {
 		switch (pointType) {
 			case START:
-				return MapActivity.ShowQuickSearchMode.START_POINT_SELECTION;
+				return ShowQuickSearchMode.START_POINT_SELECTION;
 			case TARGET:
-				return MapActivity.ShowQuickSearchMode.DESTINATION_SELECTION;
+				return ShowQuickSearchMode.DESTINATION_SELECTION;
 			case INTERMEDIATE:
-				return MapActivity.ShowQuickSearchMode.INTERMEDIATE_SELECTION;
+				return ShowQuickSearchMode.INTERMEDIATE_SELECTION;
 			case HOME:
-				return MapActivity.ShowQuickSearchMode.HOME_POINT_SELECTION;
+				return ShowQuickSearchMode.HOME_POINT_SELECTION;
 			case WORK:
-				return MapActivity.ShowQuickSearchMode.WORK_POINT_SELECTION;
+				return ShowQuickSearchMode.WORK_POINT_SELECTION;
 			default:
-				return MapActivity.ShowQuickSearchMode.START_POINT_SELECTION;
+				return ShowQuickSearchMode.START_POINT_SELECTION;
 		}
 	}
 
 	private void createMyLocItem() {
 		BaseBottomSheetItem myLocationItem = new SimpleBottomSheetItem.Builder()
 				.setIcon(getIcon(OsmAndLocationProvider.isLocationPermissionAvailable(getActivity())
-					? R.drawable.ic_action_location_color : R.drawable.ic_action_location_color_lost, 0))
+						? R.drawable.ic_action_location_color : R.drawable.ic_action_location_color_lost, 0))
 				.setTitle(getString(R.string.shared_string_my_location))
 				.setLayoutId(R.layout.bottom_sheet_item_simple_56dp)
 				.setOnClickListener(new OnClickListener() {
@@ -253,11 +256,11 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 											break;
 										case HOME:
 											app.showShortToastMessage(R.string.add_home);
-											app.getFavorites().setSpecialPoint(ll, FavouritePoint.SpecialPointType.HOME, null);
+											app.getFavoritesHelper().setSpecialPoint(ll, SpecialPointType.HOME, null);
 											break;
 										case WORK:
 											app.showShortToastMessage(R.string.add_work);
-											app.getFavorites().setSpecialPoint(ll, FavouritePoint.SpecialPointType.WORK, null);
+											app.getFavoritesHelper().setSpecialPoint(ll, SpecialPointType.WORK, null);
 											break;
 									}
 								} else if (pointType == PointType.START) {
@@ -270,8 +273,9 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 								}
 							} else if (activity != null) {
 								ActivityCompat.requestPermissions(activity,
-									new String[]{Manifest.permission.ACCESS_FINE_LOCATION},
-									OsmAndLocationProvider.REQUEST_LOCATION_PERMISSION);
+										new String[] {Manifest.permission.ACCESS_FINE_LOCATION,
+												Manifest.permission.ACCESS_COARSE_LOCATION},
+										OsmAndLocationProvider.REQUEST_LOCATION_PERMISSION);
 							}
 						}
 						dismiss();
@@ -305,7 +309,7 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 	}
 
 	private void createMarkersScrollItem() {
-		final OsmandApplication app = getMyApplication();
+		OsmandApplication app = getMyApplication();
 		if (app != null) {
 			List<Object> items = new ArrayList<>();
 			MarkersItemsAdapter adapter = new MarkersItemsAdapter(app, items);
@@ -322,8 +326,8 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 	}
 
 	private void createSwitchStartAndEndItem() {
-		final View switchStartAndEndView = View.inflate(new ContextThemeWrapper(getContext(), themeRes), R.layout.bottom_sheet_item_simple_56dp, null);
-		TextView title = (TextView) switchStartAndEndView.findViewById(R.id.title);
+		View switchStartAndEndView = View.inflate(new ContextThemeWrapper(getContext(), themeRes), R.layout.bottom_sheet_item_simple_56dp, null);
+		TextView title = switchStartAndEndView.findViewById(R.id.title);
 
 		String start = getString(R.string.route_start_point);
 		String destination = getString(R.string.route_descr_destination);
@@ -332,7 +336,7 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 		int startIndex = titleS.indexOf(start);
 		int destinationIndex = titleS.indexOf(destination);
 		if (startIndex != -1 && destinationIndex != -1) {
-			Typeface typeface = FontCache.getRobotoMedium(getContext());
+			Typeface typeface = FontCache.getMediumFont();
 			titleSpan.setSpan(new CustomTypefaceSpan(typeface), startIndex, startIndex + start.length(), 0);
 			titleSpan.setSpan(new CustomTypefaceSpan(typeface), destinationIndex, destinationIndex + destination.length(), 0);
 		}
@@ -361,7 +365,7 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 		items.add(switchStartAndEndItem);
 	}
 
-	private void loadFavoritesItems(List<Object> items, FavouritesDbHelper helper) {
+	private void loadFavoritesItems(List<Object> items, FavouritesHelper helper) {
 		items.clear();
 		addMainScrollItems(items);
 		items.addAll(helper.getVisibleFavouritePoints());
@@ -372,17 +376,17 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 	}
 
 	private void createFavoritesScrollItem() {
-		final OsmandApplication app = getMyApplication();
+		OsmandApplication app = getMyApplication();
 		if (app != null) {
 			List<Object> items = new ArrayList<>();
-			final FavoritesItemsAdapter adapter = new FavoritesItemsAdapter(app, items);
+			FavoritesItemsAdapter adapter = new FavoritesItemsAdapter(app, items);
 			adapter.setItemClickListener(getAdapterOnClickListener(items));
-			final FavouritesDbHelper helper = app.getFavorites();
+			FavouritesHelper helper = app.getFavoritesHelper();
 			if (helper.isFavoritesLoaded()) {
 				loadFavoritesItems(items, helper);
 			} else {
 				addMainScrollItems(items);
-				helper.addListener(new FavouritesDbHelper.FavoritesListener() {
+				helper.addListener(new FavoritesListener() {
 
 					private void reloadFavoritesItems() {
 						MapActivity mapActivity = (MapActivity) getActivity();
@@ -398,7 +402,7 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 					}
 
 					@Override
-					public void onFavoriteDataUpdated(@NonNull FavouritePoint favouritePoint) {
+					public void onFavoriteDataUpdated(@NonNull FavouritePoint point) {
 						reloadFavoritesItems();
 					}
 				});
@@ -411,7 +415,7 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 		}
 	}
 
-	private OnClickListener getAdapterOnClickListener(final List<Object> items) {
+	private OnClickListener getAdapterOnClickListener(List<Object> items) {
 		return new OnClickListener() {
 			@Override
 			public void onClick(View v) {
@@ -423,7 +427,7 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 				}
 				Object item = items.get(position);
 				if (item.equals(FAVORITES)) {
-					openFavoritesDialog();
+					SelectFavouriteToGoBottomSheet.showInstance(mapActivity, AddPointBottomSheetDialog.this, pointType);
 				} else if (item.equals(MARKERS)) {
 					MapRouteInfoMenu menu = mapActivity.getMapRouteInfoMenu();
 					menu.selectMapMarker(-1, pointType);
@@ -439,12 +443,12 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 					PointDescription name = pair.second;
 					if (ll == null) {
 						if (item instanceof PointType) {
-							AddPointBottomSheetDialog.showInstance(mapActivity, (PointType) item);
+							showInstance(mapActivity, (PointType) item);
 						} else {
 							dismiss();
 						}
 					} else {
-						FavouritesDbHelper favorites = requiredMyApplication().getFavorites();
+						FavouritesHelper favorites = requiredMyApplication().getFavoritesHelper();
 						switch (pointType) {
 							case START:
 								targetPointsHelper.setStartPoint(ll, true, name);
@@ -456,13 +460,13 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 								targetPointsHelper.navigateToPoint(ll, true, targetPointsHelper.getIntermediatePoints().size(), name);
 								break;
 							case HOME:
-								favorites.setSpecialPoint(ll, FavouritePoint.SpecialPointType.HOME, null);
+								favorites.setSpecialPoint(ll, SpecialPointType.HOME, null);
 								break;
 							case WORK:
-								favorites.setSpecialPoint(ll, FavouritePoint.SpecialPointType.WORK, null);
+								favorites.setSpecialPoint(ll, SpecialPointType.WORK, null);
 								break;
 							case PARKING:
-								favorites.setSpecialPoint(ll, FavouritePoint.SpecialPointType.PARKING, null);
+								favorites.setSpecialPoint(ll, SpecialPointType.PARKING, null);
 								break;
 						}
 						dismiss();
@@ -482,14 +486,14 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 		} else if (item instanceof PointType) {
 			MapActivity mapActivity = (MapActivity) getActivity();
 			if (mapActivity != null) {
-				FavouritesDbHelper favorites = mapActivity.getMyApplication().getFavorites();
+				FavouritesHelper favorites = mapActivity.getMyApplication().getFavoritesHelper();
 				FavouritePoint point = null;
 				if (item == PointType.HOME) {
-					point = favorites.getSpecialPoint(FavouritePoint.SpecialPointType.HOME);
+					point = favorites.getSpecialPoint(SpecialPointType.HOME);
 				} else if (item == PointType.WORK) {
-					point = favorites.getSpecialPoint(FavouritePoint.SpecialPointType.WORK);
+					point = favorites.getSpecialPoint(SpecialPointType.WORK);
 				} else if (item == PointType.PARKING) {
-					point = favorites.getSpecialPoint(FavouritePoint.SpecialPointType.PARKING);
+					point = favorites.getSpecialPoint(SpecialPointType.PARKING);
 				}
 				if (point != null) {
 					ll = new LatLon(point.getLatitude(), point.getLongitude());
@@ -498,19 +502,6 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 			}
 		}
 		return new Pair<>(ll, name);
-	}
-
-	private void openFavoritesDialog() {
-		MapActivity mapActivity = (MapActivity) getActivity();
-		if (mapActivity != null) {
-			FragmentManager fragmentManager = mapActivity.getSupportFragmentManager();
-			FavouritesBottomSheetMenuFragment fragment = new FavouritesBottomSheetMenuFragment();
-			Bundle args = new Bundle();
-			args.putString(FavouritesBottomSheetMenuFragment.POINT_TYPE_KEY, pointType.name());
-			fragment.setTargetFragment(AddPointBottomSheetDialog.this, ADD_FAVORITE_TO_ROUTE_REQUEST_CODE);
-			fragment.setArguments(args);
-			fragment.show(fragmentManager, FavouritesBottomSheetMenuFragment.TAG);
-		}
 	}
 
 	public static boolean showInstance(@NonNull MapActivity mapActivity, PointType pointType) {
@@ -523,7 +514,7 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 				return false;
 			}
 			Bundle args = new Bundle();
-			args.putString(AddPointBottomSheetDialog.POINT_TYPE_KEY, pointType.name());
+			args.putString(POINT_TYPE_KEY, pointType.name());
 			AddPointBottomSheetDialog fragment = new AddPointBottomSheetDialog();
 			fragment.setArguments(args);
 			fragment.setUsedOnMap(usedOnMap);
@@ -551,7 +542,7 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 	private abstract class ScrollItemsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
 		private final List<Object> items;
-		private OsmandApplication app;
+		private final OsmandApplication app;
 		private OnClickListener listener;
 
 		ScrollItemsAdapter(OsmandApplication app, List<Object> items) {
@@ -576,17 +567,6 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 		public RecyclerView.ViewHolder onCreateViewHolder(@NonNull ViewGroup viewGroup, int viewType) {
 			View view = LayoutInflater.from(viewGroup.getContext()).inflate(R.layout.bottom_sheet_item_with_descr_56dp, viewGroup, false);
 			view.setOnClickListener(listener);
-			Activity activity = getActivity();
-			if (activity != null) {
-				RecyclerView.LayoutParams layoutParams = (RecyclerView.LayoutParams) view.getLayoutParams();
-				if (AndroidUiHelper.isOrientationPortrait(getActivity())) {
-					layoutParams.width = (int) (AndroidUtils.getScreenWidth(activity) / 2.5);
-				} else {
-					// 11.5dp is the shadow width
-					layoutParams.width = (int) ((getResources().getDimensionPixelSize(R.dimen.landscape_bottom_sheet_dialog_fragment_width) / 2.5) - AndroidUtils.dpToPx(activity, 11.5f));
-				}
-				view.setLayoutParams(layoutParams);
-			}
 			ItemViewHolder viewHolder = new ItemViewHolder(view);
 			view.setTag(viewHolder);
 
@@ -604,6 +584,29 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 
 		void setItemClickListener(OnClickListener listener) {
 			this.listener = listener;
+		}
+
+		protected void setItemWidth(View itemView, boolean isTitleItem, int itemsSize) {
+			Activity activity = getActivity();
+			if (activity != null) {
+				// 11.5dp is the shadow width
+				int shadowWidth = AndroidUtils.dpToPx(activity, 11.5f);
+				int bottomSheetWidth = getResources().getDimensionPixelSize(R.dimen.landscape_bottom_sheet_dialog_fragment_width);
+
+				RecyclerView.LayoutParams layoutParams = (RecyclerView.LayoutParams) itemView.getLayoutParams();
+				if (AndroidUiHelper.isOrientationPortrait(activity)) {
+					layoutParams.width = (int) (AndroidUtils.getScreenWidth(activity) / 2.5);
+				} else {
+					if (isTitleItem) {
+						layoutParams.width = itemsSize > 1
+								? (bottomSheetWidth / 2 - shadowWidth)
+								: (bottomSheetWidth - shadowWidth);
+					} else {
+						layoutParams.width = (int) (bottomSheetWidth / 2.2 - shadowWidth);
+					}
+				}
+				itemView.setLayoutParams(layoutParams);
+			}
 		}
 	}
 
@@ -638,11 +641,13 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 			if (holder instanceof ItemViewHolder) {
 				Object item = getItem(position);
 				ItemViewHolder favoriteViewHolder = (ItemViewHolder) holder;
-				if (item.equals(FAVORITES)) {
+				boolean titleItem = item.equals(FAVORITES);
+				if (titleItem) {
 					bindFavoritesButton(favoriteViewHolder);
 				} else if (item instanceof FavouritePoint) {
 					bindFavoritePoint(favoriteViewHolder, (FavouritePoint) item);
 				}
+				setItemWidth(favoriteViewHolder.itemView, titleItem, getItemCount());
 			}
 		}
 
@@ -667,13 +672,13 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 				AndroidUiHelper.updateVisibility(favoriteViewHolder.description, !Algorithms.isEmpty(description));
 			} else {
 				int defaultFavoritesColor = ContextCompat.getColor(app, R.color.color_favorite);
-				int pointColor = app.getFavorites().getColorWithCategory(point, defaultFavoritesColor);
+				int pointColor = app.getFavoritesHelper().getColorWithCategory(point, defaultFavoritesColor);
 				int pointIconRes = point.getIconId() == 0 ? R.drawable.ic_action_favorite : point.getIconId();
 				BackgroundType backgroundType = point.getBackgroundType() == null
 						? BackgroundType.CIRCLE
 						: point.getBackgroundType();
 
-				Drawable pointIcon = PointImageDrawable.getOrCreate(app, pointColor, false,
+				Drawable pointIcon = PointImageUtils.getOrCreate(app, pointColor, false,
 						false, pointIconRes, backgroundType);
 				favoriteViewHolder.icon.setImageDrawable(pointIcon);
 
@@ -698,7 +703,8 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 			if (holder instanceof ItemViewHolder) {
 				Object item = getItem(position);
 				ItemViewHolder markerViewHolder = (ItemViewHolder) holder;
-				if (item.equals(MARKERS)) {
+				boolean titleItem = item.equals(MARKERS);
+				if (titleItem) {
 					markerViewHolder.title.setText(R.string.shared_string_markers);
 					markerViewHolder.icon.setImageDrawable(getContentIcon(R.drawable.ic_action_flag));
 				} else {
@@ -706,6 +712,7 @@ public class AddPointBottomSheetDialog extends MenuBottomSheetDialogFragment {
 					markerViewHolder.title.setText(marker.getName(getContext()));
 					markerViewHolder.icon.setImageDrawable(MapMarkerDialogHelper.getMapMarkerIcon(app, marker.colorIndex));
 				}
+				setItemWidth(markerViewHolder.itemView, titleItem, getItemCount());
 				markerViewHolder.description.setVisibility(View.GONE);
 			}
 		}

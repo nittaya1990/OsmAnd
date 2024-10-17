@@ -6,6 +6,7 @@ import androidx.annotation.StringRes;
 import net.osmand.plus.R;
 
 public enum ProfileIconColors {
+
 	DEFAULT(R.string.rendering_value_default_name, R.color.profile_icon_color_blue_light_default, R.color.profile_icon_color_blue_dark_default),
 	PURPLE(R.string.rendering_value_purple_name, R.color.profile_icon_color_purple_light, R.color.profile_icon_color_purple_dark),
 	GREEN(R.string.rendering_value_green_name, R.color.profile_icon_color_green_light, R.color.profile_icon_color_green_dark),
@@ -15,11 +16,11 @@ public enum ProfileIconColors {
 	MAGENTA(R.string.shared_string_color_magenta, R.color.profile_icon_color_magenta_light, R.color.profile_icon_color_magenta_dark);
 
 	@StringRes
-	private int name;
+	private final int name;
 	@ColorRes
-	private int dayColor;
+	private final int dayColor;
 	@ColorRes
-	private int nightColor;
+	private final int nightColor;
 
 	ProfileIconColors(@StringRes int name, @ColorRes int dayColor, @ColorRes int nightColor) {
 		this.name = name;
@@ -37,7 +38,7 @@ public enum ProfileIconColors {
 	}
 
 	public static int getOutdatedLocationColor(boolean nightMode) {
-		return nightMode ? R.color.profile_icon_color_outdated_dark : R.color.profile_icon_color_outdated_light;
+		return nightMode ? R.color.icon_color_default_dark : R.color.profile_icon_color_outdated_light;
 	}
 
 }

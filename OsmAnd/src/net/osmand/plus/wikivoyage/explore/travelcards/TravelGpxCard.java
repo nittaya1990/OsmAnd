@@ -5,26 +5,23 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentActivity;
 import androidx.recyclerview.widget.RecyclerView;
 
-import net.osmand.AndroidUtils;
-import net.osmand.GPXUtilities;
-import net.osmand.osm.RouteActivityType;
-import net.osmand.plus.OsmAndFormatter;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.osm.OsmRouteType;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.track.TrackMenuFragment;
+import net.osmand.plus.track.fragments.TrackMenuFragment;
 import net.osmand.plus.wikivoyage.data.TravelGpx;
 import net.osmand.plus.wikivoyage.data.TravelHelper;
 import net.osmand.util.Algorithms;
 
 import java.io.File;
-
-import static net.osmand.util.Algorithms.capitalizeFirstLetterAndLowercase;
 
 public class TravelGpxCard extends BaseTravelCard {
 
@@ -46,16 +43,20 @@ public class TravelGpxCard extends BaseTravelCard {
 	@Override
 	public void bindViewHolder(@NonNull RecyclerView.ViewHolder viewHolder) {
 		if (viewHolder instanceof TravelGpxVH) {
-			final TravelGpxVH holder = (TravelGpxVH) viewHolder;
-			holder.title.setText(article.getTitle());
+			TravelGpxVH holder = (TravelGpxVH) viewHolder;
+			if (!Algorithms.isEmpty(article.getDescription())) {
+				holder.title.setText(article.getDescription());
+			} else {
+				holder.title.setText(article.getTitle());
+			}
 			holder.userIcon.setImageDrawable(getActiveIcon(R.drawable.ic_action_user_account_16));
 			holder.user.setText(article.user);
 			String activityTypeKey = article.activityType;
 			if (!Algorithms.isEmpty(activityTypeKey)) {
-				RouteActivityType activityType = RouteActivityType.getOrCreateTypeFromName(activityTypeKey);
-				int activityTypeIcon = getActivityTypeIcon(activityType);
+				OsmRouteType activityType = OsmRouteType.getOrCreateTypeFromName(activityTypeKey);
+				int activityTypeIcon = AndroidUtils.getActivityTypeIcon(app, activityType);
 				holder.activityTypeIcon.setImageDrawable(getActiveIcon(activityTypeIcon));
-				holder.activityType.setText(getActivityTypeTitle(activityType));
+				holder.activityType.setText(AndroidUtils.getActivityTypeTitle(app, activityType));
 				holder.activityTypeLabel.setVisibility(View.VISIBLE);
 			}
 			holder.distance.setText(OsmAndFormatter.getFormattedDistance(article.totalDistance, app));
@@ -73,7 +74,7 @@ public class TravelGpxCard extends BaseTravelCard {
 									}
 
 									@Override
-									public void onGpxFileRead(@Nullable GPXUtilities.GPXFile gpxFile) {
+									public void onGpxFileRead(@Nullable GpxFile gpxFile) {
 										File file = app.getTravelHelper().createGpxFile(article);
 										TrackMenuFragment.openTrack(activity, file, null);
 									}
@@ -90,21 +91,10 @@ public class TravelGpxCard extends BaseTravelCard {
 		}
 	}
 
-	@DrawableRes
-	private int getActivityTypeIcon(RouteActivityType activityType) {
-		int iconId = app.getResources().getIdentifier("mx_" + activityType.getIcon(), "drawable", app.getPackageName());
-		return iconId != 0 ? iconId : R.drawable.mx_special_marker;
-	}
-
-	private String getActivityTypeTitle(RouteActivityType activityType) {
-		return AndroidUtils.getActivityTypeStringPropertyName(app, activityType.getName(),
-				capitalizeFirstLetterAndLowercase(activityType.getName()));
-	}
-
-	private void updateSaveButton(final TravelGpxVH holder) {
+	private void updateSaveButton(TravelGpxVH holder) {
 		if (article != null) {
-			final TravelHelper helper = app.getTravelHelper();
-			final boolean saved = helper.getBookmarksHelper().isArticleSaved(article);
+			TravelHelper helper = app.getTravelHelper();
+			boolean saved = helper.getBookmarksHelper().isArticleSaved(article);
 			Drawable icon = getActiveIcon(saved ? R.drawable.ic_action_read_later_fill : R.drawable.ic_action_read_later);
 			holder.rightButton.setText(saved ? R.string.shared_string_remove : R.string.shared_string_save);
 			holder.rightButton.setCompoundDrawablesWithIntrinsicBounds(null, null, icon, null);
@@ -134,7 +124,7 @@ public class TravelGpxCard extends BaseTravelCard {
 		public final View divider;
 		public final View shadow;
 
-		public TravelGpxVH(final View itemView) {
+		public TravelGpxVH(View itemView) {
 			super(itemView);
 			title = itemView.findViewById(R.id.title);
 			user = itemView.findViewById(R.id.user_name);

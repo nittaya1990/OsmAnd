@@ -9,6 +9,7 @@ import net.osmand.binary.RouteDataObject;
 import net.osmand.binary.StringExternalizable;
 import net.osmand.data.LatLon;
 import net.osmand.util.Algorithms;
+import net.osmand.util.CollectionUtils;
 import net.osmand.util.MapUtils;
 
 import java.util.ArrayList;
@@ -19,11 +20,12 @@ import java.util.Map;
 
 import gnu.trove.map.hash.TIntObjectHashMap;
 
+import static net.osmand.gpx.GPXUtilities.RouteSegment.START_TRKPT_IDX_ATTR;
+
 
 public class RouteSegmentResult implements StringExternalizable<RouteDataBundle> {
-	// this should be bigger (50-80m) but tests need to be fixed first
-	public static final float DIST_BEARING_DETECT = 5;
-	
+
+	public static final float DIST_BEARING_DETECT = 15;
 	public static final float DIST_BEARING_DETECT_UNMATCHED = 50;
 	
 	private RouteDataObject object;
@@ -35,9 +37,12 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 	private float routingTime;
 	private float speed;
 	private float distance;
-	private String description = "";
+	private String[] description = null;
 	// this make not possible to make turns in between segment result for now
 	private TurnType turnType;
+	private boolean leftside = false;
+
+	private int gpxPointIndex = -1; // used by approximation to reconstruct finalPoints.routeToTarget
 
 	// Evaluates street name that the route follows after turn within specified distance.
 	// It is useful to find names for short segments on intersections
@@ -51,6 +56,11 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 		this.object = object;
 	}
 
+	public RouteSegmentResult(RouteDataObject object, boolean leftside) {
+		this.object = object;
+		this.leftside = leftside;
+	}
+
 	public RouteSegmentResult(RouteDataObject object, int startPointIndex, int endPointIndex) {
 		this.object = object;
 		this.startPointIndex = startPointIndex;
@@ -58,7 +68,24 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 		updateCapacity();
 	}
 
-	void collectTypes(RouteDataResources resources) {
+	public RouteSegmentResult(RouteDataObject object, int startPointIndex, int endPointIndex,
+	                          RouteSegmentResult[][] preAttachedRoutes, float segmentTime,
+	                          float routingTime, float speed, float distance, int gpxPointIndex, TurnType turnType) {
+		// JNI-only method
+		this.object = object;
+		this.startPointIndex = startPointIndex;
+		this.endPointIndex = endPointIndex;
+		this.preAttachedRoutes = preAttachedRoutes;
+		this.segmentTime = segmentTime;
+		this.routingTime = routingTime;
+		this.speed = speed;
+		this.distance = distance;
+		this.gpxPointIndex = gpxPointIndex;
+		this.turnType = turnType;
+		updateCapacity();
+	}
+
+	public void collectTypes(RouteDataResources resources) {
 		Map<RouteTypeRule, Integer> rules = resources.getRules();
 		if (object.types != null) {
 			collectRules(rules, object.types);
@@ -75,7 +102,7 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 		}
 	}
 
-	void collectNames(RouteDataResources resources) {
+	public void collectNames(RouteDataResources resources) {
 		Map<RouteTypeRule, Integer> rules = resources.getRules();
 		RouteRegion region = object.region;
 		if (region.getNameTypeRule() != -1) {
@@ -220,6 +247,9 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 			int refTypeRule = region.getRefTypeRule();
 			object.names = new TIntObjectHashMap<>();
 			for (int nameId : object.nameIds) {
+				if (nameId >= region.quickGetEncodingRulesSize()) {
+					continue;
+				}
 				RouteTypeRule rule = region.quickGetEncodingRule(nameId);
 				if (rule != null) {
 					if (nameTypeRule != -1 && "name".equals(rule.getTag())) {
@@ -262,9 +292,14 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 
 	@Override
 	public void writeToBundle(RouteDataBundle bundle) {
-		Map<RouteTypeRule, Integer> rules = bundle.getResources().getRules();
+		RouteDataResources resources = bundle.getResources();
+		Map<RouteTypeRule, Integer> rules = resources.getRules();
+
 		boolean reversed = endPointIndex < startPointIndex;
-		bundle.putInt("length", Math.abs(endPointIndex - startPointIndex) + 1);
+		int length = Math.abs(endPointIndex - startPointIndex) + 1;
+
+		bundle.putInt("length", length);
+		bundle.putInt(START_TRKPT_IDX_ATTR, resources.getCurrentSegmentStartLocationIndex());
 		bundle.putFloat("segmentTime", segmentTime, 2);
 		bundle.putFloat("speed", speed, 2);
 		if (turnType != null) {
@@ -288,7 +323,7 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 		if (object.pointTypes != null && start < object.pointTypes.length) {
 			int[][] types = Arrays.copyOfRange(object.pointTypes, start, Math.min(end, object.pointTypes.length));
 			if (reversed) {
-				Algorithms.reverseArray(types);
+				CollectionUtils.reverseArray(types);
 			}
 			bundle.putArray("pointTypes", convertTypes(types, rules));
 		}
@@ -299,11 +334,13 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 			int[][] types = Arrays.copyOfRange(object.pointNameTypes, start, Math.min(end, object.pointNameTypes.length));
 			String[][] names = Arrays.copyOfRange(object.pointNames, start, Math.min(end, object.pointNames.length));
 			if (reversed) {
-				Algorithms.reverseArray(types);
-				Algorithms.reverseArray(names);
+				CollectionUtils.reverseArray(types);
+				CollectionUtils.reverseArray(names);
 			}
 			bundle.putArray("pointNames", convertPointNames(types, names, rules));
 		}
+
+		resources.updateNextSegmentStartLocation(length);
 	}
 
 	@Override
@@ -317,7 +354,7 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 		speed = bundle.getFloat("speed", speed);
 		String turnTypeStr = bundle.getString("turnType", null);
 		if (!Algorithms.isEmpty(turnTypeStr)) {
-			turnType = TurnType.fromString(turnTypeStr, false);
+			turnType = TurnType.fromString(turnTypeStr, leftside);
 			turnType.setSkipToSpeak(bundle.getBoolean("skipTurn", turnType.isSkipToSpeak()));
 			turnType.setTurnAngle(bundle.getFloat("turnAngle", turnType.getTurnAngle()));
 			int[] turnLanes = TurnType.lanesFromString(bundle.getString("turnLanes", null));
@@ -340,22 +377,20 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 		float distance = 0;
 		Location prevLocation = null;
 		for (int i = 0; i < length; i++) {
-			Location location = resources.getLocation(index);
-			if (location != null) {
-				double dist = 0;
-				if (prevLocation != null) {
-					dist = MapUtils.getDistance(prevLocation.getLatitude(), prevLocation.getLongitude(), location.getLatitude(), location.getLongitude());
-					distance += dist;
-				}
-				prevLocation = location;
-				object.pointsX[i] = MapUtils.get31TileNumberX(location.getLongitude());
-				object.pointsY[i] = MapUtils.get31TileNumberY(location.getLatitude());
-				if (location.hasAltitude() && object.heightDistanceArray.length > 0) {
-					object.heightDistanceArray[i * 2] = (float) dist;
-					object.heightDistanceArray[i * 2 + 1] = (float) location.getAltitude();
-				} else {
-					object.heightDistanceArray = new float[0];
-				}
+			Location location = resources.getCurrentSegmentLocation(index);
+			double dist = 0;
+			if (prevLocation != null) {
+				dist = MapUtils.getDistance(prevLocation.getLatitude(), prevLocation.getLongitude(), location.getLatitude(), location.getLongitude());
+				distance += dist;
+			}
+			prevLocation = location;
+			object.pointsX[i] = MapUtils.get31TileNumberX(location.getLongitude());
+			object.pointsY[i] = MapUtils.get31TileNumberY(location.getLatitude());
+			if (location.hasAltitude() && object.heightDistanceArray.length > 0) {
+				object.heightDistanceArray[i * 2] = (float) dist;
+				object.heightDistanceArray[i * 2 + 1] = (float) location.getAltitude();
+			} else {
+				object.heightDistanceArray = new float[0];
 			}
 			if (plus) {
 				index++;
@@ -364,7 +399,8 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 			}
 		}
 		this.distance = distance;
-		resources.incrementCurrentLocation(length - 1);
+
+		resources.updateNextSegmentStartLocation(length);
 	}
 
 	public float[] getHeightValues() {
@@ -407,7 +443,7 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 		int capacity = Math.abs(endPointIndex - startPointIndex) + 1;
 		List<RouteSegmentResult>[] old = this.attachedRoutes;
 		this.attachedRoutes = new List[capacity];
-		if(old != null){
+		if (old != null) {
 			System.arraycopy(old, 0, this.attachedRoutes, 0, Math.min(old.length, this.attachedRoutes.length));
 		}
 	}
@@ -422,7 +458,7 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 		}
 		attachedRoutes[st].add(r);
 	}
-	
+
 	public void copyPreattachedRoutes(RouteSegmentResult toCopy, int shift) {
 		if (toCopy.preAttachedRoutes != null) {
 			int l = toCopy.preAttachedRoutes.length - shift;
@@ -430,7 +466,15 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 			System.arraycopy(toCopy.preAttachedRoutes, shift, preAttachedRoutes, 0, l);
 		}
 	}
-	
+
+	public void clearAttachedRoutes() {
+		attachedRoutes = null;
+	}
+
+	public void clearPreattachedRoutes() {
+		preAttachedRoutes = null;
+	}
+
 	public RouteSegmentResult[] getPreAttachedRoutes(int routeInd) {
 		int st = Math.abs(routeInd - startPointIndex);
 		if (preAttachedRoutes != null && st < preAttachedRoutes.length) {
@@ -438,7 +482,7 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 		}
 		return null;
 	}
-	
+
 	public List<RouteSegmentResult> getAttachedRoutes(int routeInd) {
 		int st = Math.abs(routeInd - startPointIndex);
 		List<RouteSegmentResult> list = attachedRoutes[st];
@@ -513,22 +557,43 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 		return startPointIndex;
 	}
 	
+	public int getStartPointX() {
+		return object.getPoint31XTile(startPointIndex);
+	}
+	
+	public int getStartPointY() {
+		return object.getPoint31YTile(startPointIndex);
+	}
+
 	public int getEndPointIndex() {
 		return endPointIndex;
 	}
 	
+	public int getEndPointX() {
+		return object.getPoint31XTile(endPointIndex);
+	}
+	
+	public int getEndPointY() {
+		return object.getPoint31YTile(endPointIndex);
+	}
+
 	public LatLon getPoint(int i) {
 		return convertPoint(object, i);
 	}
-	
+
 	public LatLon getEndPoint() {
 		return convertPoint(object, endPointIndex);
 	}
-	
+
+	public boolean continuesBeyondRouteSegment(RouteSegmentResult segment) {
+		boolean commonX = object.pointsX[startPointIndex] == segment.object.pointsX[segment.endPointIndex];
+		boolean commonY = object.pointsY[startPointIndex] == segment.object.pointsY[segment.endPointIndex];
+		return commonX && commonY;
+	}
+
 	public boolean isForwardDirection() {
 		return endPointIndex - startPointIndex > 0;
 	}
-
 
 	private LatLon convertPoint(RouteDataObject o, int ind){
 		return new LatLon(MapUtils.get31LatitudeY(o.getPoint31YTile(ind)), MapUtils.get31LongitudeX(o.getPoint31XTile(ind)));
@@ -560,12 +625,22 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 		this.distance = distance;
 	}
 	
-	public String getDescription() {
-		return description;
+	public String getDescription(boolean full) {
+		if(description == null || description.length == 0) {
+			return "";
+		}
+		if(full && description.length > 1) {
+			return description[1];
+		}
+		return description[0];
 	}
 	
-	public void setDescription(String description) {
-		this.description = description;
+	public void setDescription(String shortD, String full) {
+		this.description = new String[] {shortD, full};
+	}
+	
+	public void clearDescription() {
+		this.description = null;
 	}
 	
 	public void setObject(RouteDataObject r) {
@@ -649,5 +724,13 @@ public class RouteSegmentResult implements StringExternalizable<RouteDataBundle>
 			}
 		}
 		return rdo;
+	}
+
+	public int getGpxPointIndex() {
+		return gpxPointIndex;
+	}
+
+	public void setGpxPointIndex(int gpxPointIndex) {
+		this.gpxPointIndex = gpxPointIndex;
 	}
 }

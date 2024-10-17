@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
- xmlns:osmand="http://schemas.android.com/apk/res-auto"
+ xmlns:app="http://schemas.android.com/apk/res-auto"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:id="@+id/home_work_card"
 	android:layout_width="match_parent"
@@ -50,8 +50,8 @@
 				android:layout_marginLeft="@dimen/list_content_padding"
 				android:layout_marginEnd="@dimen/favorites_icon_right_margin"
 				android:layout_marginRight="@dimen/favorites_icon_right_margin"
-				osmand:srcCompat="@drawable/ic_action_home_dark"
-				android:tint="@color/description_font_and_bottom_sheet_icons" />
+				app:srcCompat="@drawable/ic_action_home_dark"
+				android:tint="@color/icon_color_default_light" />
 
 			<LinearLayout
 				android:layout_width="match_parent"
@@ -80,7 +80,7 @@
 					android:letterSpacing="@dimen/text_button_letter_spacing"
 					android:maxLines="1"
 					android:text="@string/home_button"
-					android:textColor="@color/description_font_and_bottom_sheet_icons"
+					android:textColor="@color/text_color_secondary_light"
 					android:textSize="@dimen/default_desc_text_size"
 					tools:ignore="UnusedAttribute"
 					tools:text="Amsterdam" />
@@ -116,8 +116,8 @@
 				android:layout_marginLeft="@dimen/list_content_padding"
 				android:layout_marginEnd="@dimen/favorites_icon_right_margin"
 				android:layout_marginRight="@dimen/favorites_icon_right_margin"
-				osmand:srcCompat="@drawable/ic_action_work"
-				android:tint="@color/description_font_and_bottom_sheet_icons" />
+				app:srcCompat="@drawable/ic_action_work"
+				android:tint="@color/icon_color_default_light" />
 
 			<LinearLayout
 				android:layout_width="match_parent"
@@ -146,7 +146,7 @@
 					android:letterSpacing="@dimen/text_button_letter_spacing"
 					android:maxLines="1"
 					android:text="@string/work_button"
-					android:textColor="@color/description_font_and_bottom_sheet_icons"
+					android:textColor="@color/text_color_secondary_light"
 					android:textSize="@dimen/default_desc_text_size"
 					tools:ignore="UnusedAttribute"
 					tools:text="Business centre" />
@@ -166,7 +166,7 @@
 			android:layout_width="match_parent"
 			android:layout_height="wrap_content"
 			android:scaleType="fitXY"
-			osmand:srcCompat="@drawable/bg_shadow_list_bottom" />
+			app:srcCompat="@drawable/bg_shadow_list_bottom" />
 
 	</LinearLayout>
 

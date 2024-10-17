@@ -2,6 +2,7 @@ package net.osmand.plus.settings.fragments;
 
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.fragment.app.FragmentManager;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceViewHolder;
@@ -13,7 +14,7 @@ import net.osmand.plus.settings.bottomsheets.WakeTimeBottomSheet;
 import net.osmand.plus.settings.preferences.ListPreferenceEx;
 import net.osmand.plus.settings.preferences.SwitchPreferenceEx;
 
-public class TurnScreenOnFragment extends BaseSettingsFragment implements OnPreferenceChanged {
+public class TurnScreenOnFragment extends BaseSettingsFragment {
 
 	public static final String TAG = TurnScreenOnFragment.class.getSimpleName();
 
@@ -27,7 +28,7 @@ public class TurnScreenOnFragment extends BaseSettingsFragment implements OnPref
 	}
 
 	@Override
-	protected void onBindPreferenceViewHolder(Preference preference, PreferenceViewHolder holder) {
+	protected void onBindPreferenceViewHolder(@NonNull Preference preference, @NonNull PreferenceViewHolder holder) {
 		super.onBindPreferenceViewHolder(preference, holder);
 		String prefId = preference.getKey();
 		if (settings.TURN_SCREEN_ON_TIME_INT.getId().equals(prefId) && preference instanceof ListPreferenceEx) {
@@ -62,12 +63,12 @@ public class TurnScreenOnFragment extends BaseSettingsFragment implements OnPref
 	}
 
 	private void setupUseSystemScreenTimeout() {
-		SwitchPreferenceEx systemScreenTimeout = (SwitchPreferenceEx) findPreference(settings.USE_SYSTEM_SCREEN_TIMEOUT.getId());
+		SwitchPreferenceEx systemScreenTimeout = findPreference(settings.USE_SYSTEM_SCREEN_TIMEOUT.getId());
 		systemScreenTimeout.setDescription(R.string.system_screen_timeout_descr);
 	}
 
 	private void setupTurnScreenOnTimePref() {
-		Integer[] entryValues = new Integer[] {0, 5, 10, 15, 20, 30, 45, 60};
+		Integer[] entryValues = {0, 5, 10, 15, 20, 30, 45, 60};
 		String[] entries = new String[entryValues.length];
 
 		entries[0] = getString(R.string.keep_screen_on);
@@ -75,7 +76,7 @@ public class TurnScreenOnFragment extends BaseSettingsFragment implements OnPref
 			entries[i] = entryValues[i] + " " + getString(R.string.int_seconds);
 		}
 
-		ListPreferenceEx turnScreenOnTime = (ListPreferenceEx) findPreference(settings.TURN_SCREEN_ON_TIME_INT.getId());
+		ListPreferenceEx turnScreenOnTime = findPreference(settings.TURN_SCREEN_ON_TIME_INT.getId());
 		turnScreenOnTime.setEnabled(!settings.USE_SYSTEM_SCREEN_TIMEOUT.getModeValue(getSelectedAppMode()));
 		turnScreenOnTime.setEntries(entries);
 		turnScreenOnTime.setEntryValues(entryValues);
@@ -84,13 +85,13 @@ public class TurnScreenOnFragment extends BaseSettingsFragment implements OnPref
 	}
 
 	private void setupTurnScreenOnSensorPref() {
-		SwitchPreferenceEx turnScreenOnSensor = (SwitchPreferenceEx) findPreference(settings.TURN_SCREEN_ON_SENSOR.getId());
+		SwitchPreferenceEx turnScreenOnSensor = findPreference(settings.TURN_SCREEN_ON_SENSOR.getId());
 		turnScreenOnSensor.setIcon(getPersistentPrefIcon(R.drawable.ic_action_sensor_interaction));
 		turnScreenOnSensor.setDescription(R.string.turn_screen_on_sensor_descr);
 	}
 
 	private void setupTurnScreenOnNavigationInstructionsPref() {
-		SwitchPreferenceEx turnScreenOnNavigationInstructions = (SwitchPreferenceEx) findPreference(settings.TURN_SCREEN_ON_NAVIGATION_INSTRUCTIONS.getId());
+		SwitchPreferenceEx turnScreenOnNavigationInstructions = findPreference(settings.TURN_SCREEN_ON_NAVIGATION_INSTRUCTIONS.getId());
 		turnScreenOnNavigationInstructions.setIcon(getPersistentPrefIcon(R.drawable.ic_action_notification_navigation));
 		turnScreenOnNavigationInstructions.setDescription(R.string.turn_screen_on_navigation_instructions_descr);
 	}
@@ -98,7 +99,7 @@ public class TurnScreenOnFragment extends BaseSettingsFragment implements OnPref
 	private void setupTurnScreenOnPowerButtonPref() {
 		ApplicationMode appMode = getSelectedAppMode();
 		boolean enabled = settings.TURN_SCREEN_ON_TIME_INT.getModeValue(appMode) == 0 || settings.USE_SYSTEM_SCREEN_TIMEOUT.getModeValue(appMode);
-		SwitchPreferenceEx turnScreenOnPowerButton = (SwitchPreferenceEx) findPreference(settings.TURN_SCREEN_ON_POWER_BUTTON.getId());
+		SwitchPreferenceEx turnScreenOnPowerButton = findPreference(settings.TURN_SCREEN_ON_POWER_BUTTON.getId());
 		turnScreenOnPowerButton.setEnabled(enabled);
 		turnScreenOnPowerButton.setDescription(R.string.turn_screen_on_power_button_descr);
 		turnScreenOnPowerButton.setIcon(getPersistentPrefIcon(R.drawable.ic_action_power_button));
@@ -107,7 +108,7 @@ public class TurnScreenOnFragment extends BaseSettingsFragment implements OnPref
 	}
 
 	@Override
-	public void onPreferenceChanged(String prefId) {
+	public void onPreferenceChanged(@NonNull String prefId) {
 		if (settings.USE_SYSTEM_SCREEN_TIMEOUT.getId().equals(prefId)) {
 			Preference turnScreenOnTime = findPreference(settings.TURN_SCREEN_ON_TIME_INT.getId());
 			if (turnScreenOnTime != null) {

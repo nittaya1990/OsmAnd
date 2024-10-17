@@ -1,8 +1,9 @@
 package net.osmand.plus.download.ui;
 
+import static net.osmand.plus.download.ui.DownloadResourceGroupFragment.REGION_ID_DLG_KEY;
+
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -18,27 +19,25 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.DialogFragment;
 import androidx.viewpager.widget.ViewPager;
 
-import net.osmand.AndroidUtils;
 import net.osmand.map.WorldRegion;
-import net.osmand.plus.CustomRegion;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
-import net.osmand.plus.download.CustomIndexItem;
+import net.osmand.plus.plugins.custom.CustomRegion;
+import net.osmand.plus.plugins.custom.CustomIndexItem;
 import net.osmand.plus.download.DownloadActivity;
-import net.osmand.plus.download.DownloadActivity.BannerAndDownloadFreeVersion;
 import net.osmand.plus.download.DownloadIndexesThread.DownloadEvents;
 import net.osmand.plus.download.DownloadResourceGroup;
 import net.osmand.plus.download.DownloadResources;
 import net.osmand.plus.download.IndexItem;
 import net.osmand.plus.download.ui.DownloadDescriptionInfo.ActionButton;
 import net.osmand.plus.helpers.AndroidUiHelper;
-import net.osmand.plus.wikipedia.WikipediaDialogFragment;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.UiUtilities;
+import net.osmand.plus.widgets.dialogbutton.DialogButton;
+import net.osmand.plus.widgets.dialogbutton.DialogButtonType;
 import net.osmand.util.Algorithms;
 
 import java.util.List;
-
-import static net.osmand.plus.download.ui.DownloadResourceGroupFragment.REGION_ID_DLG_KEY;
 
 public class DownloadItemFragment extends DialogFragment implements DownloadEvents {
 
@@ -70,7 +69,7 @@ public class DownloadItemFragment extends DialogFragment implements DownloadEven
 
 	@Override
 	public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-		final View view = inflater.inflate(R.layout.item_info_fragment, container, false);
+		View view = inflater.inflate(R.layout.item_info_fragment, container, false);
 
 		if (savedInstanceState != null) {
 			regionId = savedInstanceState.getString(REGION_ID_DLG_KEY);
@@ -105,11 +104,7 @@ public class DownloadItemFragment extends DialogFragment implements DownloadEven
 			@Override
 			public void onGlobalLayout() {
 				ViewTreeObserver obs = view.getViewTreeObserver();
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-					obs.removeOnGlobalLayoutListener(this);
-				} else {
-					obs.removeGlobalOnLayoutListener(this);
-				}
+				obs.removeOnGlobalLayoutListener(this);
 				descriptionContainer.setPadding(0, 0, 0, buttonsContainer.getHeight());
 			}
 		});
@@ -172,9 +167,9 @@ public class DownloadItemFragment extends DialogFragment implements DownloadEven
 		}
 	}
 
-	static void updateActionButtons(final DownloadActivity ctx, DownloadDescriptionInfo descriptionInfo,
-	                                @Nullable final IndexItem indexItem, ViewGroup buttonsContainer,
-	                                @LayoutRes int layoutId, final boolean nightMode) {
+	static void updateActionButtons(DownloadActivity ctx, DownloadDescriptionInfo descriptionInfo,
+	                                @Nullable IndexItem indexItem, ViewGroup buttonsContainer,
+	                                @LayoutRes int layoutId, boolean nightMode) {
 		buttonsContainer.removeAllViews();
 
 		List<ActionButton> actionButtons = descriptionInfo.getActionButtons(ctx);
@@ -182,29 +177,27 @@ public class DownloadItemFragment extends DialogFragment implements DownloadEven
 			actionButtons.add(new ActionButton(ActionButton.DOWNLOAD_ACTION, ctx.getString(R.string.shared_string_download), null));
 		}
 
-		for (final ActionButton actionButton : actionButtons) {
+		for (ActionButton actionButton : actionButtons) {
 			View buttonView = UiUtilities.getInflater(ctx, nightMode).inflate(layoutId, buttonsContainer, false);
-			View button = buttonView.findViewById(R.id.dismiss_button);
+			DialogButton button = buttonView.findViewById(R.id.dismiss_button);
 			if (button != null) {
-				UiUtilities.setupDialogButton(nightMode, button, UiUtilities.DialogButtonType.PRIMARY, actionButton.getName());
+				button.setButtonType(DialogButtonType.PRIMARY);
+				button.setTitle(actionButton.getName());
 			} else {
 				TextView buttonText = buttonView.findViewById(R.id.button_text);
 				buttonText.setText(actionButton.getName());
 			}
-			buttonView.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					if (actionButton.getUrl() != null) {
-						WikipediaDialogFragment.showFullArticle(ctx, Uri.parse(actionButton.getUrl()), nightMode);
-					} else if (ActionButton.DOWNLOAD_ACTION.equalsIgnoreCase(actionButton.getActionType()) && indexItem != null) {
-						boolean isDownloading = ctx.getDownloadThread().isDownloading(indexItem);
-						if (!isDownloading) {
-							ctx.startDownload(indexItem);
-						}
-					} else {
-						String text = ctx.getString(R.string.download_unsupported_action, actionButton.getActionType());
-						Toast.makeText(ctx, text, Toast.LENGTH_SHORT).show();
+			buttonView.setOnClickListener(v -> {
+				if (actionButton.getUrl() != null) {
+					AndroidUtils.openUrl(ctx, Uri.parse(actionButton.getUrl()), nightMode);
+				} else if (ActionButton.DOWNLOAD_ACTION.equalsIgnoreCase(actionButton.getActionType()) && indexItem != null) {
+					boolean isDownloading = ctx.getDownloadThread().isDownloading(indexItem);
+					if (!isDownloading) {
+						ctx.startDownload(indexItem);
 					}
+				} else {
+					String text = ctx.getString(R.string.download_unsupported_action, actionButton.getActionType());
+					Toast.makeText(ctx, text, Toast.LENGTH_SHORT).show();
 				}
 			});
 			buttonsContainer.addView(buttonView);

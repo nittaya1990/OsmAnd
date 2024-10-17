@@ -6,11 +6,12 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import net.osmand.plus.OsmandApplication;
+import net.osmand.util.CollectionUtils;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Iterator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
@@ -19,9 +20,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 public class BackupExecutor extends ThreadPoolExecutor {
 
 	private final OsmandApplication app;
-	private final List<BackupExecutorListener> listeners = Collections.synchronizedList(new ArrayList<>());
 	private final AtomicInteger aState = new AtomicInteger(State.IDLE.ordinal());
-	private final List<BackupCommand> activeCommands = Collections.synchronizedList(new ArrayList<>());
+	private List<BackupCommand> activeCommands = new ArrayList<>();
+	private List<BackupExecutorListener> listeners = new ArrayList<>();
 
 	public enum State {
 		IDLE,
@@ -52,17 +53,17 @@ public class BackupExecutor extends ThreadPoolExecutor {
 	}
 
 	public void addListener(@NonNull BackupExecutorListener listener) {
-		listeners.add(listener);
+		listeners = CollectionUtils.addToList(listeners, listener);
 	}
 
 	public void removeListener(@NonNull BackupExecutorListener listener) {
-		listeners.remove(listener);
+		listeners = CollectionUtils.removeFromList(listeners, listener);
 	}
 
 	public void runCommand(@NonNull BackupCommand command) {
 		updateActiveCommands();
 		if (command.getStatus() == AsyncTask.Status.PENDING) {
-			activeCommands.add(command);
+			activeCommands = CollectionUtils.addToList(activeCommands, command);
 			command.executeOnExecutor(this);
 		}
 	}
@@ -114,12 +115,12 @@ public class BackupExecutor extends ThreadPoolExecutor {
 	}
 
 	private void updateActiveCommands() {
-		Iterator<BackupCommand> it = activeCommands.iterator();
-		while (it.hasNext()) {
-			BackupCommand command = it.next();
+		Set<BackupCommand> commandsToRemove = new HashSet<>();
+		for (BackupCommand command : activeCommands) {
 			if (command.getStatus() == AsyncTask.Status.FINISHED) {
-				it.remove();
+				commandsToRemove.add(command);
 			}
 		}
+		activeCommands = CollectionUtils.removeAllFromList(activeCommands, commandsToRemove);
 	}
 }

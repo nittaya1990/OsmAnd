@@ -10,11 +10,12 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
-import net.osmand.AndroidUtils;
 import net.osmand.plus.R;
 import net.osmand.plus.helpers.SearchHistoryHelper;
 import net.osmand.plus.helpers.SearchHistoryHelper.HistoryEntry;
 import net.osmand.plus.search.ShareHistoryAsyncTask;
+import net.osmand.plus.settings.enums.HistorySource;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.search.core.SearchResult;
 
 import java.util.ArrayList;
@@ -37,7 +38,8 @@ public class SearchHistorySettingsFragment extends HistoryItemsFragment {
 	@Override
 	protected void updateHistoryItems() {
 		clearItems();
-		List<SearchResult> searchResults = HistorySettingsFragment.getSearchHistoryResults(app);
+		SearchHistoryHelper historyHelper = SearchHistoryHelper.getInstance(app);
+		List<SearchResult> searchResults = historyHelper.getHistoryResults(HistorySource.SEARCH, false, true);
 		sortSearchResults(searchResults);
 
 		Map<Integer, List<SearchResult>> historyGroups = new HashMap<>();
@@ -74,7 +76,7 @@ public class SearchHistorySettingsFragment extends HistoryItemsFragment {
 			if (historyEntry2 != null) {
 				lastTime2 = historyEntry2.getLastAccessTime();
 			}
-			return (lastTime1 < lastTime2) ? 1 : ((lastTime1 == lastTime2) ? 0 : -1);
+			return Long.compare(lastTime2, lastTime1);
 		});
 	}
 
@@ -91,7 +93,6 @@ public class SearchHistorySettingsFragment extends HistoryItemsFragment {
 			settings.SEARCH_HISTORY.set(checked);
 			updateToolbarSwitch(toolbarContainer);
 			updateDisabledItems();
-
 			Fragment target = getTargetFragment();
 			if (target instanceof OnPreferenceChanged) {
 				((OnPreferenceChanged) target).onPreferenceChanged(settings.SEARCH_HISTORY.getId());

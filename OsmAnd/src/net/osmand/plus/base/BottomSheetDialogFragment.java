@@ -83,6 +83,16 @@ public abstract class BottomSheetDialogFragment extends DialogFragment {
 	}
 
 	@Nullable
+	protected Drawable getIcon(@DrawableRes int drawableRes) {
+		OsmandApplication app = getMyApplication();
+		if (app != null) {
+			return app.getUIUtilities().getIcon(drawableRes);
+		} else {
+			return null;
+		}
+	}
+
+	@Nullable
 	protected Drawable getIcon(@DrawableRes int drawableRes, @ColorRes int colorRes) {
 		OsmandApplication app = getMyApplication();
 		if (app != null) {
@@ -113,6 +123,6 @@ public abstract class BottomSheetDialogFragment extends DialogFragment {
 	}
 
 	protected int getWindowAnimations(@NonNull Activity context) {
-		return R.style.Animations_PopUpMenu_Bottom;
+		return R.style.Animation_MaterialComponents_BottomSheetDialog;
 	}
 }

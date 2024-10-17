@@ -9,8 +9,8 @@ import androidx.annotation.Nullable;
 import net.osmand.data.PointDescription;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper;
-import net.osmand.plus.TargetPointsHelper.TargetPoint;
+import net.osmand.plus.helpers.TargetPointsHelper;
+import net.osmand.plus.helpers.TargetPointsHelper.TargetPoint;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.util.Algorithms;
 
@@ -27,7 +27,7 @@ public class PreviousRouteCard extends MapBaseCard {
 
 	@Override
 	protected void updateContent() {
-		final TargetPointsHelper targetPointsHelper = app.getTargetPointsHelper();
+		TargetPointsHelper targetPointsHelper = app.getTargetPointsHelper();
 		TextView startTitle = view.findViewById(R.id.start_title);
 		TextView destinationTitle = view.findViewById(R.id.destination_title);
 
@@ -53,15 +53,7 @@ public class PreviousRouteCard extends MapBaseCard {
 		destinationName = getPointName(app, destinationPoint);
 		destinationTitle.setText(destinationName);
 		View button = view.findViewById(R.id.card_button);
-		button.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				CardListener listener = getListener();
-				if (listener != null) {
-					listener.onCardButtonPressed(PreviousRouteCard.this, 0);
-				}
-			}
-		});
+		button.setOnClickListener(v -> notifyButtonPressed(0));
 	}
 
 	public static String getPointName(@NonNull OsmandApplication app, @Nullable TargetPoint point) {

@@ -1,5 +1,7 @@
 package net.osmand.plus.quickaction.actions;
 
+import static net.osmand.plus.quickaction.QuickActionIds.NAV_VOICE_ACTION_ID;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -14,10 +16,11 @@ import net.osmand.plus.quickaction.QuickAction;
 import net.osmand.plus.quickaction.QuickActionType;
 
 public class NavVoiceAction extends QuickAction {
-	public static final QuickActionType TYPE = new QuickActionType(11,
+	public static final QuickActionType TYPE = new QuickActionType(NAV_VOICE_ACTION_ID,
 			"nav.voice", NavVoiceAction.class).
-			nameRes(R.string.quick_action_navigation_voice).iconRes(R.drawable.ic_action_volume_up).nonEditable().
-			category(QuickActionType.NAVIGATION);
+			nameRes(R.string.voices).iconRes(R.drawable.ic_action_volume_up).nonEditable().
+			category(QuickActionType.NAVIGATION)
+			.nameActionRes(R.string.quick_action_verb_turn_on_off);
 
 	public NavVoiceAction() {
 		super(TYPE);
@@ -45,14 +48,14 @@ public class NavVoiceAction extends QuickAction {
 	}
 
 	@Override
-	public String getActionText(OsmandApplication application) {
-		return application.getSettings().VOICE_MUTE.get()
-				? application.getString(R.string.quick_action_navigation_voice_off)
-				: application.getString(R.string.quick_action_navigation_voice_on);
+	public String getActionText(@NonNull OsmandApplication app) {
+		return app.getSettings().VOICE_MUTE.get()
+				? app.getString(R.string.quick_action_navigation_voice_off)
+				: app.getString(R.string.quick_action_navigation_voice_on);
 	}
 
 	@Override
-	public boolean isActionWithSlash(OsmandApplication application) {
-		return !application.getSettings().VOICE_MUTE.get();
+	public boolean isActionWithSlash(@NonNull OsmandApplication app) {
+		return !app.getSettings().VOICE_MUTE.get();
 	}
 }

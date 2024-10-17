@@ -1,5 +1,7 @@
 package net.osmand.plus.routepreparationmenu.cards;
 
+import static net.osmand.plus.mapcontextmenu.other.TrackDetailsMenu.ChartPointLayer.ROUTE;
+
 import android.os.Build;
 import android.text.SpannableStringBuilder;
 import android.text.style.ForegroundColorSpan;
@@ -12,24 +14,26 @@ import android.widget.TextView;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
+import com.github.mikephil.charting.charts.ElevationChart;
 import com.github.mikephil.charting.charts.LineChart;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 
-import net.osmand.AndroidUtils;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
-import net.osmand.plus.GpxSelectionHelper.GpxDisplayItem;
-import net.osmand.plus.OsmAndFormatter;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.helpers.GpxUiHelper;
-import net.osmand.plus.helpers.GpxUiHelper.GPXDataSetAxisType;
-import net.osmand.plus.helpers.GpxUiHelper.OrderedLineDataSet;
-import net.osmand.plus.mapcontextmenu.other.TrackDetailsMenu.ChartPointLayer;
-import net.osmand.plus.measurementtool.graph.CommonGraphAdapter;
+import net.osmand.plus.charts.ChartUtils;
+import net.osmand.plus.charts.GPXDataSetAxisType;
+import net.osmand.plus.charts.GPXDataSetType;
+import net.osmand.plus.charts.OrderedLineDataSet;
+import net.osmand.plus.measurementtool.graph.CommonChartAdapter;
 import net.osmand.plus.routing.RoutingHelper;
+import net.osmand.plus.track.helpers.GpxDisplayItem;
+import net.osmand.plus.track.helpers.GpxUiHelper;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.OsmAndFormatter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -39,26 +43,25 @@ public class RouteStatisticCard extends MapBaseCard {
 	public static final int DETAILS_BUTTON_INDEX = 0;
 	public static final int START_BUTTON_INDEX = 1;
 
-	private GPXFile gpx;
-	private GpxDisplayItem gpxItem;
+	private final GpxFile gpxFile;
+	private final GpxDisplayItem gpxItem;
 	@Nullable
 	private OrderedLineDataSet slopeDataSet;
 	@Nullable
 	private OrderedLineDataSet elevationDataSet;
-	private OnClickListener onAnalyseClickListener;
-	private CommonGraphAdapter graphAdapter;
+	private final OnClickListener onAnalyseClickListener;
+	private CommonChartAdapter graphAdapter;
 
-	public RouteStatisticCard(MapActivity mapActivity, GPXFile gpx,
-							  OnClickListener onAnalyseClickListener) {
+	public RouteStatisticCard(MapActivity mapActivity, GpxFile gpxFile, OnClickListener onAnalyseClickListener) {
 		super(mapActivity);
-		this.gpx = gpx;
+		this.gpxFile = gpxFile;
 		this.onAnalyseClickListener = onAnalyseClickListener;
-		this.gpxItem = GpxUiHelper.makeGpxDisplayItem(app, gpx, ChartPointLayer.ROUTE);
+		this.gpxItem = GpxUiHelper.makeGpxDisplayItem(app, gpxFile, ROUTE, null);
 	}
 
 	@Nullable
-	public GPXFile getGpx() {
-		return gpx;
+	public GpxFile getGpxFile() {
+		return gpxFile;
 	}
 
 	@Nullable
@@ -86,7 +89,7 @@ public class RouteStatisticCard extends MapBaseCard {
 		if (spaceIndex != -1) {
 			distanceStr.setSpan(new ForegroundColorSpan(getMainFontColor()), 0, spaceIndex, 0);
 		}
-		TextView distanceTv = (TextView) view.findViewById(R.id.distance);
+		TextView distanceTv = view.findViewById(R.id.distance);
 		distanceTv.setText(distanceStr);
 
 		int time = routingHelper.getLeftTime();
@@ -96,18 +99,18 @@ public class RouteStatisticCard extends MapBaseCard {
 		if (spaceIndex != -1) {
 			timeStr.setSpan(new ForegroundColorSpan(getMainFontColor()), 0, spaceIndex, 0);
 		}
-		TextView timeTv = (TextView) view.findViewById(R.id.time);
+		TextView timeTv = view.findViewById(R.id.time);
 		timeTv.setText(timeStr);
 
-		TextView arriveTimeTv = (TextView) view.findViewById(R.id.time_desc);
-		String arriveStr = app.getString(R.string.arrive_at_time, OsmAndFormatter.getFormattedTime(time, true));
+		TextView arriveTimeTv = view.findViewById(R.id.time_desc);
+		String arriveStr = app.getString(R.string.arrive_at_time, OsmAndFormatter.getFormattedTimeShort(time, true));
 		arriveTimeTv.setText(arriveStr);
 
 		buildSlopeInfo();
 		updateButtons();
 
 		if (isTransparentBackground()) {
-			view.setBackgroundDrawable(null);
+			view.setBackground(null);
 		}
 	}
 
@@ -118,36 +121,17 @@ public class RouteStatisticCard extends MapBaseCard {
 	}
 
 	private void updateButtons() {
-		FrameLayout detailsButton = (FrameLayout) view.findViewById(R.id.details_button);
-		TextView detailsButtonDescr = (TextView) view.findViewById(R.id.details_button_descr);
-		if (Build.VERSION.SDK_INT > Build.VERSION_CODES.LOLLIPOP) {
-			AndroidUtils.setBackground(app, detailsButton, nightMode, R.drawable.btn_border_light, R.drawable.btn_border_dark);
-			AndroidUtils.setBackground(app, detailsButtonDescr, nightMode, R.drawable.ripple_light, R.drawable.ripple_dark);
-		} else {
-			AndroidUtils.setBackground(app, detailsButton, nightMode, R.drawable.btn_border_trans_light, R.drawable.btn_border_trans_dark);
-		}
-		detailsButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				CardListener listener = getListener();
-				if (listener != null) {
-					listener.onCardButtonPressed(RouteStatisticCard.this, DETAILS_BUTTON_INDEX);
-				}
-			}
-		});
-		FrameLayout startButton = (FrameLayout) view.findViewById(R.id.start_button);
-		TextView startButtonDescr = (TextView) view.findViewById(R.id.start_button_descr);
+		FrameLayout detailsButton = view.findViewById(R.id.details_button);
+		TextView detailsButtonDescr = view.findViewById(R.id.details_button_descr);
+		AndroidUtils.setBackground(app, detailsButton, nightMode, R.drawable.btn_border_light, R.drawable.btn_border_dark);
+		AndroidUtils.setBackground(app, detailsButtonDescr, nightMode, R.drawable.ripple_light, R.drawable.ripple_dark);
+		detailsButton.setOnClickListener(v -> notifyButtonPressed(DETAILS_BUTTON_INDEX));
+
+		FrameLayout startButton = view.findViewById(R.id.start_button);
+		TextView startButtonDescr = view.findViewById(R.id.start_button_descr);
 		AndroidUtils.setBackground(app, startButton, nightMode, R.drawable.btn_active_light, R.drawable.btn_active_dark);
 		int color = ContextCompat.getColor(app, R.color.card_and_list_background_light);
-		startButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				CardListener listener = getListener();
-				if (listener != null) {
-					listener.onCardButtonPressed(RouteStatisticCard.this, START_BUTTON_INDEX);
-				}
-			}
-		});
+		startButton.setOnClickListener(v -> notifyButtonPressed(START_BUTTON_INDEX));
 		RoutingHelper helper = app.getRoutingHelper();
 		if (helper.isFollowingMode() || helper.isPauseNavigation()) {
 			startButtonDescr.setText(R.string.shared_string_resume);
@@ -158,18 +142,19 @@ public class RouteStatisticCard extends MapBaseCard {
 	}
 
 	private void buildSlopeInfo() {
-		GPXTrackAnalysis analysis = gpx.getAnalysis(0);
+		GpxTrackAnalysis analysis = gpxFile.getAnalysis(0);
 
 		buildHeader(analysis);
-		if (analysis.hasElevationData) {
-			((TextView) view.findViewById(R.id.average_text)).setText(OsmAndFormatter.getFormattedAlt(analysis.avgElevation, app));
+		boolean hasElevationData = analysis.hasElevationData();
+		if (hasElevationData) {
+			((TextView) view.findViewById(R.id.average_text)).setText(OsmAndFormatter.getFormattedAlt(analysis.getAvgElevation(), app));
 
-			String min = OsmAndFormatter.getFormattedAlt(analysis.minElevation, app);
-			String max = OsmAndFormatter.getFormattedAlt(analysis.maxElevation, app);
+			String min = OsmAndFormatter.getFormattedAlt(analysis.getMinElevation(), app);
+			String max = OsmAndFormatter.getFormattedAlt(analysis.getMaxElevation(), app);
 			((TextView) view.findViewById(R.id.range_text)).setText(min + " - " + max);
 
-			String asc = OsmAndFormatter.getFormattedAlt(analysis.diffElevationUp, app);
-			String desc = OsmAndFormatter.getFormattedAlt(analysis.diffElevationDown, app);
+			String asc = OsmAndFormatter.getFormattedAlt(analysis.getDiffElevationUp(), app);
+			String desc = OsmAndFormatter.getFormattedAlt(analysis.getDiffElevationDown(), app);
 			((TextView) view.findViewById(R.id.descent_text)).setText(desc);
 			((TextView) view.findViewById(R.id.ascent_text)).setText(asc);
 
@@ -178,9 +163,9 @@ public class RouteStatisticCard extends MapBaseCard {
 			((ImageView) view.findViewById(R.id.descent_icon)).setImageDrawable(getContentIcon(R.drawable.ic_action_altitude_descent));
 			((ImageView) view.findViewById(R.id.ascent_icon)).setImageDrawable(getContentIcon(R.drawable.ic_action_altitude_ascent));
 
-			TextView analyseButtonDescr = (TextView) view.findViewById(R.id.analyse_button_descr);
+			TextView analyseButtonDescr = view.findViewById(R.id.analyse_button_descr);
 
-			FrameLayout analyseButton = (FrameLayout) view.findViewById(R.id.analyse_button);
+			FrameLayout analyseButton = view.findViewById(R.id.analyse_button);
 			if (Build.VERSION.SDK_INT > Build.VERSION_CODES.LOLLIPOP) {
 				AndroidUtils.setBackground(app, analyseButton, nightMode, R.drawable.btn_border_light, R.drawable.btn_border_dark);
 				AndroidUtils.setBackground(app, analyseButtonDescr, nightMode, R.drawable.ripple_light, R.drawable.ripple_dark);
@@ -189,10 +174,10 @@ public class RouteStatisticCard extends MapBaseCard {
 			}
 			analyseButton.setOnClickListener(onAnalyseClickListener);
 		}
-		view.findViewById(R.id.altitude_container).setVisibility(analysis.hasElevationData ? View.VISIBLE : View.GONE);
-		view.findViewById(R.id.slope_info_divider).setVisibility(analysis.hasElevationData ? View.VISIBLE : View.GONE);
-		view.findViewById(R.id.slope_container).setVisibility(analysis.hasElevationData ? View.VISIBLE : View.GONE);
-		view.findViewById(R.id.buttons_container).setVisibility(analysis.hasElevationData ? View.VISIBLE : View.GONE);
+		view.findViewById(R.id.altitude_container).setVisibility(hasElevationData ? View.VISIBLE : View.GONE);
+		view.findViewById(R.id.slope_info_divider).setVisibility(hasElevationData ? View.VISIBLE : View.GONE);
+		view.findViewById(R.id.slope_container).setVisibility(hasElevationData ? View.VISIBLE : View.GONE);
+		view.findViewById(R.id.buttons_container).setVisibility(hasElevationData ? View.VISIBLE : View.GONE);
 	}
 
 	@Nullable
@@ -206,25 +191,23 @@ public class RouteStatisticCard extends MapBaseCard {
 	}
 
 	@Nullable
-	public CommonGraphAdapter getGraphAdapter() {
+	public CommonChartAdapter getGraphAdapter() {
 		return graphAdapter;
 	}
 
-	private void buildHeader(GPXTrackAnalysis analysis) {
-		LineChart mChart = (LineChart) view.findViewById(R.id.chart);
-		GpxUiHelper.setupGPXChart(mChart, 4, 24f, 16f, !nightMode, true);
-		graphAdapter = new CommonGraphAdapter(app, mChart, true);
+	private void buildHeader(GpxTrackAnalysis analysis) {
+		ElevationChart mChart = view.findViewById(R.id.chart);
+		ChartUtils.setupElevationChart(mChart, 24f, 16f, true);
+		graphAdapter = new CommonChartAdapter(app, mChart, true);
 
-		if (analysis.hasElevationData) {
+		if (analysis.hasElevationData()) {
 			List<ILineDataSet> dataSets = new ArrayList<>();
-			OrderedLineDataSet slopeDataSet = null;
-			OrderedLineDataSet elevationDataSet = GpxUiHelper.createGPXElevationDataSet(app, mChart, analysis,
-					GPXDataSetAxisType.DISTANCE, false, true, false);
-			if (elevationDataSet != null) {
-				dataSets.add(elevationDataSet);
-				slopeDataSet = GpxUiHelper.createGPXSlopeDataSet(app, mChart, analysis,
-						GPXDataSetAxisType.DISTANCE, elevationDataSet.getValues(), true, true, false);
-			}
+			OrderedLineDataSet slopeDataSet;
+			OrderedLineDataSet elevationDataSet = ChartUtils.createGPXElevationDataSet(app, mChart, analysis,
+					GPXDataSetType.ALTITUDE, GPXDataSetAxisType.DISTANCE, false, true, false);
+			dataSets.add(elevationDataSet);
+			slopeDataSet = ChartUtils.createGPXSlopeDataSet(app, mChart, analysis,
+					GPXDataSetType.SLOPE, GPXDataSetAxisType.DISTANCE, elevationDataSet.getEntries(), true, true, false);
 			if (slopeDataSet != null) {
 				dataSets.add(slopeDataSet);
 			}

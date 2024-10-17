@@ -11,11 +11,12 @@ import net.osmand.OperationLog;
 import net.osmand.plus.backup.BackupListeners.OnDeleteFilesListener;
 import net.osmand.plus.backup.NetworkWriter.OnUploadItemListener;
 import net.osmand.plus.backup.PrepareBackupResult.RemoteFilesType;
-import net.osmand.plus.settings.backend.ExportSettingsType;
+import net.osmand.plus.settings.backend.backup.exporttype.ExportType;
 import net.osmand.plus.settings.backend.backup.AbstractWriter;
 import net.osmand.plus.settings.backend.backup.Exporter;
 import net.osmand.plus.settings.backend.backup.items.SettingsItem;
 import net.osmand.util.Algorithms;
+import net.osmand.util.CollectionUtils;
 
 import java.io.IOException;
 import java.util.ArrayList;
@@ -33,10 +34,11 @@ public class BackupExporter extends Exporter {
 
 	private final BackupHelper backupHelper;
 	private final List<SettingsItem> itemsToDelete = new ArrayList<>();
+	private final List<SettingsItem> itemsToLocalDelete = new ArrayList<>();
 	private final List<SettingsItem> oldItemsToDelete = new ArrayList<>();
 	private ThreadPoolTaskExecutor<ItemWriterTask> executor;
 	private final NetworkExportProgressListener listener;
-	private final List<RemoteFile> oldFilesToDelete = Collections.synchronizedList(new ArrayList<>());
+	private List<RemoteFile> oldFilesToDelete = new ArrayList<>();
 
 	public interface NetworkExportProgressListener {
 		void itemExportStarted(@NonNull String type, @NonNull String fileName, int work);
@@ -61,6 +63,10 @@ public class BackupExporter extends Exporter {
 		return itemsToDelete;
 	}
 
+	public List<SettingsItem> getItemsToLocalDelete() {
+		return itemsToLocalDelete;
+	}
+
 	@NonNull
 	public List<SettingsItem> getOldItemsToDelete() {
 		return oldItemsToDelete;
@@ -68,6 +74,10 @@ public class BackupExporter extends Exporter {
 
 	public void addItemToDelete(@NonNull SettingsItem item) throws IllegalArgumentException {
 		itemsToDelete.add(item);
+	}
+
+	public void addItemToLocalDelete(@NonNull SettingsItem item) throws IllegalArgumentException {
+		itemsToLocalDelete.add(item);
 	}
 
 	public void addOldItemToDelete(@NonNull SettingsItem item) throws IllegalArgumentException {
@@ -138,6 +148,7 @@ public class BackupExporter extends Exporter {
 		writeItems(networkWriter);
 		deleteFiles(deleteFilesListener);
 		deleteOldFiles(deleteFilesListener);
+		deleteLocalFiles(itemsProgress, dataProgress);
 		if (!isCancelled()) {
 			backupHelper.updateBackupUploadTime();
 		}
@@ -165,6 +176,20 @@ public class BackupExporter extends Exporter {
 			}
 		} catch (UserNotRegisteredException e) {
 			throw new IOException(e.getMessage(), e);
+		}
+	}
+
+	protected void deleteLocalFiles(Set<Object> itemsProgress, AtomicInteger dataProgress) {
+		List<SettingsItem> itemsToLocalDelete = this.itemsToLocalDelete;
+		for (SettingsItem item : itemsToLocalDelete) {
+			item.delete();
+			itemsProgress.add(item);
+			if (listener != null) {
+				int p = dataProgress.addAndGet(APPROXIMATE_FILE_SIZE_BYTES / 1024);
+				String fileName = BackupUtils.getItemFileName(item);
+				listener.itemExportDone(item.getType().name(), fileName);
+				listener.updateGeneralProgress(itemsProgress.size(), p);
+			}
 		}
 	}
 
@@ -220,7 +245,7 @@ public class BackupExporter extends Exporter {
 			}
 
 			@Override
-			public void onItemUploadDone(@NonNull SettingsItem item, @NonNull String fileName, long uploadTime, @Nullable String error) {
+			public void onItemUploadDone(@NonNull SettingsItem item, @NonNull String fileName, @Nullable String error) {
 				String type = item.getType().name();
 				if (!Algorithms.isEmpty(error)) {
 					errors.put(type + "/" + fileName, error);
@@ -236,12 +261,6 @@ public class BackupExporter extends Exporter {
 
 	private OnDeleteFilesListener getOnDeleteFilesListener(Set<Object> itemsProgress, AtomicInteger dataProgress) {
 		return new OnDeleteFilesListener() {
-
-			@Override
-			public void onFilesDeleteStarted(@NonNull List<RemoteFile> files) {
-
-			}
-
 			@Override
 			public void onFileDeleteProgress(@NonNull RemoteFile file, int progress) {
 				int p = dataProgress.addAndGet(APPROXIMATE_FILE_SIZE_BYTES / 1024);
@@ -251,26 +270,16 @@ public class BackupExporter extends Exporter {
 					listener.updateGeneralProgress(itemsProgress.size(), p);
 				}
 			}
-
-			@Override
-			public void onFilesDeleteDone(@NonNull Map<RemoteFile, String> errors) {
-
-			}
-
-			@Override
-			public void onFilesDeleteError(int status, @NonNull String message) {
-
-			}
 		};
 	}
 
 	private void markOldFileForDeletion(@NonNull SettingsItem item, @NonNull String fileName) {
 		String type = item.getType().name();
-		ExportSettingsType exportType = ExportSettingsType.getExportSettingsTypeForItem(item);
+		ExportType exportType = ExportType.findBy(item);
 		if (exportType != null && !backupHelper.getVersionHistoryTypePref(exportType).get()) {
 			RemoteFile remoteFile = backupHelper.getBackup().getRemoteFile(type, fileName);
 			if (remoteFile != null) {
-				oldFilesToDelete.add(remoteFile);
+				oldFilesToDelete = CollectionUtils.addToList(oldFilesToDelete, remoteFile);
 			}
 		}
 	}

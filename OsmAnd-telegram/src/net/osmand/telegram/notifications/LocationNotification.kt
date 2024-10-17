@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import net.osmand.telegram.R
@@ -19,20 +20,33 @@ private const val DISABLE_MONITORING_ACTION = "disable_monitoring_action"
 class LocationNotification(app: TelegramApplication) : TelegramNotification(app, GROUP_NAME) {
 
 	init {
-		app.registerReceiver(object : BroadcastReceiver() {
+		val stopSharingLocationReceiver = object : BroadcastReceiver() {
 			override fun onReceive(context: Context?, intent: Intent?) {
 				app.stopSharingLocation()
 			}
-		}, IntentFilter(DISABLE_SHARING_ACTION))
-		app.registerReceiver(object : BroadcastReceiver() {
+		}
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+			app.registerReceiver(stopSharingLocationReceiver, IntentFilter(DISABLE_SHARING_ACTION),
+				Context.RECEIVER_EXPORTED)
+		} else {
+			app.registerReceiver(stopSharingLocationReceiver, IntentFilter(DISABLE_SHARING_ACTION))
+		}
+
+		val stopMonitoringReceiver = object : BroadcastReceiver() {
 			override fun onReceive(context: Context?, intent: Intent?) {
 				app.stopMonitoring()
 			}
-		}, IntentFilter(DISABLE_MONITORING_ACTION))
+		}
+		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+			app.registerReceiver(stopMonitoringReceiver, IntentFilter(DISABLE_MONITORING_ACTION),
+				Context.RECEIVER_EXPORTED)
+		} else {
+			app.registerReceiver(stopMonitoringReceiver, IntentFilter(DISABLE_MONITORING_ACTION))
+		}
 	}
 
-	override val type: TelegramNotification.NotificationType
-		get() = TelegramNotification.NotificationType.LOCATION
+	override val type: NotificationType
+		get() = NotificationType.LOCATION
 
 	override val priority: Int
 		get() = NotificationCompat.PRIORITY_DEFAULT
@@ -47,10 +61,10 @@ class LocationNotification(app: TelegramApplication) : TelegramNotification(app,
 		get() = app.settings.hasAnyChatToShareLocation() || isShowingChatsNotificationEnabled()
 
 	override val telegramNotificationId: Int
-		get() = TelegramNotification.LOCATION_NOTIFICATION_SERVICE_ID
+		get() = LOCATION_NOTIFICATION_SERVICE_ID
 
 	override val telegramWearableNotificationId: Int
-		get() = TelegramNotification.WEAR_LOCATION_NOTIFICATION_SERVICE_ID
+		get() = WEAR_LOCATION_NOTIFICATION_SERVICE_ID
 
 	override fun buildNotification(wearable: Boolean): NotificationCompat.Builder {
 		val notificationTitle: String
@@ -69,7 +83,7 @@ class LocationNotification(app: TelegramApplication) : TelegramNotification(app,
 				app,
 				0,
 				Intent(DISABLE_SHARING_ACTION),
-				PendingIntent.FLAG_UPDATE_CURRENT
+				PendingIntent.FLAG_IMMUTABLE
 			)
 		} else {
 			notificationTitle = app.getString(R.string.location_recording_enabled)
@@ -81,7 +95,7 @@ class LocationNotification(app: TelegramApplication) : TelegramNotification(app,
 				app,
 				0,
 				Intent(DISABLE_MONITORING_ACTION),
-				PendingIntent.FLAG_UPDATE_CURRENT
+				PendingIntent.FLAG_IMMUTABLE
 			)
 		}
 

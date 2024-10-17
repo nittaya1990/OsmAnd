@@ -13,11 +13,6 @@ import com.amazon.device.iap.model.PurchaseResponse;
 import com.amazon.device.iap.model.Receipt;
 import com.amazon.device.iap.model.UserData;
 
-import net.osmand.AndroidNetworkUtils;
-import net.osmand.AndroidNetworkUtils.OnSendRequestsListener;
-import net.osmand.AndroidNetworkUtils.Request;
-import net.osmand.AndroidNetworkUtils.RequestResponse;
-import net.osmand.AndroidUtils;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.inapp.InAppPurchases.InAppPurchase;
@@ -28,6 +23,11 @@ import net.osmand.plus.inapp.util.IapPurchasingListener;
 import net.osmand.plus.inapp.util.IapPurchasingListener.PurchaseResponseListener;
 import net.osmand.plus.inapp.util.UserIapData;
 import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.utils.AndroidNetworkUtils;
+import net.osmand.plus.utils.AndroidNetworkUtils.OnSendRequestsListener;
+import net.osmand.plus.utils.AndroidNetworkUtils.Request;
+import net.osmand.plus.utils.AndroidNetworkUtils.RequestResponse;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.util.Algorithms;
 
 import java.lang.ref.WeakReference;
@@ -35,6 +35,7 @@ import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Currency;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -170,7 +171,7 @@ public class InAppPurchaseHelperImpl extends InAppPurchaseHelper {
 	}
 
 	private PurchaseInfo getPurchaseInfo(String sku, Receipt receipt) {
-		return new PurchaseInfo(sku, receipt.getReceiptId(), getUserId(),
+		return new PurchaseInfo(Collections.singletonList(sku), receipt.getReceiptId(), getUserId(),
 				receipt.getPurchaseDate().getTime(), 0, true, !receipt.isCanceled());
 	}
 
@@ -388,11 +389,11 @@ public class InAppPurchaseHelperImpl extends InAppPurchaseHelper {
 					for (Entry<String, Receipt> receiptEntry : tokensToSend.entrySet()) {
 						purchaseInfoList.add(getPurchaseInfo(receiptEntry.getKey(), receiptEntry.getValue()));
 					}
-					onSkuDetailsResponseDone(purchaseInfoList, userRequested);
+					onProductDetailsResponseDone(purchaseInfoList, userRequested);
 				}
 
 				private void onSubscriptionExpired() {
-					if (!isDepthContoursPurchased(ctx)) {
+					if (!InAppPurchaseUtils.isDepthContoursPurchased(ctx)) {
 						ctx.getSettings().getCustomRenderBooleanProperty("depthContours").set(false);
 					}
 				}

@@ -1,26 +1,27 @@
 package net.osmand.plus.inapp;
 
+import static android.graphics.Typeface.DEFAULT;
+
 import android.content.Context;
-import android.graphics.Color;
-import android.graphics.Typeface;
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.text.style.ForegroundColorSpan;
+import android.util.Pair;
 
 import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 
-import net.osmand.AndroidUtils;
 import net.osmand.Period;
 import net.osmand.Period.PeriodUnit;
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.helpers.FontCache;
-import net.osmand.plus.settings.backend.CommonPreference;
 import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.settings.backend.preferences.CommonPreference;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.FontCache;
 import net.osmand.plus.widgets.style.CustomTypefaceSpan;
 import net.osmand.util.Algorithms;
 
@@ -29,16 +30,7 @@ import org.json.JSONObject;
 
 import java.text.NumberFormat;
 import java.text.ParseException;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Calendar;
-import java.util.Collections;
-import java.util.Currency;
-import java.util.Date;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Locale;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 
 public abstract class InAppPurchases {
@@ -46,8 +38,8 @@ public abstract class InAppPurchases {
 	protected InAppPurchase fullVersion;
 	protected InAppPurchase depthContours;
 	protected InAppPurchase contourLines;
-	protected InAppSubscription monthlyLiveUpdates;
-	protected InAppSubscription legacyMonthlyLiveUpdates;
+	protected InAppSubscription monthlySubscription;
+	protected InAppSubscription legacyMonthlySubscription;
 	protected InAppSubscriptionList subscriptions;
 	protected InAppPurchase[] inAppPurchases;
 
@@ -83,16 +75,16 @@ public abstract class InAppPurchases {
 		return null;
 	}
 
-	public InAppSubscription getMonthlyLiveUpdates() {
-		return monthlyLiveUpdates;
+	public InAppSubscription getMonthlySubscription() {
+		return monthlySubscription;
 	}
 
 	@Nullable
-	public InAppSubscription getPurchasedMonthlyLiveUpdates() {
-		if (monthlyLiveUpdates.isAnyPurchased()) {
-			return monthlyLiveUpdates;
-		} else if (legacyMonthlyLiveUpdates != null && legacyMonthlyLiveUpdates.isAnyPurchased()) {
-			return legacyMonthlyLiveUpdates;
+	public InAppSubscription getPurchasedMonthlySubscription() {
+		if (monthlySubscription.isAnyPurchased()) {
+			return monthlySubscription;
+		} else if (legacyMonthlySubscription != null && legacyMonthlySubscription.isAnyPurchased()) {
+			return legacyMonthlySubscription;
 		}
 		return null;
 	}
@@ -258,16 +250,42 @@ public abstract class InAppPurchases {
 			NOT_PURCHASED
 		}
 
+		public enum PurchaseOrigin {
+
+			UNDEFINED(R.string.shared_string_undefined),
+			GOOGLE(R.string.google_play),
+			AMAZON(R.string.amazon_market),
+			HUAWEI(R.string.huawei_market),
+			IOS(R.string.apple_app_store),
+			PROMO(R.string.promo),
+			TRIPLTEK_PROMO(R.string.tripltek),
+			HUGEROCK_PROMO(R.string.hugerock);
+
+			private final int storeNameId;
+
+			PurchaseOrigin(@StringRes int storeNameId) {
+				this.storeNameId = storeNameId;
+			}
+
+			@StringRes
+			public int getStoreNameId() {
+				return storeNameId;
+			}
+		}
+
 		private final int featureId;
 		private final String sku;
 		private String price;
+		private String originalPrice;
 		private double priceValue;
+		private double originalPriceValue;
 		private String priceCurrencyCode;
 		private PurchaseState purchaseState = PurchaseState.UNKNOWN;
 		private PurchaseInfo purchaseInfo;
 
 		double monthlyPriceValue;
-		boolean donationSupported = false;
+		double monthlyOriginalPriceValue;
+		boolean donationSupported;
 
 		private NumberFormat currencyFormatter;
 
@@ -336,8 +354,20 @@ public abstract class InAppPurchases {
 			}
 		}
 
+		public String getOriginalPrice(Context ctx) {
+			if (!Algorithms.isEmpty(originalPrice)) {
+				return originalPrice;
+			} else {
+				return getDefaultPrice(ctx);
+			}
+		}
+
 		public void setPrice(String price) {
 			this.price = price;
+		}
+
+		public void setOriginalPrice(String originalPrice) {
+			this.originalPrice = originalPrice;
 		}
 
 		public long getPurchaseTime() {
@@ -400,8 +430,16 @@ public abstract class InAppPurchases {
 			return priceValue;
 		}
 
+		public double getOriginalPriceValue() {
+			return originalPriceValue;
+		}
+
 		public void setPriceValue(double priceValue) {
 			this.priceValue = priceValue;
+		}
+
+		public void setOriginalPriceValue(double originalPriceValue) {
+			this.originalPriceValue = originalPriceValue;
 		}
 
 		public double getMonthlyPriceValue() {
@@ -587,17 +625,17 @@ public abstract class InAppPurchases {
 			return "";
 		}
 
-		private String getDisountPeriodString(String unitStr, long totalPeriods) {
+		private String getDisountPeriodString(@NonNull Context ctx, String unitStr, long totalPeriods) {
 			if (totalPeriods == 1)
 				return unitStr;
-			if (AndroidUtils.isRTL()) {
+			if (AndroidUtils.isLayoutRtl(ctx)) {
 				return unitStr + " " + totalPeriods;
 			} else {
 				return totalPeriods + " " + unitStr;
 			}
 		}
 
-		public CharSequence getFormattedDescription(@NonNull Context ctx, @ColorInt int textColor) {
+		public Pair<Spannable, Spannable> getFormattedDescription(@NonNull Context ctx, @ColorInt int textColor) {
 			long totalPeriods = getTotalPeriods();
 			String singleUnitStr = getUnitString(ctx).toLowerCase();
 			String unitStr = getTotalUnitsString(ctx, false).toLowerCase();
@@ -605,13 +643,13 @@ public abstract class InAppPurchases {
 			Period subscriptionPeriod = subscription.getSubscriptionPeriod();
 			long originalNumberOfUnits = subscriptionPeriod != null ? subscriptionPeriod.getNumberOfUnits() : 1;
 			String originalUnitsStr = getTotalUnitsString(ctx, true).toLowerCase();
-			String originalPriceStr = subscription.getPrice(ctx);
+			String originalPriceStr = subscription.getOriginalPrice(ctx);
 			String priceStr = introductoryPrice;
 
 			String pricePeriod;
 			String originalPricePeriod;
 
-			if (AndroidUtils.isRTL()) {
+			if (AndroidUtils.isLayoutRtl(ctx)) {
 				pricePeriod = singleUnitStr + " / " + priceStr;
 				originalPricePeriod = originalUnitsStr + " / " + originalPriceStr;
 				if (numberOfUnits > 1) {
@@ -637,33 +675,31 @@ public abstract class InAppPurchases {
 			String periodPriceStr = introductoryCycles == 1 ? priceStr : pricePeriod;
 
 			int firstPartRes = totalPeriods == 1 ? R.string.get_discount_first_part : R.string.get_discount_first_few_part;
-			SpannableStringBuilder mainPart = new SpannableStringBuilder(ctx.getString(firstPartRes, periodPriceStr, getDisountPeriodString(unitStr, totalPeriods)));
-			SpannableStringBuilder thenPart = new SpannableStringBuilder(ctx.getString(R.string.get_discount_second_part, originalPricePeriod));
-			Typeface typefaceRegular = FontCache.getRobotoRegular(ctx);
-			Typeface typefaceBold = FontCache.getRobotoMedium(ctx);
+			Spannable mainPart = new SpannableStringBuilder(ctx.getString(firstPartRes, periodPriceStr, getDisountPeriodString(ctx, unitStr, totalPeriods)));
+			Spannable thenPart = new SpannableStringBuilder(ctx.getString(R.string.get_discount_second_part, originalPricePeriod));
 			mainPart.setSpan(new ForegroundColorSpan(textColor), 0, mainPart.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-			mainPart.setSpan(new CustomTypefaceSpan(typefaceBold), 0, mainPart.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+			mainPart.setSpan(new CustomTypefaceSpan(FontCache.getMediumFont()), 0, mainPart.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 			int secondaryTextColor = ColorUtilities.getColorWithAlpha(textColor, 0.5f);
 			thenPart.setSpan(new ForegroundColorSpan(secondaryTextColor), 0, thenPart.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-			thenPart.setSpan(new CustomTypefaceSpan(typefaceRegular), 0, thenPart.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+			thenPart.setSpan(new CustomTypefaceSpan(DEFAULT), 0, thenPart.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 
-			return new SpannableStringBuilder(mainPart).append("\n").append(thenPart);
+			return new Pair<>(mainPart, thenPart);
 		}
 	}
 
-	public static abstract class InAppSubscription extends InAppPurchase {
+	public abstract static class InAppSubscription extends InAppPurchase {
 
-		private final static int MIN_SHOWN_DISCOUNT_PERCENT = 10;
+		private static final int MIN_SHOWN_DISCOUNT_PERCENT = 10;
 
 		private final Map<String, InAppSubscription> upgrades = new ConcurrentHashMap<>();
 		private final String skuNoVersion;
 		private String subscriptionPeriodString;
 		private Period subscriptionPeriod;
-		private boolean upgrade = false;
+		private boolean upgrade;
 		private SubscriptionState state = SubscriptionState.UNDEFINED;
 		private SubscriptionState previousState = SubscriptionState.UNDEFINED;
-		private long startTime = 0;
-		private long expireTime = 0;
+		private long startTime;
+		private long expireTime;
 
 		private InAppSubscriptionIntroductoryInfo introductoryInfo;
 
@@ -696,7 +732,7 @@ public abstract class InAppPurchases {
 
 			@NonNull
 			public static SubscriptionState getByStateStr(@NonNull String stateStr) {
-				for (SubscriptionState state : SubscriptionState.values()) {
+				for (SubscriptionState state : values()) {
 					if (state.stateStr.equals(stateStr)) {
 						return state;
 					}
@@ -956,15 +992,8 @@ public abstract class InAppPurchases {
 			return 0;
 		}
 
-		public String getRegularPrice(@NonNull Context ctx, @NonNull InAppSubscription monthlyLiveUpdates) {
-			Period period = getSubscriptionPeriod();
-			if (period != null) {
-				double price = monthlyLiveUpdates.getPriceValue();
-				double months = period.getUnit().getMonthsValue();
-				double regularPrice = price * months;
-				return getFormattedPrice(ctx, regularPrice, getPriceCurrencyCode());
-			}
-			return "";
+		public String getRegularPrice(@NonNull Context ctx) {
+			return getFormattedPrice(ctx, getOriginalPriceValue(), getPriceCurrencyCode());
 		}
 
 		public String getPriceWithPeriod(Context ctx) {
@@ -976,7 +1005,7 @@ public abstract class InAppPurchases {
 		}
 	}
 
-	public static abstract class InAppPurchaseDepthContours extends InAppPurchase {
+	public abstract static class InAppPurchaseDepthContours extends InAppPurchase {
 
 		protected InAppPurchaseDepthContours(int featureId, String sku) {
 			super(featureId, sku);
@@ -988,7 +1017,7 @@ public abstract class InAppPurchases {
 		}
 	}
 
-	public static abstract class InAppPurchaseContourLines extends InAppPurchase {
+	public abstract static class InAppPurchaseContourLines extends InAppPurchase {
 
 		protected InAppPurchaseContourLines(int featureId, String sku) {
 			super(featureId, sku);
@@ -1000,7 +1029,7 @@ public abstract class InAppPurchases {
 		}
 	}
 
-	protected static abstract class InAppPurchaseMonthlySubscription extends InAppSubscription {
+	protected abstract static class InAppPurchaseMonthlySubscription extends InAppSubscription {
 
 		InAppPurchaseMonthlySubscription(int featureId, String skuNoVersion, int version) {
 			super(featureId, skuNoVersion, version);
@@ -1021,6 +1050,12 @@ public abstract class InAppPurchases {
 		public void setPriceValue(double priceValue) {
 			super.setPriceValue(priceValue);
 			monthlyPriceValue = priceValue;
+		}
+
+		@Override
+		public void setOriginalPriceValue(double originalPriceValue) {
+			super.setOriginalPriceValue(originalPriceValue);
+			monthlyOriginalPriceValue = originalPriceValue;
 		}
 
 		@Override
@@ -1055,7 +1090,7 @@ public abstract class InAppPurchases {
 		}
 	}
 
-	protected static abstract class InAppPurchaseQuarterlySubscription extends InAppSubscription {
+	protected abstract static class InAppPurchaseQuarterlySubscription extends InAppSubscription {
 
 		InAppPurchaseQuarterlySubscription(int featureId, String skuNoVersion, int version) {
 			super(featureId, skuNoVersion, version);
@@ -1074,6 +1109,12 @@ public abstract class InAppPurchases {
 		public void setPriceValue(double priceValue) {
 			super.setPriceValue(priceValue);
 			monthlyPriceValue = priceValue / 3d;
+		}
+
+		@Override
+		public void setOriginalPriceValue(double originalPriceValue) {
+			super.setOriginalPriceValue(originalPriceValue);
+			monthlyOriginalPriceValue = originalPriceValue / 3d;
 		}
 
 		@Override
@@ -1103,7 +1144,7 @@ public abstract class InAppPurchases {
 		}
 	}
 
-	protected static abstract class InAppPurchaseAnnualSubscription extends InAppSubscription {
+	protected abstract static class InAppPurchaseAnnualSubscription extends InAppSubscription {
 
 		InAppPurchaseAnnualSubscription(int featureId, String skuNoVersion, int version) {
 			super(featureId, skuNoVersion, version);
@@ -1122,6 +1163,12 @@ public abstract class InAppPurchases {
 		public void setPriceValue(double priceValue) {
 			super.setPriceValue(priceValue);
 			monthlyPriceValue = priceValue / 12d;
+		}
+
+		@Override
+		public void setOriginalPriceValue(double originalPriceValue) {
+			super.setOriginalPriceValue(originalPriceValue);
+			monthlyOriginalPriceValue = originalPriceValue / 12d;
 		}
 
 		@Override
@@ -1180,7 +1227,8 @@ public abstract class InAppPurchases {
 	}
 
 	public static class PurchaseInfo {
-		private String sku;
+
+		private List<String> sku = new ArrayList<>();
 		private String orderId;
 		private String purchaseToken;
 		private long purchaseTime;
@@ -1188,9 +1236,9 @@ public abstract class InAppPurchases {
 		private boolean acknowledged;
 		private boolean autoRenewing;
 
-		PurchaseInfo(String sku, String orderId, String purchaseToken, long purchaseTime,
-							int purchaseState, boolean acknowledged, boolean autoRenewing) {
-			this.sku = sku;
+		PurchaseInfo(List<String> sku, String orderId, String purchaseToken, long purchaseTime,
+		             int purchaseState, boolean acknowledged, boolean autoRenewing) {
+			this.sku.addAll(sku);
 			this.orderId = orderId;
 			this.purchaseToken = purchaseToken;
 			this.purchaseTime = purchaseTime;
@@ -1203,7 +1251,7 @@ public abstract class InAppPurchases {
 			parseJson(json);
 		}
 
-		public String getSku() {
+		public List<String> getSku() {
 			return sku;
 		}
 
@@ -1237,7 +1285,7 @@ public abstract class InAppPurchases {
 
 		public String toJson() {
 			Map<String, Object> jsonMap = new HashMap<>();
-			jsonMap.put("sku", sku);
+			jsonMap.put("sku", sku.get(0));
 			jsonMap.put("orderId", orderId);
 			jsonMap.put("purchaseToken", purchaseToken);
 			jsonMap.put("purchaseTime", purchaseTime);
@@ -1250,7 +1298,7 @@ public abstract class InAppPurchases {
 		public void parseJson(@NonNull String json) throws JSONException {
 			JSONObject jsonObj = new JSONObject(json);
 			if (jsonObj.has("sku")) {
-				this.sku = jsonObj.getString("sku");
+				this.sku.add(jsonObj.getString("sku"));
 			}
 			if (jsonObj.has("orderId")) {
 				this.orderId = jsonObj.getString("orderId");

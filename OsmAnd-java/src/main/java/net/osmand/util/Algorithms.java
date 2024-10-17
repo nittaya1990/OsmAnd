@@ -1,9 +1,13 @@
 package net.osmand.util;
 
+import static net.osmand.util.CollectionUtils.startsWithAny;
+
+import net.osmand.CallbackWithObject;
 import net.osmand.IProgress;
+import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
-import net.osmand.router.RouteColorize;
+import net.osmand.data.QuadRect;
 
 import org.apache.commons.logging.Log;
 import org.xmlpull.v1.XmlPullParser;
@@ -22,6 +26,11 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.InterruptedIOException;
 import java.io.OutputStream;
+import java.lang.ref.WeakReference;
+import java.security.MessageDigest;
+import java.text.DecimalFormat;
+import java.text.DecimalFormatSymbols;
+import java.text.NumberFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -35,6 +44,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
@@ -45,13 +56,13 @@ import java.util.zip.GZIPOutputStream;
 public class Algorithms {
 	private static final int BUFFER_SIZE = 1024;
 	private static final Log log = PlatformUtil.getLog(Algorithms.class);
-
-	public static boolean isEmpty(Collection<?> c) {
-		return c == null || c.size() == 0;
-	}
 	
-	private static char[] CHARS_TO_NORMALIZE_KEY = new char['’'];
-	private static char[] CHARS_TO_NORMALIZE_VALUE = new char['\''];
+	private static final char[] CHARS_TO_NORMALIZE_KEY = {'’'};
+	private static final char[] CHARS_TO_NORMALIZE_VALUE = {'\''};
+
+	public static final NumberFormat DECIMAL_FORMAT = new DecimalFormat("#.#", new DecimalFormatSymbols(Locale.US));
+
+	private static final String HTML_PATTERN = "<(\"[^\"]*\"|'[^']*'|[^'\">])*>";
 
 	public static final int ZIP_FILE_SIGNATURE = 0x504b0304;
 	public static final int XML_FILE_SIGNATURE = 0x3c3f786d;
@@ -107,8 +118,16 @@ public class Algorithms {
 		return splitStr;
 	}
 
+	public static boolean isEmpty(Collection<?> c) {
+		return c == null || c.size() == 0;
+	}
+
 	public static boolean isEmpty(Map<?, ?> map) {
 		return map == null || map.size() == 0;
+	}
+
+	public static <T> boolean isEmpty(T[] array) {
+		return array == null || array.length == 0;
 	}
 
 	public static String emptyIfNull(String s) {
@@ -143,7 +162,7 @@ public class Algorithms {
 	}
 
 	public static long parseLongSilently(String input, long def) {
-		if (input != null && input.length() > 0) {
+		if (!isEmpty(input)) {
 			try {
 				return Long.parseLong(input);
 			} catch (NumberFormatException e) {
@@ -154,7 +173,7 @@ public class Algorithms {
 	}
 
 	public static int parseIntSilently(String input, int def) {
-		if (input != null && input.length() > 0) {
+		if (!isEmpty(input)) {
 			try {
 				return Integer.parseInt(input);
 			} catch (NumberFormatException e) {
@@ -165,9 +184,20 @@ public class Algorithms {
 	}
 
 	public static double parseDoubleSilently(String input, double def) {
-		if (input != null && input.length() > 0) {
+		if (!isEmpty(input)) {
 			try {
 				return Double.parseDouble(input);
+			} catch (NumberFormatException e) {
+				return def;
+			}
+		}
+		return def;
+	}
+
+	public static float parseFloatSilently(String input, float def) {
+		if (!isEmpty(input)) {
+			try {
+				return Float.parseFloat(input);
 			} catch (NumberFormatException e) {
 				return def;
 			}
@@ -213,6 +243,11 @@ public class Algorithms {
 		return oddNodes;
 	}
 
+	public static String getFileNameWithoutExtensionAndRoadSuffix(String fileName) {
+		String name = getFileNameWithoutExtension(fileName);
+		return name.endsWith(".road") ? name.substring(0, name.lastIndexOf(".road")) : name;
+	}
+
 	public static String getFileNameWithoutExtension(File f) {
 		return getFileNameWithoutExtension(f.getName());
 	}
@@ -244,20 +279,33 @@ public class Algorithms {
 		return name;
 	}
 
+	public static String convertToPermittedFileName(String name) {
+		name = name.replace ("\"", "~");
+		name = name.replace ("*", "~");
+		name = name.replace ("/", "~");
+		name = name.replace (":", "~");
+		name = name.replace ("<", "~");
+		name = name.replace (">", "~");
+		name = name.replace ("?", "~");
+		name = name.replace ("\\", "~");
+		name = name.replace ("|", "~");
+		return name;
+	}
+
 	public static List<File> collectDirs(File parentDir, List<File> dirs) {
 		return collectDirs(parentDir, dirs, null);
 	}
 
 	public static List<File> collectDirs(File parentDir, List<File> dirs, File exclDir) {
-		File[] listFiles = parentDir.listFiles();
-		if (listFiles != null) {
-			Arrays.sort(listFiles);
-			for (File f : listFiles) {
-				if (f.isDirectory()) {
-					if (!f.equals(exclDir)) {
-						dirs.add(f);
+		File[] files = parentDir.listFiles();
+		if (files != null) {
+			Arrays.sort(files);
+			for (File file : files) {
+				if (file.isDirectory()) {
+					if (!file.equals(exclDir)) {
+						dirs.add(file);
 					}
-					Algorithms.collectDirs(f, dirs);
+					collectDirs(file, dirs, exclDir);
 				}
 			}
 		}
@@ -282,14 +330,31 @@ public class Algorithms {
 		};
 	}
 
-    private static String simplifyFileName(String fn) {
-        String lc = fn.toLowerCase();
+	public static String getRegionName(String filename) {
+		String lc = filename.toLowerCase();
+		int firstPoint = lc.indexOf(".");
+		if (firstPoint != -1) {
+			lc = lc.substring(0, firstPoint);
+		}
+		int ind = lc.length() - 1;
+		for (; ind > 0; ind--) {
+			if ((lc.charAt(ind) >= '0' && lc.charAt(ind) <= '9') || lc.charAt(ind) == '_') {
+				// timestamp ending or version ending
+			} else {
+				break;
+			}
+		}
+		return lc.substring(0, ind + 1);
+	}
+	
+    private static String simplifyFileName(String filename) {
+        String lc = filename.toLowerCase();
         if (lc.contains(".")) {
             lc = lc.substring(0, lc.indexOf("."));
         }
-        if (lc.endsWith("_2")) {
-            lc = lc.substring(0, lc.length() - "_2".length());
-        }
+        if (lc.endsWith("_" + IndexConstants.BINARY_MAP_VERSION)) {
+			lc = lc.substring(0, lc.length() - ("_" + IndexConstants.BINARY_MAP_VERSION).length());
+		}
         boolean hasTimestampEnd = false;
         for (int i = 0; i < lc.length(); i++) {
             if (lc.charAt(i) >= '0' && lc.charAt(i) <= '9') {
@@ -428,6 +493,12 @@ public class Algorithms {
 		return charAt >= '0' && charAt <= '9';
 	}
 
+	public static boolean isHtmlText(String text) {
+		Pattern pattern = Pattern.compile(HTML_PATTERN);
+		Matcher matcher = pattern.matcher(text);
+		return matcher.find();
+	}
+
 	/**
 	 * Determine whether a file is a ZIP File.
 	 */
@@ -509,38 +580,7 @@ public class Algorithms {
 		return ((ch1 << 8) + ch2);
 	}
 
-	public static boolean startsWithAny(String s, String ... args) {
-		if (!isEmpty(s) && args != null && args.length > 0) {
-			for (String arg : args) {
-				if (s.startsWith(arg)) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
 
-	public static boolean containsAny(String s, String ... args) {
-		if (!isEmpty(s) && args != null && args.length > 0) {
-			for (String arg : args) {
-				if (s.contains(arg)) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
-
-	public static boolean endsWithAny(String s, String ... args) {
-		if (!isEmpty(s) && args != null && args.length > 0) {
-			for (String arg : args) {
-				if (s.endsWith(arg)) {
-					return true;
-				}
-			}
-		}
-		return false;
-	}
 
 	public static String capitalizeFirstLetterAndLowercase(String s) {
 		if (s != null && s.length() > 1) {
@@ -596,6 +636,30 @@ public class Algorithms {
 		throw new IllegalArgumentException("Unknown color " + colorString); //$NON-NLS-1$
 	}
 
+	public static String formatLatlon(LatLon latLon) {
+		if (latLon != null) {
+			String lat = String.format(Locale.US, "%.6f", latLon.getLatitude());
+			String lan = String.format(Locale.US, "%.6f", latLon.getLongitude());
+			return lat + "," + lan;
+		}
+		return null;
+	}
+
+	public static LatLon parseLatLon(String latLon) {
+		if (latLon != null) {
+			String[] coords = latLon.split(",");
+			if (coords.length == 2) {
+				try {
+					double lat = Double.parseDouble(coords[0]);
+					double lon = Double.parseDouble(coords[1]);
+					return new LatLon(lat, lon);
+				} catch (NumberFormatException e) {
+					return null;
+				}
+			}
+		}
+		return null;
+	}
 
 	public static int extractFirstIntegerNumber(String s) {
 		int i = 0;
@@ -672,7 +736,7 @@ public class Algorithms {
 		try {
 			FileInputStream fin = new FileInputStream(src);
 			try {
-				Algorithms.streamCopy(fin, fout);
+				streamCopy(fin, fout);
 			} finally {
 				fin.close();
 			}
@@ -691,11 +755,18 @@ public class Algorithms {
 
 
 	public static void streamCopy(InputStream in, OutputStream out, IProgress pg, int bytesDivisor) throws IOException {
+		streamCopy(in, out, pg, bytesDivisor, null);
+	}
+
+	public static void streamCopy(InputStream in, OutputStream out, IProgress pg, int bytesDivisor, MessageDigest digest) throws IOException {
 		byte[] b = new byte[BUFFER_SIZE];
 		int read;
 		int cp = 0;
 		while ((read = in.read(b)) != -1) {
 			out.write(b, 0, read);
+			if (digest != null) {
+				digest.update(b, 0, read);
+			}
 			cp += read;
 			if (pg != null && cp > bytesDivisor) {
 				pg.progress(cp / bytesDivisor);
@@ -749,6 +820,13 @@ public class Algorithms {
 		return readFromInputStream(i, true);
 	}
 	
+	public static byte[] readBytesFromInputStream(InputStream i) throws IOException {
+		ByteArrayOutputStream bous = new ByteArrayOutputStream();
+		streamCopy(i, bous);
+		i.close();
+		return bous.toByteArray();
+	}
+	
 	public static StringBuilder readFromInputStream(InputStream i, boolean autoclose) throws IOException {
 		StringBuilder responseBody = new StringBuilder();
 		responseBody.setLength(0);
@@ -773,6 +851,9 @@ public class Algorithms {
 
 	public static String gzipToString(byte[] gzip) {
 		try {
+			if (gzip == null) {
+				return null;
+			}
 			GZIPInputStream gzipIs = new GZIPInputStream(new ByteArrayInputStream(gzip));
 			return readFromInputStream(gzipIs).toString();
 		} catch (IOException e) {
@@ -782,6 +863,9 @@ public class Algorithms {
 	
 	public static byte[] stringToGzip(String str) {
 		try {
+			if (str == null) {
+				return null;
+			}
 			ByteArrayOutputStream bous = new ByteArrayOutputStream();
 			GZIPOutputStream gzout = new GZIPOutputStream(bous);
 			gzout.write(str.getBytes());
@@ -792,23 +876,22 @@ public class Algorithms {
 		}
 	}
 
-	public static boolean removeAllFiles(File f) {
-		if (f == null) {
+	public static boolean removeAllFiles(File file) {
+		if (file == null) {
 			return false;
 		}
-		if (f.isDirectory()) {
-			File[] fs = f.listFiles();
-			if (fs != null) {
-				for (File c : fs) {
-					removeAllFiles(c);
+		if (file.isDirectory()) {
+			File[] files = file.listFiles();
+			if (!isEmpty(files)) {
+				for (File f : files) {
+					removeAllFiles(f);
 				}
 			}
-			return f.delete();
+			return file.delete();
 		} else {
-			return f.delete();
+			return file.delete();
 		}
 	}
-
 
 	public static long parseLongFromBytes(byte[] bytes, int offset) {
 		long o = 0xff & bytes[offset + 7];
@@ -934,29 +1017,6 @@ public class Algorithms {
 		return true;
 	}
 
-	public static boolean isFloat(String value) {
-		int pointsCount = 0;
-		int length = value.length();
-		for (int i = 0; i < length; i++) {
-			char ch = value.charAt(i);
-			if (!Character.isDigit(ch)) {
-				if (length < 2) {
-					return false;
-				}
-				if (!(ch == '-' || ch == '.')) {
-					return false;
-				} else if (ch == '-' && i != 0) {
-					return false;
-				} else if ((ch == '.' && pointsCount >= 1) || (ch == '.' && i == length - 1)) {
-					return false;
-				} else if (ch == '.') {
-					pointsCount++;
-				}
-			}
-		}
-		return pointsCount == 1;
-	}
-
 	public static <T> T getPercentile(List<T> sortedValues, int percentile) throws IllegalArgumentException {
 		if (percentile < 0 || percentile > 100) {
 			throw new IllegalArgumentException("invalid percentile " + percentile + ", should be 0-100");
@@ -1043,11 +1103,11 @@ public class Algorithms {
 		return (x < y) ? -1 : ((x == y) ? 0 : 1);
 	}
 	
-	public static int compare(final String str1, final String str2) {
+	public static int compare(String str1, String str2) {
 		return compare(str1, str2, false);
 	}
 	
-	public static int compare(final String str1, final String str2, final boolean nullIsLess) {
+	public static int compare(String str1, String str2, boolean nullIsLess) {
         if (str1 == str2) {
             return 0;
         }
@@ -1111,78 +1171,6 @@ public class Algorithms {
 		return map;
 	}
 
-	public static <T> void reverseArray(T[] array) {
-		for (int i = 0; i < array.length / 2; i++) {
-			T temp = array[i];
-			array[i] = array[array.length - i - 1];
-			array[array.length - i - 1] = temp;
-		}
-	}
-
-	public static boolean containsInArrayL(long[] array, long value) {
-		return Arrays.binarySearch(array, value) >= 0;
-	}
-
-	public static long[] addToArrayL(long[] array, long value, boolean skipIfExists) {
-		long[] result;
-		if (array == null) {
-			result = new long[]{ value };
-		} else if (skipIfExists && Arrays.binarySearch(array, value) >= 0) {
-			result = array;
-		} else {
-			result = new long[array.length + 1];
-			System.arraycopy(array, 0, result, 0, array.length);
-			result[result.length - 1] = value;
-			Arrays.sort(result);
-		}
-		return result;
-	}
-
-	public static long[] removeFromArrayL(long[] array, long value) {
-		long[] result;
-		if (array != null) {
-			int index = Arrays.binarySearch(array, value);
-			if (index >= 0) {
-				result = new long[array.length - 1];
-				System.arraycopy(array, 0, result, 0, index);
-				if (index < result.length) {
-					System.arraycopy(array, index + 1, result, index, array.length - (index + 1));
-				}
-				return result;
-			} else {
-				return array;
-			}
-		} else {
-			return array;
-		}
-	}
-
-	public static String arrayToString(int[] a) {
-		if (a == null || a.length == 0) {
-			return null;
-		}
-		StringBuilder b = new StringBuilder();
-		for (int value : a) {
-			if (b.length() > 0) {
-				b.append(",");
-			}
-			b.append(value);
-		}
-		return b.toString();
-	}
-
-	public static int[] stringToArray(String array) throws NumberFormatException {
-		if (array == null || array.length() == 0) {
-			return null;
-		}
-		String[] items = array.split(",");
-		int[] res = new int[items.length];
-		for (int i = 0; i < items.length; i++) {
-			res[i] = Integer.parseInt(items[i]);
-		}
-		return res;
-	}
-
 	public static boolean isValidMessageFormat(CharSequence sequence) {
 		if (!isEmpty(sequence)) {
 			int counter = 0;
@@ -1199,41 +1187,166 @@ public class Algorithms {
 		return false;
 	}
 
-	public static int[] stringToGradientPalette(String str, String gradientScaleType) {
-		boolean isSlope = "gradient_slope_color".equals(gradientScaleType);
-		if (Algorithms.isBlank(str)) {
-			return isSlope ? RouteColorize.SLOPE_COLORS : RouteColorize.COLORS;
-		}
-		String[] arr = str.split(" ");
-		if (arr.length < 2) {
-			return isSlope ? RouteColorize.SLOPE_COLORS : RouteColorize.COLORS;
-		}
-		int[] colors = new int[arr.length];
-		try {
-			for (int i = 0; i < arr.length; i++) {
-				colors[i] = Algorithms.parseColor(arr[i]);
-			}
-		} catch (IllegalArgumentException e) {
-			return isSlope ? RouteColorize.SLOPE_COLORS : RouteColorize.COLORS;
-		}
-		return colors;
+
+	public static boolean isUrl(String value) {
+		String[] urlPrefixes = new String[] {"http://", "https://", "HTTP://", "HTTPS://"};
+		return startsWithAny(value, urlPrefixes);
 	}
 
-	public static String gradientPaletteToString(int[] palette, String gradientScaleType) {
-		boolean isSlope = "gradient_slope_color".equals(gradientScaleType);
-		int[] src;
-		if (palette != null && palette.length >= 2) {
-			src = palette;
-		} else {
-			src = isSlope ? RouteColorize.SLOPE_COLORS : RouteColorize.COLORS;
-		}
-		StringBuilder stringPalette = new StringBuilder();
-		for (int i = 0; i < src.length; i++) {
-			stringPalette.append(colorToString(src[i]));
-			if (i + 1 != src.length) {
-				stringPalette.append(" ");
+	public static <T> List<WeakReference<T>> updateWeakReferencesList(List<WeakReference<T>> list, T item, boolean isNew) {
+		List<WeakReference<T>> copy = new ArrayList<>(list);
+		Iterator<WeakReference<T>> it = copy.iterator();
+		while (it.hasNext()) {
+			WeakReference<T> ref = it.next();
+			T object = ref.get();
+			if (object == null || object == item) {
+				it.remove();
 			}
 		}
-		return stringPalette.toString();
+		if (isNew) {
+			copy.add(new WeakReference<>(item));
+		}
+		return copy;
 	}
+
+	public static void extendRectToContainPoint(QuadRect mapRect, double longitude, double latitude) {
+		mapRect.left = mapRect.left == 0.0 ? longitude : Math.min(mapRect.left, longitude);
+		mapRect.right = Math.max(mapRect.right, longitude);
+		mapRect.bottom = mapRect.bottom == 0.0 ? latitude : Math.min(mapRect.bottom, latitude);
+		mapRect.top = Math.max(mapRect.top, latitude);
+	}
+
+	public static void extendRectToContainRect(QuadRect mapRect, QuadRect gpxRect) {
+		mapRect.left = mapRect.left == 0.0 ? gpxRect.left : Math.min(mapRect.left, gpxRect.left);
+		mapRect.right = Math.max(mapRect.right, gpxRect.right);
+		mapRect.top = Math.max(mapRect.top, gpxRect.top);
+		mapRect.bottom = mapRect.bottom == 0.0 ? gpxRect.bottom : Math.min(mapRect.bottom, gpxRect.bottom);
+	}
+	
+	public static long combine2Points(int x, int y) {
+		return (((long) x) << 32) | ((long) y);
+	}
+
+	public static String makeUniqueName(String oldName, CallbackWithObject<String> checkNameCallback) {
+		int suffix = 0;
+		int i = oldName.length() - 1;
+		do {
+			try {
+				if (oldName.charAt(i) == ' ' || oldName.charAt(i) == '-') {
+					throw new NumberFormatException();
+				}
+				suffix = Integer.parseInt(oldName.substring(i));
+			} catch (NumberFormatException e) {
+				break;
+			}
+			i--;
+		} while (i >= 0);
+		String newName;
+		String divider = suffix == 0 ? " " : "";
+		do {
+			suffix++;
+			newName = oldName.substring(0, i + 1) + divider + suffix;
+		}
+		while (!checkNameCallback.processResult(newName));
+		return newName;
+	}
+	
+
+	public static int lowerTo10BaseRoundingBounds(int num, int[] roundRange) {
+		int k = 1;
+		while (k < roundRange.length && (roundRange[k] > num || roundRange[k - 1] > num) ) {
+			k += 2;
+		}
+		if (k < roundRange.length) {
+			return (num / roundRange[k - 1]) * roundRange[k - 1];
+		}
+		return num;
+	}
+	
+	public static int[] generate10BaseRoundingBounds(int max, int multCoef) {
+		int basenum = 1, mult = 1, num = basenum * mult, ind = 0;
+		List<Integer> bounds = new ArrayList<>();
+		while (num < max) {
+			ind++;
+			if (ind % 3 == 1) {
+				mult = 2;
+			} else if (ind % 3 == 2) {
+				mult = 5;
+			} else {
+				basenum *= 10;
+				mult = 1;
+			}
+			if (ind > 1) {
+				int bound = num * multCoef;
+				while (bound % (basenum * mult) != 0 && bound > basenum * mult ) {
+					bound += num;
+				}
+				bounds.add(bound);
+			}
+			num = basenum * mult;
+			bounds.add(num);
+		}
+		int[] ret = new int[bounds.size()];
+		for(int j = 0; j < ret.length; j++) {
+			ret[j] = bounds.get(bounds.size() - j - 1);
+		}
+		return ret;
+	}
+	
+	public static final String DEFAULT_SERIALIZER = ",";
+
+	public static String serializeStringArray(String[] array) {
+		return serializeStringArray(array, DEFAULT_SERIALIZER);
+	}
+	public static String serializeStringArray(String[] array, String delimiter) {
+		if (array == null) {
+			return null;
+		}
+	    StringBuilder sb = new StringBuilder();
+	    for (int i = 0; i < array.length; i++) {
+			String v = array[i];
+			if (v == null) {
+				v = "";
+			}
+	        sb.append("\"").append(v.replace("\"", "\"\"")).append("\""); // Double quotes are escaped by doubling them
+	        if (i < array.length - 1) {
+	            sb.append(delimiter);
+	        }
+	    }
+	    return sb.toString();
+	}
+
+	public static String[] deserializeStringArray(String serialized) {
+		return deserializeStringArray(serialized, DEFAULT_SERIALIZER);
+	}
+
+	public static String[] deserializeStringArray(String serialized, String delimiter) {
+		if (serialized == null || serialized.trim().length() == 0) {
+			return new String[0];
+		}
+		List<String> resultList = new ArrayList<>();
+		boolean inQuotes = false;
+		StringBuilder sb = new StringBuilder();
+		for (int i = 0; i < serialized.length(); i++) {
+			char c = serialized.charAt(i);
+			if (c == '"') {
+				if (i < serialized.length() - 1 && serialized.charAt(i + 1) == '"') {
+					sb.append(c); // Append one quote of the escaped quotes
+					i++; // Skip the next quote since it's part of the escaped pair
+				} else {
+					inQuotes = !inQuotes;
+				}
+				continue;
+			}
+			if (!inQuotes && c == delimiter.charAt(0)) {
+				resultList.add(sb.toString());
+				sb = new StringBuilder();
+			} else {
+				sb.append(c);
+			}
+		}
+		resultList.add(sb.toString());
+		return resultList.toArray(new String[resultList.size()]);
+	}
+
 }

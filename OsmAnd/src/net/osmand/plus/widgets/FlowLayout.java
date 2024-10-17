@@ -1,23 +1,40 @@
 package net.osmand.plus.widgets;
 
 import android.content.Context;
+import android.content.res.TypedArray;
 import android.util.AttributeSet;
 import android.view.View;
 import android.view.ViewGroup;
 
-import net.osmand.AndroidUtils;
+import net.osmand.plus.R;
+import net.osmand.plus.utils.AndroidUtils;
 
 public class FlowLayout extends ViewGroup {
 
 	private int line_height;
 	private boolean horizontalAutoSpacing;
+	private boolean alignToCenter = false;
+	private final int defaultHorizontalSpacing;
+	private final int defaultVerticalSpacing;
 
 	public FlowLayout(Context context) {
-		super(context);
+		this(context, null);
 	}
 
 	public FlowLayout(Context context, AttributeSet attrs) {
-		super(context, attrs);
+		this(context, attrs, 0);
+	}
+
+	public FlowLayout(Context context, AttributeSet attrs, int defStyleAttr) {
+		super(context, attrs, defStyleAttr);
+		TypedArray a = context.getTheme().obtainStyledAttributes(
+				attrs,
+				R.styleable.FlowLayout,
+				defStyleAttr,
+				0
+		);
+		defaultHorizontalSpacing = (int) a.getDimension(R.styleable.FlowLayout_horizontalItemsSpacing, 1);
+		defaultVerticalSpacing = (int) a.getDimension(R.styleable.FlowLayout_verticalItemsSpacing, 1);
 	}
 
 	// If true, available horizontal space is added to items horizontalSpacing to fit the screen width.
@@ -25,14 +42,18 @@ public class FlowLayout extends ViewGroup {
 		this.horizontalAutoSpacing = horizontalAutoSpacing;
 	}
 
+	public void setAlignToCenter(boolean alignToCenter) {
+		this.alignToCenter = alignToCenter;
+	}
+
 	@Override
 	protected void onMeasure(int widthMeasureSpec, int heightMeasureSpec) {
 		if ((MeasureSpec.getMode(widthMeasureSpec) == MeasureSpec.UNSPECIFIED))
 			throw new AssertionError();
 
-		final int width = MeasureSpec.getSize(widthMeasureSpec) - getPaddingLeft() - getPaddingRight();
+		int width = MeasureSpec.getSize(widthMeasureSpec) - getPaddingLeft() - getPaddingRight();
 		int height = MeasureSpec.getSize(heightMeasureSpec) - getPaddingTop() - getPaddingBottom();
-		final int count = getChildCount();
+		int count = getChildCount();
 		int line_height = 0;
 		int horizontalPosition = getPaddingLeft();
 		int verticalPosition = getPaddingTop();
@@ -45,17 +66,16 @@ public class FlowLayout extends ViewGroup {
 		}
 
 		for (int i = 0; i < count; i++) {
-			final View child = getChildAt(i);
+			View child = getChildAt(i);
 			if (child.getVisibility() != GONE) {
-				final LayoutParams lp = (LayoutParams) child.getLayoutParams();
 				child.measure(MeasureSpec.makeMeasureSpec(width, MeasureSpec.AT_MOST), childHeightMeasureSpec);
-				final int childWidth = child.getMeasuredWidth();
-				line_height = Math.max(line_height, child.getMeasuredHeight() + lp.verticalSpacing);
+				int childWidth = child.getMeasuredWidth();
+				line_height = Math.max(line_height, child.getMeasuredHeight() + getItemVerticalSpacing(child));
 				if (horizontalPosition + childWidth > width) {
 					horizontalPosition = getPaddingLeft();
 					verticalPosition += line_height;
 				}
-				horizontalPosition += childWidth + lp.horizontalSpacing;
+				horizontalPosition += childWidth + getItemHorizontalSpacing(child);
 			}
 		}
 
@@ -82,28 +102,36 @@ public class FlowLayout extends ViewGroup {
 
 	@Override
 	protected void onLayout(boolean changed, int l, int t, int r, int b) {
-		final int count = getChildCount();
-		final int width = r - l;
+		int count = getChildCount();
+		int width = r - l;
 		boolean isLayoutRtl = AndroidUtils.isLayoutRtl(getContext());
-		int horizontalPosition = isLayoutRtl ? width - getPaddingRight() : getPaddingLeft();
+		int horizontalPosition;
+		if (alignToCenter) {
+			horizontalPosition = getCenteredHorizontalStartPosition(width, 0, isLayoutRtl);
+		} else {
+			horizontalPosition = isLayoutRtl ? width - getPaddingRight() : getPaddingLeft();
+		}
 		int verticalPosition = getPaddingTop();
 		for (int i = 0; i < count; i++) {
-			final View child = getChildAt(i);
+			View child = getChildAt(i);
 			if (child.getVisibility() != GONE) {
-				final LayoutParams lp = (LayoutParams) child.getLayoutParams();
-				final int childWidth = child.getMeasuredWidth();
-				final int childHeight = child.getMeasuredHeight();
-				int freeSizeSpacing = getFreeSizeSpacing(width, lp, childWidth);
+				int childWidth = child.getMeasuredWidth();
+				int childHeight = child.getMeasuredHeight();
+				int freeSizeSpacing = getFreeSizeSpacing(width, childWidth, getItemHorizontalSpacing(child));
 				if (isLayoutRtl) {
 					if (horizontalPosition - childWidth < getPaddingLeft()) {
-						horizontalPosition = width - getPaddingRight();
+						horizontalPosition = alignToCenter
+								? getCenteredHorizontalStartPosition(width, i, isLayoutRtl)
+								: width - getPaddingRight();
 						verticalPosition += line_height;
 					}
 					child.layout(horizontalPosition - childWidth, verticalPosition, horizontalPosition, verticalPosition + childHeight);
 					horizontalPosition -= freeSizeSpacing;
 				} else {
 					if (horizontalPosition + childWidth > width) {
-						horizontalPosition = getPaddingLeft();
+						horizontalPosition = alignToCenter
+								? getCenteredHorizontalStartPosition(width, i, isLayoutRtl)
+								: getPaddingLeft();
 						verticalPosition += line_height;
 					}
 					child.layout(horizontalPosition, verticalPosition, horizontalPosition + childWidth, verticalPosition + childHeight);
@@ -113,17 +141,56 @@ public class FlowLayout extends ViewGroup {
 		}
 	}
 
-	private int getFreeSizeSpacing(int width, LayoutParams lp, int childWidth) {
+	private int getCenteredHorizontalStartPosition(int width, int startChildIndex, boolean isLayoutRtl) {
+		int startPosition = isLayoutRtl ? width - getPaddingRight() : getPaddingLeft();
+		int filledSpace = 0;
+		int horizontalCenter = (width / 2);
+		for (int i = startChildIndex; i < getChildCount(); i++) {
+			View child = getChildAt(i);
+			if (child.getVisibility() != GONE) {
+				filledSpace += child.getMeasuredWidth();
+				if (i != startChildIndex) {
+					filledSpace += getItemHorizontalSpacing(child);
+				}
+				if (filledSpace > width - (getPaddingLeft() + getPaddingRight())) {
+					return startPosition;
+				}
+
+				startPosition = isLayoutRtl ? horizontalCenter + (filledSpace / 2) : horizontalCenter - (filledSpace / 2);
+			}
+		}
+		return startPosition;
+	}
+
+	private int getFreeSizeSpacing(int width, int childWidth, int horizontalSpacing) {
+		int childWithSpacing = childWidth + horizontalSpacing;
+		int itemsCount = width / childWithSpacing;
+		if (width % childWithSpacing >= childWidth) {
+			itemsCount++;
+		}
 		int freeSizeSpacing;
-		int itemsCount = width / (childWidth + lp.horizontalSpacing);
 		if (itemsCount > 1 && horizontalAutoSpacing) {
-			freeSizeSpacing = (width - childWidth) / (itemsCount-1);
+			freeSizeSpacing = (width - childWidth) / (itemsCount - 1);
 		} else if (!horizontalAutoSpacing) {
-			freeSizeSpacing = childWidth + lp.horizontalSpacing;
+			freeSizeSpacing = childWithSpacing;
 		} else {
 			freeSizeSpacing = (width % childWidth / itemsCount);
 		}
 		return freeSizeSpacing;
+	}
+
+	private int getItemHorizontalSpacing(View view) {
+		if (view.getLayoutParams() instanceof LayoutParams) {
+			return ((LayoutParams) view.getLayoutParams()).horizontalSpacing;
+		}
+		return defaultHorizontalSpacing;
+	}
+
+	private int getItemVerticalSpacing(View view) {
+		if (view.getLayoutParams() instanceof LayoutParams) {
+			return ((LayoutParams) view.getLayoutParams()).verticalSpacing;
+		}
+		return defaultVerticalSpacing;
 	}
 
 	public static class LayoutParams extends ViewGroup.LayoutParams {

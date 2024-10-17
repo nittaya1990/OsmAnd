@@ -1,6 +1,6 @@
 package net.osmand.plus.settings.fragments;
 
-import android.graphics.Typeface;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,12 +10,12 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
 
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
-import net.osmand.plus.helpers.FontCache;
-import net.osmand.plus.settings.backend.ExportSettingsType;
+import net.osmand.plus.settings.backend.backup.exporttype.ExportType;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.FontCache;
+import net.osmand.plus.utils.UiUtilities;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -25,14 +25,14 @@ import java.util.Map;
 
 public class ImportedSettingsItemsAdapter extends
 		RecyclerView.Adapter<ImportedSettingsItemsAdapter.ItemViewHolder> {
-	private Map<ExportSettingsType, List<?>> itemsMap;
-	private List<ExportSettingsType> itemsTypes;
-	private UiUtilities uiUtils;
-	private OsmandApplication app;
-	private boolean nightMode;
-	private OnItemClickListener listener;
+	private final Map<ExportType, List<?>> itemsMap;
+	private final List<ExportType> itemsTypes;
+	private final UiUtilities uiUtils;
+	private final OsmandApplication app;
+	private final boolean nightMode;
+	private final OnItemClickListener listener;
 
-	ImportedSettingsItemsAdapter(@NonNull OsmandApplication app, Map<ExportSettingsType, List<?>> itemsMap,
+	ImportedSettingsItemsAdapter(@NonNull OsmandApplication app, Map<ExportType, List<?>> itemsMap,
 								 boolean nightMode, OnItemClickListener listener) {
 		this.app = app;
 		this.itemsMap = itemsMap;
@@ -53,26 +53,18 @@ public class ImportedSettingsItemsAdapter extends
 
 	@Override
 	public void onBindViewHolder(@NonNull ItemViewHolder holder, int position) {
-		final ExportSettingsType currentItemType = itemsTypes.get(position);
+		ExportType currentItemType = itemsTypes.get(position);
 		boolean isLastItem = itemsTypes.size() - 1 == position;
 		int activeColorRes = ColorUtilities.getActiveColorId(nightMode);
 
-		holder.title.setTextColor(app.getResources().getColor(activeColorRes));
-		Typeface typeface = FontCache.getFont(app, app.getString(R.string.font_roboto_medium));
-		if (typeface != null) {
-			holder.title.setTypeface(typeface);
-		}
+		holder.title.setTextColor(app.getColor(activeColorRes));
+		holder.title.setTypeface(FontCache.getMediumFont());
 		holder.divider.setVisibility(isLastItem ? View.VISIBLE : View.GONE);
-		holder.itemView.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				listener.onItemClick(currentItemType);
-			}
-		});
+		holder.itemView.setOnClickListener(view -> listener.onItemClick(currentItemType));
 		holder.subTitle.setText(String.format(
 				app.getString(R.string.ltr_or_rtl_combine_via_colon),
 				app.getString(R.string.items_added),
-				String.valueOf(itemsMap.get(currentItemType).size()))
+				itemsMap.get(currentItemType).size())
 		);
 
 		switch (currentItemType) {
@@ -86,7 +78,7 @@ public class ImportedSettingsItemsAdapter extends
 				break;
 			case POI_TYPES:
 				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_info_dark, activeColorRes));
-				holder.title.setText(R.string.search_activity);
+				holder.title.setText(R.string.shared_string_search);
 				break;
 			case MAP_SOURCES:
 				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_layers, activeColorRes));
@@ -124,9 +116,25 @@ public class ImportedSettingsItemsAdapter extends
 				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_favorite, activeColorRes));
 				holder.title.setText(R.string.shared_string_favorites);
 				break;
-			case OFFLINE_MAPS:
+			case STANDARD_MAPS:
 				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_map, activeColorRes));
-				holder.title.setText(R.string.shared_string_maps);
+				holder.title.setText(R.string.standard_maps);
+				break;
+			case ROAD_MAPS:
+				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_map, activeColorRes));
+				holder.title.setText(R.string.download_roads_only_maps);
+				break;
+			case WIKI_AND_TRAVEL:
+				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_wikipedia, activeColorRes));
+				holder.title.setText(R.string.wikipedia_and_travel_maps);
+				break;
+			case TERRAIN_DATA:
+				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_terrain, activeColorRes));
+				holder.title.setText(R.string.topography_maps);
+				break;
+			case DEPTH_DATA:
+				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_anchor, activeColorRes));
+				holder.title.setText(R.string.nautical_maps);
 				break;
 			case TTS_VOICE:
 				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_volume_up, activeColorRes));
@@ -138,7 +146,7 @@ public class ImportedSettingsItemsAdapter extends
 				break;
 			case GLOBAL:
 				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_settings, activeColorRes));
-				holder.title.setText(R.string.general_settings_2);
+				holder.title.setText(R.string.osmand_settings);
 				break;
 			case ACTIVE_MARKERS:
 				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_flag, activeColorRes));
@@ -152,6 +160,10 @@ public class ImportedSettingsItemsAdapter extends
 				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_history, activeColorRes));
 				holder.title.setText(R.string.shared_string_search_history);
 				break;
+			case NAVIGATION_HISTORY:
+				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_gdirections_dark, activeColorRes));
+				holder.title.setText(R.string.navigation_history);
+				break;
 			case ONLINE_ROUTING_ENGINES:
 				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_world_globe_dark, activeColorRes));
 				holder.title.setText(R.string.online_routing_engines);
@@ -159,6 +171,10 @@ public class ImportedSettingsItemsAdapter extends
 			case ITINERARY_GROUPS:
 				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_flag, activeColorRes));
 				holder.title.setText(R.string.shared_string_itinerary);
+				break;
+			case FAVORITES_BACKUP:
+				holder.icon.setImageDrawable(uiUtils.getIcon(R.drawable.ic_action_folder_favorites, activeColorRes));
+				holder.title.setText(R.string.favorites_backup);
 				break;
 		}
 	}
@@ -184,6 +200,6 @@ public class ImportedSettingsItemsAdapter extends
 	}
 
 	interface OnItemClickListener {
-		void onItemClick(ExportSettingsType type);
+		void onItemClick(@NonNull ExportType type);
 	}
 }

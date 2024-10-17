@@ -1,5 +1,9 @@
 package net.osmand.plus.routepreparationmenu;
 
+import static net.osmand.aidlapi.OsmAndCustomizationConstants.*;
+import static net.osmand.plus.settings.fragments.RouteParametersFragment.AVOID_ROUTING_PARAMETER_PREFIX;
+import static net.osmand.router.GeneralRouter.*;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.DialogInterface;
@@ -12,48 +16,48 @@ import android.widget.ArrayAdapter;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.widget.AppCompatCheckedTextView;
 
-import net.osmand.AndroidUtils;
 import net.osmand.CallbackWithObject;
+import net.osmand.Collator;
 import net.osmand.IndexConstants;
 import net.osmand.Location;
+import net.osmand.OsmAndCollator;
 import net.osmand.data.LatLon;
-import net.osmand.plus.ContextMenuAdapter;
-import net.osmand.plus.ContextMenuItem;
-import net.osmand.plus.DialogListItemAdapter;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper;
-import net.osmand.plus.TargetPointsHelper.TargetPoint;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.dashboard.DashboardOnMap;
 import net.osmand.plus.download.DownloadActivity;
 import net.osmand.plus.download.DownloadActivityType;
 import net.osmand.plus.helpers.FileNameTranslationHelper;
+import net.osmand.plus.helpers.TargetPointsHelper;
+import net.osmand.plus.helpers.TargetPointsHelper.TargetPoint;
 import net.osmand.plus.routing.GPXRouteParams.GPXRouteParamsBuilder;
 import net.osmand.plus.routing.RouteService;
 import net.osmand.plus.routing.RoutingHelper;
+import net.osmand.plus.routing.RoutingHelperUtils;
 import net.osmand.plus.settings.backend.ApplicationMode;
-import net.osmand.plus.settings.backend.CommonPreference;
-import net.osmand.plus.settings.backend.OsmandPreference;
 import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.settings.backend.preferences.CommonPreference;
+import net.osmand.plus.settings.backend.preferences.OsmandPreference;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.voice.JsMediaCommandPlayer;
 import net.osmand.plus.voice.JsTtsCommandPlayer;
+import net.osmand.plus.widgets.alert.AlertDialogData;
+import net.osmand.plus.widgets.alert.CustomAlert;
+import net.osmand.plus.widgets.ctxmenu.ContextMenuAdapter;
+import net.osmand.plus.widgets.ctxmenu.ContextMenuUtils;
+import net.osmand.plus.widgets.ctxmenu.data.ContextMenuItem;
 import net.osmand.router.GeneralRouter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 
 import java.io.File;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashMap;
-import java.util.LinkedHashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 
 public class RoutingOptionsHelper {
@@ -61,9 +65,9 @@ public class RoutingOptionsHelper {
 	public static final String MORE_VALUE = "MORE_VALUE";
 	public static final String DRIVING_STYLE = "driving_style";
 
-	private OsmandApplication app;
+	private final OsmandApplication app;
 
-	private Map<ApplicationMode, RouteMenuAppModes> modes = new HashMap<>();
+	private final Map<ApplicationMode, RouteMenuAppModes> modes = new HashMap<>();
 
 	public RoutingOptionsHelper(OsmandApplication application) {
 		app = application;
@@ -86,7 +90,11 @@ public class RoutingOptionsHelper {
 		}
 	}
 
+	@Nullable
 	public RouteMenuAppModes getRouteMenuAppMode(ApplicationMode appMode) {
+		if (isFollowGpxTrack()) {
+			return new RouteMenuAppModes(appMode, getRoutingParameters(appMode, PermanentAppModeOptions.OTHER.routingParameters));
+		}
 		if (!modes.containsKey(appMode)) {
 			addRouteMenuAppModes(appMode, getRoutingParametersForProfileType(appMode));
 		}
@@ -100,23 +108,11 @@ public class RoutingOptionsHelper {
 		routingHelper.getVoiceRouter().setMuteForMode(mode, mute);
 	}
 
-	public void switchMusic() {
-		OsmandSettings settings = app.getSettings();
-		boolean mt = !settings.INTERRUPT_MUSIC.get();
-		settings.INTERRUPT_MUSIC.set(mt);
-	}
-
-	public void selectRestrictedRoads(final MapActivity mapActivity) {
-		mapActivity.getDashboard().setDashboardVisibility(false, DashboardOnMap.DashboardType.ROUTE_PREFERENCES);
-		mapActivity.getMapRouteInfoMenu().hide();
-		mapActivity.getMyApplication().getAvoidSpecificRoads().showDialog(mapActivity, null);
-	}
-
-	public void selectVoiceGuidance(final MapActivity mapActivity, final CallbackWithObject<String> callback, ApplicationMode applicationMode) {
-		final ContextMenuAdapter adapter = new ContextMenuAdapter(app);
+	public void selectVoiceGuidance(MapActivity mapActivity, CallbackWithObject<String> callback, ApplicationMode applicationMode) {
+		ContextMenuAdapter contextMenuAdapter = new ContextMenuAdapter(app);
 
 		String[] entries;
-		final String[] entrieValues;
+		String[] entrieValues;
 		Set<String> voiceFiles = getVoiceFiles(mapActivity);
 		entries = new String[voiceFiles.size() + 2];
 		entrieValues = new String[voiceFiles.size() + 2];
@@ -125,8 +121,7 @@ public class RoutingOptionsHelper {
 		String selectedValue = mapActivity.getMyApplication().getSettings().VOICE_PROVIDER.getModeValue(applicationMode);
 		entrieValues[k] = OsmandSettings.VOICE_PROVIDER_NOT_USE;
 		entries[k] = mapActivity.getResources().getString(R.string.shared_string_do_not_use);
-		ContextMenuItem.ItemBuilder itemBuilder = new ContextMenuItem.ItemBuilder();
-		adapter.addItem(itemBuilder.setTitle(entries[k]).createItem());
+		contextMenuAdapter.addItem(new ContextMenuItem(null).setTitle(entries[k]));
 		if (OsmandSettings.VOICE_PROVIDER_NOT_USE.equals(selectedValue)) {
 			selected = k;
 		}
@@ -135,7 +130,7 @@ public class RoutingOptionsHelper {
 			entries[k] = (s.contains("tts") ? mapActivity.getResources().getString(R.string.ttsvoice) + " " : "") +
 					FileNameTranslationHelper.getVoiceName(mapActivity, s);
 			entrieValues[k] = s;
-			adapter.addItem(itemBuilder.setTitle(entries[k]).createItem());
+			contextMenuAdapter.addItem(new ContextMenuItem(null).setTitle(entries[k]));
 			if (s.equals(selectedValue)) {
 				selected = k;
 			}
@@ -143,35 +138,26 @@ public class RoutingOptionsHelper {
 		}
 		entrieValues[k] = MORE_VALUE;
 		entries[k] = mapActivity.getResources().getString(R.string.install_more);
-		adapter.addItem(itemBuilder.setTitle(entries[k]).createItem());
+		contextMenuAdapter.addItem(new ContextMenuItem(null).setTitle(entries[k]));
 
-		boolean nightMode = isNightMode(app);
-		Context themedContext = UiUtilities.getThemedContext(mapActivity, nightMode);
-		int themeRes = getThemeRes(app);
-		ApplicationMode selectedAppMode = app.getRoutingHelper().getAppMode();
-		int selectedModeColor = selectedAppMode.getProfileColor(nightMode);
-		DialogListItemAdapter dialogAdapter = DialogListItemAdapter.createSingleChoiceAdapter(
-				entries, nightMode, selected, app, selectedModeColor, themeRes, new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						int which = (int) v.getTag();
-						String value = entrieValues[which];
-						if (MORE_VALUE.equals(value)) {
-							final Intent intent = new Intent(mapActivity, DownloadActivity.class);
-							intent.putExtra(DownloadActivity.TAB_TO_OPEN, DownloadActivity.DOWNLOAD_TAB);
-							intent.putExtra(DownloadActivity.FILTER_CAT, DownloadActivityType.VOICE_FILE.getTag());
-							mapActivity.startActivity(intent);
-						} else {
-							if (callback != null) {
-								callback.processResult(value);
-							}
-						}
-					}
+		boolean nightMode = isNightMode();
+		AlertDialogData dialogData = new AlertDialogData(mapActivity, nightMode)
+				.setControlsColor(ColorUtilities.getAppModeColor(app, nightMode));
+
+		CustomAlert.showSingleSelection(dialogData, entries, selected, v -> {
+			int which = (int) v.getTag();
+			String value = entrieValues[which];
+			if (MORE_VALUE.equals(value)) {
+				Intent intent = new Intent(mapActivity, DownloadActivity.class);
+				intent.putExtra(DownloadActivity.TAB_TO_OPEN, DownloadActivity.DOWNLOAD_TAB);
+				intent.putExtra(DownloadActivity.FILTER_CAT, DownloadActivityType.VOICE_FILE.getTag());
+				mapActivity.startActivity(intent);
+			} else {
+				if (callback != null) {
+					callback.processResult(value);
 				}
-		);
-		AlertDialog.Builder bld = new AlertDialog.Builder(themedContext);
-		bld.setAdapter(dialogAdapter, null);
-		dialogAdapter.setDialog(bld.show());
+			}
+		});
 	}
 
 	public String getVoiceProviderName(Context ctx, String value) {
@@ -218,10 +204,10 @@ public class RoutingOptionsHelper {
 	}
 
 	public void applyRoutingParameter(LocalRoutingParameter rp, boolean isChecked) {
-		final OsmandSettings settings = app.getSettings();
+		OsmandSettings settings = app.getSettings();
 		RoutingHelper routingHelper = app.getRoutingHelper();
 		// if short way that it should set valut to fast mode opposite of current
-		if (rp.routingParameter != null && rp.routingParameter.getId().equals(GeneralRouter.USE_SHORTEST_WAY)) {
+		if (rp.routingParameter != null && rp.routingParameter.getId().equals(USE_SHORTEST_WAY)) {
 			settings.FAST_ROUTE_MODE.setModeValue(routingHelper.getAppMode(), !isChecked);
 		}
 		rp.setSelected(settings, isChecked);
@@ -234,7 +220,7 @@ public class RoutingOptionsHelper {
 
 	public void updateGpxRoutingParameter(OtherLocalRoutingParameter gpxParam) {
 		GPXRouteParamsBuilder rp = app.getRoutingHelper().getCurrentGPXRoute();
-		final OsmandSettings settings = app.getSettings();
+		OsmandSettings settings = app.getSettings();
 		boolean selected = gpxParam.isSelected(settings);
 		if (rp != null) {
 			if (gpxParam.id == R.string.gpx_option_reverse_route) {
@@ -262,8 +248,8 @@ public class RoutingOptionsHelper {
 							tg.navigateToPoint(new LatLon(lastLoc.getLatitude(), lastLoc.getLongitude()), false, -1);
 							update = true;
 						}
-						if (pointToStart == null
-								|| MapUtils.getDistance(pointToStart.point,
+						if (pointToStart != null
+								&& MapUtils.getDistance(pointToStart.point,
 								new LatLon(lastLoc.getLatitude(), lastLoc.getLongitude())) < 10) {
 							tg.setStartPoint(new LatLon(firstLoc.getLatitude(), firstLoc.getLongitude()), false, null);
 							update = true;
@@ -320,13 +306,15 @@ public class RoutingOptionsHelper {
 		void onClick();
 	}
 
-	public void showLocalRoutingParameterGroupDialog(final LocalRoutingParameterGroup group, final MapActivity mapActivity, final OnClickListener listener) {
+	public void showLocalRoutingParameterGroupDialog(LocalRoutingParameterGroup group, MapActivity mapActivity, OnClickListener listener) {
 		OsmandSettings settings = app.getSettings();
-		final ContextMenuAdapter adapter = new ContextMenuAdapter(app);
+		ContextMenuAdapter adapter = new ContextMenuAdapter(app);
 		int i = 0;
 		int selectedIndex = -1;
 		for (LocalRoutingParameter p : group.getRoutingParameters()) {
-			adapter.addItem(ContextMenuItem.createBuilder(p.getText(mapActivity)).setSelected(false).createItem());
+			adapter.addItem(new ContextMenuItem(null)
+					.setTitle(p.getText(mapActivity))
+					.setSelected(false));
 			if (p.isSelected(settings)) {
 				selectedIndex = i;
 			}
@@ -336,24 +324,25 @@ public class RoutingOptionsHelper {
 			selectedIndex = 0;
 		}
 
-		final boolean nightMode = isNightMode(app);
+		boolean nightMode = isNightMode();
 		Context themedContext = UiUtilities.getThemedContext(mapActivity, nightMode);
 		ApplicationMode selectedAppMode = app.getRoutingHelper().getAppMode();
-		final int selectedModeColor = selectedAppMode.getProfileColor(nightMode);
+		int selectedModeColor = selectedAppMode.getProfileColor(nightMode);
 		AlertDialog.Builder builder = new AlertDialog.Builder(themedContext);
 		final int layout = R.layout.list_menu_item_native_singlechoice;
 
-		final ArrayAdapter<String> listAdapter = new ArrayAdapter<String>(themedContext, layout, R.id.text1, adapter.getItemNames()) {
+		List<String> names = ContextMenuUtils.getNames(adapter.getItems());
+		ArrayAdapter<String> listAdapter = new ArrayAdapter<String>(themedContext, layout, R.id.text1, names) {
 			@NonNull
 			@Override
-			public View getView(final int position, View convertView, @NonNull ViewGroup parent) {
+			public View getView(int position, View convertView, @NonNull ViewGroup parent) {
 				// User super class to create the View
 				View v = convertView;
 				if (v == null) {
 					v = UiUtilities.getInflater(mapActivity, nightMode).inflate(layout, parent, false);
 				}
-				final ContextMenuItem item = adapter.getItem(position);
-				AppCompatCheckedTextView tv = (AppCompatCheckedTextView) v.findViewById(R.id.text1);
+				ContextMenuItem item = adapter.getItem(position);
+				AppCompatCheckedTextView tv = v.findViewById(R.id.text1);
 				tv.setText(item.getTitle());
 				tv.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f);
 				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
@@ -364,7 +353,7 @@ public class RoutingOptionsHelper {
 			}
 		};
 
-		final int[] selectedPosition = {selectedIndex};
+		int[] selectedPosition = {selectedIndex};
 		builder.setSingleChoiceItems(listAdapter, selectedIndex, new DialogInterface.OnClickListener() {
 			@Override
 			public void onClick(DialogInterface dialog, int position) {
@@ -401,6 +390,8 @@ public class RoutingOptionsHelper {
 				return new DividerItem();
 			case RouteSimulationItem.KEY:
 				return new RouteSimulationItem();
+			case CalculateAltitudeItem.KEY:
+				return new CalculateAltitudeItem();
 			case ShowAlongTheRouteItem.KEY:
 				return new ShowAlongTheRouteItem();
 			case AvoidPTTypesRoutingParameter.KEY:
@@ -421,23 +412,22 @@ public class RoutingOptionsHelper {
 	}
 
 	public LocalRoutingParameter getRoutingParameterInnerById(ApplicationMode am, String parameterId) {
-		GPXRouteParamsBuilder rparams = app.getRoutingHelper().getCurrentGPXRoute();
 		GeneralRouter rm = app.getRouter(am);
-		if (rm == null || (rparams != null && !rparams.isCalculateOsmAndRoute()) && !rparams.getFile().hasRtePt()) {
+		if (rm == null || (isFollowNonApproximatedGpxTrack())) {
 			return null;
 		}
 
 		LocalRoutingParameter rp;
-		Map<String, GeneralRouter.RoutingParameter> parameters = rm.getParameters();
-		GeneralRouter.RoutingParameter routingParameter = parameters.get(parameterId);
+		Map<String, RoutingParameter> parameters = RoutingHelperUtils.getParametersForDerivedProfile(am, rm);
+		RoutingParameter routingParameter = parameters.get(parameterId);
 
 		if (routingParameter != null) {
 			rp = new LocalRoutingParameter(am);
 			rp.routingParameter = routingParameter;
 		} else {
 			LocalRoutingParameterGroup rpg = null;
-			for (GeneralRouter.RoutingParameter r : rm.getParameters().values()) {
-				if (r.getType() == GeneralRouter.RoutingParameterType.BOOLEAN
+			for (RoutingParameter r : parameters.values()) {
+				if (r.getType() == RoutingParameterType.BOOLEAN
 						&& !Algorithms.isEmpty(r.getGroup()) && r.getGroup().equals(parameterId)) {
 					if (rpg == null) {
 						rpg = new LocalRoutingParameterGroup(am, r.getGroup());
@@ -485,7 +475,7 @@ public class RoutingOptionsHelper {
 				list.add(new OtherLocalRoutingParameter(R.string.gpx_option_reverse_route,
 						app.getString(R.string.gpx_option_reverse_route), rparams.isReverse()));
 			}
-			if (!rparams.useIntermediateRtePoints()) {
+			if (!rparams.shouldUseIntermediateRtePoints()) {
 				list.add(new OtherLocalRoutingParameter(R.string.gpx_option_from_start_point,
 						app.getString(R.string.gpx_option_from_start_point), rparams.isPassWholeRoute()));
 				list.add(new OtherLocalRoutingParameter(R.string.gpx_option_calculate_first_last_segment,
@@ -502,14 +492,14 @@ public class RoutingOptionsHelper {
 			return getOsmandRouterParameters(am);
 		}
 
-		GPXRouteParamsBuilder rparams = app.getRoutingHelper().getCurrentGPXRoute();
 		List<LocalRoutingParameter> list = new ArrayList<LocalRoutingParameter>(getGpxRouterParameters(am));
 		GeneralRouter rm = app.getRouter(am);
-		if (rm == null || (rparams != null && !rparams.isCalculateOsmAndRoute()) && !rparams.getFile().hasRtePt()) {
+		if (rm == null || isFollowNonApproximatedGpxTrack()) {
 			return list;
 		}
-		for (GeneralRouter.RoutingParameter r : rm.getParameters().values()) {
-			if (r.getType() == GeneralRouter.RoutingParameterType.BOOLEAN) {
+		Map<String, RoutingParameter> parameters = RoutingHelperUtils.getParametersForDerivedProfile(am, rm);
+		for (RoutingParameter r : parameters.values()) {
+			if (r.getType() == RoutingParameterType.BOOLEAN) {
 				if ("relief_smoothness_factor".equals(r.getGroup())) {
 					continue;
 				}
@@ -532,6 +522,16 @@ public class RoutingOptionsHelper {
 		return list;
 	}
 
+	private boolean isFollowNonApproximatedGpxTrack() {
+		GPXRouteParamsBuilder rparams = app.getRoutingHelper().getCurrentGPXRoute();
+		return rparams != null && !rparams.isCalculateOsmAndRoute() && !rparams.getFile().hasRtePt();
+	}
+
+	private boolean isFollowGpxTrack() {
+		GPXRouteParamsBuilder rparams = app.getRoutingHelper().getCurrentGPXRoute();
+		return rparams != null && !rparams.isCalculateOsmAndRoute();
+	}
+
 	private static void updateRoutingParameterIcons(LocalRoutingParameter rp) {
 		if (rp instanceof LocalRoutingParameterGroup) {
 			LocalRoutingParameterGroup group = (LocalRoutingParameterGroup) rp;
@@ -544,42 +544,22 @@ public class RoutingOptionsHelper {
 			return;
 		}
 		switch (rp.routingParameter.getId()) {
-			case GeneralRouter.USE_SHORTEST_WAY:
+			case USE_SHORTEST_WAY, AVOID_UNPAVED, AVOID_TOLL, AVOID_FERRIES -> {
 				rp.activeIconId = R.drawable.ic_action_fuel;
 				rp.disabledIconId = R.drawable.ic_action_fuel;
-				break;
-			case GeneralRouter.USE_HEIGHT_OBSTACLES:
+			}
+			case USE_HEIGHT_OBSTACLES -> {
 				rp.activeIconId = R.drawable.ic_action_altitude_average;
 				rp.disabledIconId = R.drawable.ic_action_altitude_average;
-				break;
-			case GeneralRouter.AVOID_FERRIES:
-				rp.activeIconId = R.drawable.ic_action_fuel;
-				rp.disabledIconId = R.drawable.ic_action_fuel;
-				break;
-			case GeneralRouter.AVOID_TOLL:
-				rp.activeIconId = R.drawable.ic_action_fuel;
-				rp.disabledIconId = R.drawable.ic_action_fuel;
-				break;
-			case GeneralRouter.AVOID_MOTORWAY:
+			}
+			case AVOID_MOTORWAY, ALLOW_MOTORWAYS, PREFER_MOTORWAYS -> {
 				rp.activeIconId = R.drawable.ic_action_motorways;
 				rp.disabledIconId = R.drawable.ic_action_avoid_motorways;
-				break;
-			case GeneralRouter.AVOID_UNPAVED:
-				rp.activeIconId = R.drawable.ic_action_fuel;
-				rp.disabledIconId = R.drawable.ic_action_fuel;
-				break;
-			case GeneralRouter.PREFER_MOTORWAYS:
-				rp.activeIconId = R.drawable.ic_action_motorways;
-				rp.activeIconId = R.drawable.ic_action_avoid_motorways;
-				break;
-			case GeneralRouter.ALLOW_PRIVATE:
+			}
+			case ALLOW_PRIVATE, ALLOW_PRIVATE_FOR_TRUCK -> {
 				rp.activeIconId = R.drawable.ic_action_allow_private_access;
 				rp.disabledIconId = R.drawable.ic_action_forbid_private_access;
-				break;
-			case GeneralRouter.ALLOW_MOTORWAYS:
-				rp.activeIconId = R.drawable.ic_action_motorways;
-				rp.disabledIconId = R.drawable.ic_action_avoid_motorways;
-				break;
+			}
 		}
 	}
 
@@ -592,50 +572,65 @@ public class RoutingOptionsHelper {
 		return null;
 	}
 
-	public List<GeneralRouter.RoutingParameter> getAvoidRoutingPrefsForAppMode(ApplicationMode applicationMode) {
-		List<GeneralRouter.RoutingParameter> avoidParameters = new ArrayList<GeneralRouter.RoutingParameter>();
-		GeneralRouter router = app.getRouter(applicationMode);
+	@NonNull
+	public List<RoutingParameter> getAvoidParameters(@NonNull ApplicationMode mode) {
+		List<RoutingParameter> list = new ArrayList<>();
+		GeneralRouter router = app.getRouter(mode);
 		if (router != null) {
-			for (Map.Entry<String, GeneralRouter.RoutingParameter> e : router.getParameters().entrySet()) {
-				String param = e.getKey();
-				GeneralRouter.RoutingParameter routingParameter = e.getValue();
-				if (param.startsWith("avoid_")) {
-					avoidParameters.add(routingParameter);
+			Map<String, RoutingParameter> parameters = RoutingHelperUtils.getParametersForDerivedProfile(mode, router);
+			for (Map.Entry<String, RoutingParameter> entry : parameters.entrySet()) {
+				String key = entry.getKey();
+				if (key.startsWith(AVOID_ROUTING_PARAMETER_PREFIX)) {
+					list.add(entry.getValue());
 				}
 			}
 		}
-		return avoidParameters;
+		Collator collator = OsmAndCollator.primaryCollator();
+		list.sort((o1, o2) -> {
+			String name1 = AndroidUtils.getRoutingStringPropertyName(app, o1.getId(), o1.getName());
+			String name2 = AndroidUtils.getRoutingStringPropertyName(app, o2.getId(), o2.getName());
+
+			return collator.compare(name1, name2);
+		});
+		return list;
 	}
 
-	public GeneralRouter.RoutingParameter getRoutingPrefsForAppModeById(ApplicationMode applicationMode, String parameterId) {
+	@NonNull
+	public Map<RoutingParameter, Boolean> getAvoidParametersWithStates(@NonNull OsmandApplication app) {
+		Map<RoutingParameter, Boolean> map = new LinkedHashMap<>();
+		ApplicationMode mode = app.getRoutingHelper().getAppMode();
+		List<RoutingParameter> parameters = getAvoidParameters(mode);
+
+		for (RoutingParameter parameter : parameters) {
+			CommonPreference<Boolean> preference = app.getSettings().getCustomRoutingBooleanProperty(parameter.getId(), parameter.getDefaultBoolean());
+			map.put(parameter, preference.getModeValue(mode));
+		}
+
+		return map;
+	}
+
+	public RoutingParameter getRoutingPrefsForAppModeById(ApplicationMode applicationMode, String parameterId) {
 		GeneralRouter router = app.getRouter(applicationMode);
-		GeneralRouter.RoutingParameter parameter = null;
+		RoutingParameter parameter = null;
 
 		if (router != null) {
-			parameter = router.getParameters().get(parameterId);
+			parameter = RoutingHelperUtils.getParameterForDerivedProfile(parameterId, applicationMode, router);
 		}
 
 		return parameter;
 	}
-	
-	public boolean isNightMode(OsmandApplication app) {
-		if (app == null) {
-			return false;
-		}
+
+	public boolean isNightMode() {
 		return app.getDaynightHelper().isNightModeForMapControls();
-	}
-	
-	public int getThemeRes(OsmandApplication app) {
-		return isNightMode(app) ? R.style.OsmandDarkTheme : R.style.OsmandLightTheme;
 	}
 
 	public static class LocalRoutingParameter {
 
-		public static final String KEY = "LocalRoutingParameter";
+		public static final String KEY = NAVIGATION_LOCAL_ROUTING_ID;
 
-		public GeneralRouter.RoutingParameter routingParameter;
+		public RoutingParameter routingParameter;
 
-		private ApplicationMode am;
+		private final ApplicationMode mode;
 
 		@DrawableRes
 		public
@@ -663,8 +658,8 @@ public class RoutingOptionsHelper {
 			return disabledIconId;
 		}
 
-		public LocalRoutingParameter(ApplicationMode am) {
-			this.am = am;
+		public LocalRoutingParameter(ApplicationMode mode) {
+			this.mode = mode;
 		}
 
 		public String getText(MapActivity mapActivity) {
@@ -673,36 +668,36 @@ public class RoutingOptionsHelper {
 		}
 
 		public boolean isSelected(OsmandSettings settings) {
-			final CommonPreference<Boolean> property =
+			CommonPreference<Boolean> property =
 					settings.getCustomRoutingBooleanProperty(routingParameter.getId(), routingParameter.getDefaultBoolean());
-			if (am != null) {
-				return property.getModeValue(am);
+			if (mode != null) {
+				return property.getModeValue(mode);
 			} else {
 				return property.get();
 			}
 		}
 
 		public void setSelected(OsmandSettings settings, boolean isChecked) {
-			final CommonPreference<Boolean> property =
+			CommonPreference<Boolean> property =
 					settings.getCustomRoutingBooleanProperty(routingParameter.getId(), routingParameter.getDefaultBoolean());
-			if (am != null) {
-				property.setModeValue(am, isChecked);
+			if (mode != null) {
+				property.setModeValue(mode, isChecked);
 			} else {
 				property.set(isChecked);
 			}
 		}
 
 		public ApplicationMode getApplicationMode() {
-			return am;
+			return mode;
 		}
 	}
 
 	public static class LocalRoutingParameterGroup extends LocalRoutingParameter {
 
-		public static final String KEY = "LocalRoutingParameterGroup";
+		public static final String KEY = NAVIGATION_LOCAL_ROUTING_GROUP_ID;
 
-		private String groupName;
-		private List<LocalRoutingParameter> routingParameters = new ArrayList<>();
+		private final String groupName;
+		private final List<LocalRoutingParameter> routingParameters = new ArrayList<>();
 
 		public String getKey() {
 			if (groupName != null) {
@@ -716,7 +711,7 @@ public class RoutingOptionsHelper {
 			this.groupName = groupName;
 		}
 
-		public void addRoutingParameter(GeneralRouter.RoutingParameter routingParameter) {
+		public void addRoutingParameter(RoutingParameter routingParameter) {
 			LocalRoutingParameter p = new LocalRoutingParameter(getApplicationMode());
 			p.routingParameter = routingParameter;
 			routingParameters.add(p);
@@ -757,7 +752,7 @@ public class RoutingOptionsHelper {
 
 	public static class MuteSoundRoutingParameter extends LocalRoutingParameter {
 
-		public static final String KEY = "MuteSoundRoutingParameter";
+		public static final String KEY = NAVIGATION_SOUND_ID;
 
 		public MuteSoundRoutingParameter() {
 			super(null);
@@ -780,7 +775,7 @@ public class RoutingOptionsHelper {
 
 	public static class DividerItem extends LocalRoutingParameter {
 
-		public static final String KEY = "DividerItem";
+		public static final String KEY = NAVIGATION_DIVIDER_ID;
 
 		public String getKey() {
 			return KEY;
@@ -797,7 +792,7 @@ public class RoutingOptionsHelper {
 
 	public static class RouteSimulationItem extends LocalRoutingParameter {
 
-		public static final String KEY = "RouteSimulationItem";
+		public static final String KEY = NAVIGATION_ROUTE_SIMULATION_ID;
 
 		public String getKey() {
 			return KEY;
@@ -812,9 +807,26 @@ public class RoutingOptionsHelper {
 		}
 	}
 
+	public static class CalculateAltitudeItem extends LocalRoutingParameter {
+
+		public static final String KEY = NAVIGATION_ROUTE_CALCULATE_ALTITUDE_ID;
+
+		public String getKey() {
+			return KEY;
+		}
+
+		public boolean canAddToRouteMenu() {
+			return false;
+		}
+
+		public CalculateAltitudeItem() {
+			super(null);
+		}
+	}
+
 	public static class TimeConditionalRoutingItem extends LocalRoutingParameter {
 
-		public static final String KEY = "TimeConditionalRoutingItem";
+		public static final String KEY = NAVIGATION_TIME_CONDITIONAL_ID;
 
 		public String getKey() {
 			return KEY;
@@ -841,7 +853,7 @@ public class RoutingOptionsHelper {
 
 	public static class ShowAlongTheRouteItem extends LocalRoutingParameter {
 
-		public static final String KEY = "ShowAlongTheRouteItem";
+		public static final String KEY = NAVIGATION_SHOW_ALONG_THE_ROUTE_ID;
 
 		public ShowAlongTheRouteItem() {
 			super(null);
@@ -864,7 +876,7 @@ public class RoutingOptionsHelper {
 
 	public static class AvoidRoadsRoutingParameter extends LocalRoutingParameter {
 
-		public static final String KEY = "AvoidRoadsRoutingParameter";
+		public static final String KEY = NAVIGATION_AVOID_ROADS_ID;
 
 		public AvoidRoadsRoutingParameter() {
 			super(null);
@@ -887,7 +899,7 @@ public class RoutingOptionsHelper {
 
 	public static class AvoidPTTypesRoutingParameter extends LocalRoutingParameter {
 
-		public static final String KEY = "AvoidPTTypesRoutingParameter";
+		public static final String KEY = NAVIGATION_AVOID_PT_TYPES_ID;
 
 		public AvoidPTTypesRoutingParameter() {
 			super(null);
@@ -910,7 +922,7 @@ public class RoutingOptionsHelper {
 
 	public static class GpxLocalRoutingParameter extends LocalRoutingParameter {
 
-		public static final String KEY = "FollowTrackRoutingParameter";
+		public static final String KEY = NAVIGATION_FOLLOW_TRACK_ID;
 
 		public String getKey() {
 			return KEY;
@@ -937,7 +949,7 @@ public class RoutingOptionsHelper {
 
 	public static class OtherSettingsRoutingParameter extends LocalRoutingParameter {
 
-		public static final String KEY = "OtherSettingsRoutingParameter";
+		public static final String KEY = NAVIGATION_OTHER_SETTINGS_ID;
 
 		public OtherSettingsRoutingParameter() {
 			super(null);
@@ -964,7 +976,7 @@ public class RoutingOptionsHelper {
 
 	public static class CustomizeRouteLineRoutingParameter extends LocalRoutingParameter {
 
-		public static final String KEY = "CustomizeRouteLineRoutingParameter";
+		public static final String KEY = NAVIGATION_CUSTOMIZE_ROUTE_LINE_ID;
 
 		public CustomizeRouteLineRoutingParameter() {
 			super(null);
@@ -993,7 +1005,7 @@ public class RoutingOptionsHelper {
 
 	public static class OtherLocalRoutingParameter extends LocalRoutingParameter {
 
-		public static final String KEY = "OtherLocalRoutingParameter";
+		public static final String KEY = NAVIGATION_OTHER_LOCAL_ROUTING_ID;
 
 		public String getKey() {
 			return KEY;
@@ -1032,7 +1044,7 @@ public class RoutingOptionsHelper {
 
 	public static class InterruptMusicRoutingParameter extends LocalRoutingParameter {
 
-		public static final String KEY = "InterruptMusicRoutingParameter";
+		public static final String KEY = NAVIGATION_INTERRUPT_MUSIC_ID;
 
 		public String getKey() {
 			return KEY;
@@ -1045,7 +1057,7 @@ public class RoutingOptionsHelper {
 
 	public static class VoiceGuidanceRoutingParameter extends LocalRoutingParameter {
 
-		public static final String KEY = "VoiceGuidanceRoutingParameter";
+		public static final String KEY = NAVIGATION_VOICE_GUIDANCE_ID;
 
 		public String getKey() {
 			return KEY;
@@ -1080,12 +1092,12 @@ public class RoutingOptionsHelper {
 	public enum PermanentAppModeOptions {
 
 		CAR(MuteSoundRoutingParameter.KEY, AvoidRoadsRoutingParameter.KEY),
-		BICYCLE(MuteSoundRoutingParameter.KEY, DRIVING_STYLE, GeneralRouter.USE_HEIGHT_OBSTACLES),
-		PEDESTRIAN(MuteSoundRoutingParameter.KEY, GeneralRouter.USE_HEIGHT_OBSTACLES),
+		BICYCLE(MuteSoundRoutingParameter.KEY, DRIVING_STYLE, USE_HEIGHT_OBSTACLES),
+		PEDESTRIAN(MuteSoundRoutingParameter.KEY, USE_HEIGHT_OBSTACLES),
 		PUBLIC_TRANSPORT(MuteSoundRoutingParameter.KEY, AvoidPTTypesRoutingParameter.KEY),
 		BOAT(MuteSoundRoutingParameter.KEY),
 		AIRCRAFT(MuteSoundRoutingParameter.KEY),
-		SKI(MuteSoundRoutingParameter.KEY, DRIVING_STYLE, GeneralRouter.USE_HEIGHT_OBSTACLES),
+		SKI(MuteSoundRoutingParameter.KEY, DRIVING_STYLE, USE_HEIGHT_OBSTACLES),
 		HORSE(MuteSoundRoutingParameter.KEY),
 		OTHER(MuteSoundRoutingParameter.KEY);
 

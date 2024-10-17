@@ -1,6 +1,6 @@
 package net.osmand.plus.download.ui;
 
-import android.graphics.Typeface;
+
 import android.text.Spannable;
 import android.text.SpannableStringBuilder;
 import android.view.ContextThemeWrapper;
@@ -12,14 +12,13 @@ import androidx.annotation.NonNull;
 
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.download.DownloadValidationManager;
 import net.osmand.plus.download.IndexItem;
 import net.osmand.plus.helpers.AndroidUiHelper;
-import net.osmand.plus.helpers.FontCache;
-import net.osmand.plus.views.mapwidgets.MapInfoWidgetsFactory.TopToolbarController;
-import net.osmand.plus.views.mapwidgets.MapInfoWidgetsFactory.TopToolbarControllerType;
+import net.osmand.plus.utils.FontCache;
+import net.osmand.plus.views.mapwidgets.TopToolbarController;
+import net.osmand.plus.widgets.dialogbutton.DialogButton;
 import net.osmand.plus.widgets.style.CustomTypefaceSpan;
 import net.osmand.util.Algorithms;
 
@@ -30,8 +29,8 @@ public class DownloadMapToolbarController extends TopToolbarController {
 
 	private final boolean nightMode;
 
-	private final View btnClose;
-	private final View btnDownload;
+	private final DialogButton btnClose;
+	private final DialogButton btnDownload;
 	private final TextView tvDescription;
 	private final TextView tvSize;
 
@@ -63,11 +62,7 @@ public class DownloadMapToolbarController extends TopToolbarController {
 		btnClose = mainView.findViewById(R.id.btnClose);
 		btnDownload = mainView.findViewById(R.id.btnDownload);
 
-		UiUtilities.setupDialogButton(nightMode, btnClose, UiUtilities.DialogButtonType.SECONDARY, mapActivity.getString(R.string.shared_string_close));
-		UiUtilities.setupDialogButton(nightMode, btnDownload, UiUtilities.DialogButtonType.PRIMARY, mapActivity.getString(R.string.shared_string_download));
-
 		refreshView();
-
 		setBottomView(mainView);
 		setTopViewVisible(false);
 		setShadowViewVisible(false);
@@ -92,8 +87,7 @@ public class DownloadMapToolbarController extends TopToolbarController {
 			int endIndex = startIndex + regionName.length();
 			SpannableStringBuilder description = new SpannableStringBuilder(descriptionText);
 			if (startIndex != -1 && endIndex != -1) {
-				Typeface typeface = FontCache.getRobotoMedium(mapActivity);
-				description.setSpan(new CustomTypefaceSpan(typeface), startIndex, endIndex, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+				description.setSpan(new CustomTypefaceSpan(FontCache.getMediumFont()), startIndex, endIndex, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 			}
 			tvDescription.setText(description);
 		}
@@ -113,7 +107,7 @@ public class DownloadMapToolbarController extends TopToolbarController {
 
 	private void dismiss() {
 		lastProcessedRegionName = regionName;
-		mapActivity.hideTopToolbar(DownloadMapToolbarController.this);
+		mapActivity.hideTopToolbar(this);
 	}
 
 	@DrawableRes

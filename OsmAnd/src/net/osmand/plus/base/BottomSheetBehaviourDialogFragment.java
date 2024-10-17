@@ -2,7 +2,6 @@ package net.osmand.plus.base;
 
 import android.app.Activity;
 import android.app.Dialog;
-import android.content.DialogInterface;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -21,13 +20,14 @@ import androidx.fragment.app.FragmentActivity;
 
 import com.google.android.material.bottomsheet.BottomSheetBehavior;
 
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
-import net.osmand.plus.UiUtilities.DialogButtonType;
+import net.osmand.plus.utils.UiUtilities;
+import net.osmand.plus.widgets.dialogbutton.DialogButtonType;
 import net.osmand.plus.base.bottomsheetmenu.BaseBottomSheetItem;
 import net.osmand.plus.helpers.AndroidUiHelper;
+import net.osmand.plus.widgets.dialogbutton.DialogButton;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,8 +43,8 @@ public abstract class BottomSheetBehaviourDialogFragment extends BottomSheetDial
 	protected boolean nightMode;
 	protected boolean portrait;
 
-	protected View dismissButton;
-	protected View rightButton;
+	protected DialogButton dismissButton;
+	protected DialogButton rightButton;
 
 	private LinearLayout itemsContainer;
 
@@ -67,24 +67,19 @@ public abstract class BottomSheetBehaviourDialogFragment extends BottomSheetDial
 	public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup parent, Bundle savedInstanceState) {
 		LayoutInflater themedInflater = UiUtilities.getInflater(requireContext(), nightMode);
 		View mainView = themedInflater.inflate(R.layout.bottom_sheet_behaviour_base, parent, false);
-		itemsContainer = (LinearLayout) mainView.findViewById(R.id.items_container);
+		itemsContainer = mainView.findViewById(R.id.items_container);
 
 		View scrollView = mainView.findViewById(R.id.bottom_sheet_scroll_view);
-		final BottomSheetBehavior behavior = BottomSheetBehavior.from(scrollView);
+		BottomSheetBehavior behavior = BottomSheetBehavior.from(scrollView);
 		behavior.setPeekHeight(getPeekHeight());
 
-		LinearLayout buttonsContainer = (LinearLayout) mainView.findViewById(R.id.buttons_container);
+		LinearLayout buttonsContainer = mainView.findViewById(R.id.buttons_container);
 		buttonsContainer.setBackgroundResource(getButtonsContainerBg());
 
 		if (!portrait) {
 			Dialog dialog = getDialog();
 			if (dialog != null) {
-				dialog.setOnShowListener(new DialogInterface.OnShowListener() {
-					@Override
-					public void onShow(DialogInterface dialog) {
-						behavior.setState(BottomSheetBehavior.STATE_EXPANDED);
-					}
-				});
+				dialog.setOnShowListener(d -> behavior.setState(BottomSheetBehavior.STATE_EXPANDED));
 			}
 		}
 
@@ -92,13 +87,11 @@ public abstract class BottomSheetBehaviourDialogFragment extends BottomSheetDial
 		inflateMenuItems();
 
 		dismissButton = mainView.findViewById(R.id.dismiss_button);
-		UiUtilities.setupDialogButton(nightMode, dismissButton, getDismissButtonType(), getDismissButtonTextId());
-		dismissButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				onDismissButtonClickAction();
-				dismiss();
-			}
+		dismissButton.setButtonType(getDismissButtonType());
+		dismissButton.setTitleId(getDismissButtonTextId());
+		dismissButton.setOnClickListener(v -> {
+			onDismissButtonClickAction();
+			dismiss();
 		});
 		if (hideButtonsContainer()) {
 			mainView.findViewById(R.id.buttons_container).setVisibility(View.GONE);
@@ -107,14 +100,10 @@ public abstract class BottomSheetBehaviourDialogFragment extends BottomSheetDial
 			if (rightBottomButtonTextId != DEFAULT_VALUE) {
 				mainView.findViewById(R.id.buttons_divider).setVisibility(View.VISIBLE);
 				rightButton = mainView.findViewById(R.id.right_bottom_button);
-				UiUtilities.setupDialogButton(nightMode, rightButton, getRightBottomButtonType(), rightBottomButtonTextId);
+				rightButton.setButtonType(getRightBottomButtonType());
+				rightButton.setTitleId(rightBottomButtonTextId);
 				rightButton.setVisibility(View.VISIBLE);
-				rightButton.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						onRightBottomButtonClick();
-					}
-				});
+				rightButton.setOnClickListener(v -> onRightBottomButtonClick());
 			}
 		}
 		updateBackground();
@@ -252,9 +241,6 @@ public abstract class BottomSheetBehaviourDialogFragment extends BottomSheetDial
 	}
 
 	protected boolean isNightMode(@NonNull OsmandApplication app) {
-		if (usedOnMap) {
-			return app.getDaynightHelper().isNightModeForMapControls();
-		}
-		return !app.getSettings().isLightContent();
+		return app.getDaynightHelper().isNightMode(usedOnMap);
 	}
 }

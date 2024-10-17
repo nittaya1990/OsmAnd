@@ -2,22 +2,17 @@ package net.osmand.data;
 
 import android.content.Context;
 
-import net.osmand.GPXUtilities;
+import androidx.annotation.NonNull;
 
-
-/**
- */
 public interface LocationPoint {
 
-	public double getLatitude();
+	double getLatitude();
 
-	public double getLongitude();
+	double getLongitude();
 
-	public int getColor();
+	int getColor();
 
-	public boolean isVisible();
+	boolean isVisible();
 
-	public PointDescription getPointDescription(Context ctx);
-
-
+	PointDescription getPointDescription(@NonNull Context ctx);
 }

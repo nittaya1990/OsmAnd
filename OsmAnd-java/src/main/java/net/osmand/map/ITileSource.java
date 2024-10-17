@@ -1,50 +1,71 @@
 package net.osmand.map;
 
 import java.io.IOException;
+import java.util.Map;
 
 public interface ITileSource {
 
-	public int getMaximumZoomSupported();
+	int getMaximumZoomSupported();
 
-	public String getName();
+	String getName();
 
-	public int getTileSize();
+	int getTileSize();
 
-	public String getUrlToLoad(int x, int y, int zoom);
+	String getUrlToLoad(int x, int y, int zoom);
 
-	public String getUrlTemplate();
+	String getUrlTemplate();
 
-	public byte[] getBytes(int x, int y, int zoom, String dirWithTiles) throws IOException;
+	byte[] getBytes(int x, int y, int zoom, String dirWithTiles) throws IOException;
 
-	public int getMinimumZoomSupported();
+	int getMinimumZoomSupported();
 
-	public String getTileFormat();
+	String getTileFormat();
 
-	public int getBitDensity();
+	int getBitDensity();
 
-	public boolean isEllipticYTile();
+	boolean isEllipticYTile();
 
-	public boolean couldBeDownloadedFromInternet();
+	boolean couldBeDownloadedFromInternet();
 
-	public long getExpirationTimeMillis();
+	long getExpirationTimeMillis();
 
-	public int getExpirationTimeMinutes();
+	int getExpirationTimeMinutes();
 
-	public String getReferer();
+	long getTileModifyTime(int x, int y, int zoom, String dirWithTiles);
 
-	public String getUserAgent();
+	String getReferer();
 
-	public void deleteTiles(String path);
+	String getUserAgent();
 
-	public int getAvgSize();
+	void deleteTiles(String path);
 
-	public String getRule();
+	int getAvgSize();
 
-	public String getRandoms();
+	String getRule();
 
-	public boolean isInvertedYTile();
+	String getRandoms();
 
-	public boolean isTimeSupported();
+	boolean isInvertedYTile();
 
-	public boolean getInversiveZoom();
+	boolean isTimeSupported();
+
+	boolean getInversiveZoom();
+
+	ParameterType getParamType();
+
+	long getParamMin();
+
+	long getParamStep();
+
+	long getParamMax();
+
+	Map<String, String> getUrlParameters();
+
+	String getUrlParameter(String name);
+
+	void setUrlParameter(String name, String value);
+
+	void resetUrlParameter(String name);
+
+	void resetUrlParameters();
 }

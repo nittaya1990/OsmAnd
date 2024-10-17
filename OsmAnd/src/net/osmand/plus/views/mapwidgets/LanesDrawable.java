@@ -13,7 +13,7 @@ import android.graphics.drawable.Drawable;
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.settings.backend.OsmandSettings;
@@ -25,10 +25,10 @@ import java.util.List;
 
 public class LanesDrawable extends Drawable {
 
-	public int[] lanes = null;
-	public boolean imminent = false;
-	public boolean isTurnByTurn = false;
-	public boolean isNightMode = false;
+	public int[] lanes;
+	public boolean imminent;
+	public boolean isTurnByTurn;
+	public boolean isNightMode;
 	private final Context ctx;
 	private final Paint paintBlack;
 	private final Paint paintRouteDirection;

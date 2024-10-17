@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="city_type_district">ജില്ല</string>
     <string name="city_type_neighbourhood">സമീപദേശം</string>
@@ -127,7 +127,6 @@
     <string name="poi_filter_sightseeing">സൈറ്റ്സീയിങ്ങ്</string>
     <string name="map_widget_lock_screen">സ്ക്രീന്‍ പൂട്ടുക</string>
     <string name="map_widget_parking">പാര്‍ക്കിങ്ങ്</string>
-    <string name="map_widget_distance">ലക്ഷ്യസ്ഥാനം</string>
     <string name="bg_service_screen_lock">സ്ക്രീന്‍ പൂട്ടുക</string>
     <string name="osmand_parking_hours">മണിക്കുര്‍</string>
     <string name="osmand_parking_minutes">മിനിറ്റ്</string>
@@ -331,7 +330,6 @@
     <string name="auto_zoom_map">ഭൂപടം ഓട്ടോസൂമാക്കിക്കാണിക്കുക</string>
     <string name="bg_service_sleep_mode_on">"ബാക്ക്ഗ്രൗണ്ടില്‍ പ്രവര്‍ത്തിക്കുന്നത് നിര്‍ത്തുക "</string>
     <string name="map_widget_back_to_loc">എവിടെയാണ് ഞാന്‍</string>
-    <string name="map_widget_altitude">ഉയരം</string>
     <string name="map_widget_next_turn">അടുത്ത തിരുവ്</string>
     <string name="map_widget_next_turn_small">അടുത്ത (ചെറു) തിരുവ്</string>
     <string name="map_widget_next_next_turn">"രണ്ടാമത്തെ  തിരുവ്"</string>
@@ -525,7 +523,6 @@
     <string name="favorite_category_name">"തരത്തിന്റെ പേര് "</string>
     <string name="favorite_category_add_new_title">പുതിയ തരങ്ങള്‍ ചേര്‍ക്കുക</string>
     <string name="world_maps">ലോകഭൂപടങ്ങള്‍</string>
-    <string name="srtm_plugin_disabled">"കോണ്ടൂര്‍ ലൈനുകള്‍ നിര്‍ജീവമാക്കിയിരിക്കുന്നു "</string>
     <string name="favorite_category_select">ഒരു വിഭാഗം തെരഞ്ഞെടുക്കുക</string>
     <string name="default_speed_system_descr">വേഗതയുടെ അളവ് നിര്‍വചിക്കുക</string>
     <string name="default_speed_system">വേഗതയുടെ അളവ്</string>
@@ -543,7 +540,7 @@
     <string name="storage_directory">ഭൂപടം സൂക്ഷിക്കുന്ന സ്ഥലം</string>
     <string name="welcome_header">സ്വാഗതം</string>
     <string name="osmand_parking_overdue">കാലാവധി കഴിഞ്ഞൂ</string>
-    <string name="osmand_parking_minute">മി.</string>
+    <string name="shared_string_minute_lowercase">മി.</string>
     <string name="your_edits">നിങ്ങളുടെ എഡിറ്റുകള്‍</string>
     <string name="waypoint_visit_after">പിമ്പായി സന്ദര്‍ശിക്കുക</string>
     <string name="waypoint_visit_before">മുമ്പായി സന്ദര്‍ശിക്കുക</string>
@@ -602,7 +599,6 @@
     <string name="edit_tilesource_choose_existing">നിലവിലുള്ളത് തെരഞ്ഞെടുക്കുക…</string>
     <string name="driving_region_descr">ഡ്രൈവിങ്ങ് ദിശ തിരഞ്ഞെടുക്കുക(രാജ്യം): യുഎസ്, യൂറോപ്പ്, യൂകെ , ഏഷ്യ , മറ്റുള്ളവ</string>
     <string name="driving_region">ഡ്രൈ‌വിങ്ങ് റീജിയണ്‍(രാജ്യം)</string>
-    <string name="driving_region_uk">ഇന്ത്യ, യൂകെ, ജപ്പാന്‍</string>
     <string name="speak_street_names">തെരുവ് നാമങ്ങള്‍ (ടിടിഎസ്)</string>
     <string name="speak_speed_limit">വേഗപരിധി</string>
     <string name="speak_cameras">സ്പീഡ് ക്യാമറ</string>
@@ -639,12 +635,10 @@
     <string name="poi_filter_entertainment">കലാപ്രകടനം</string>
     <string name="auto_zoom_map_descr">"നിങ്ങളുടെ സ്പീഡിനനുസരിച്ച് ഭൂപടത്തിന്റെ സൂം സ്വയം ക്രമീകരിക്കുക "</string>
     <string name="snap_to_road">പാതയില്‍ തന്നെ നിര്‍ത്തുക</string>
-    <string name="day_night_info_description">സൂര്യോദയം: %1$s 
-സൂര്യസ്തമയം: %2$s</string>
+    <string name="day_night_info_description">സൂര്യോദയം: %1$s സൂര്യസ്തമയം: %2$s</string>
     <string name="day_night_info">പകല്‍/രാത്രി വിവരം</string>
     <string name="map_widget_show_ruler">സ്കേല്‍</string>
     <string name="bg_service_sleep_mode_off">"ആപ്പിനെ ബാക്ക്ഗ്രൗണ്ടില്‍ പ്രവര്‍ത്തിപ്പിക്കുക "</string>
-    <string name="map_widget_speed">വേഗത</string>
     <string name="map_widget_time">ദൈര്‍ഘ്യം</string>
     <string name="bg_service_screen_unlock">"സ്ക്രീന്‍ തുറക്കുക "</string>
     <string name="bg_service_screen_lock_toast">"സ്ക്രീന്‍ പൂട്ടിയിരിക്കുന്നു "</string>
@@ -678,7 +672,6 @@
     <string name="free_version_title">ഫ്രീ വേര്‍ഷ</string>
     <string name="routing_settings">വഴികാട്ടി</string>
     <string name="routing_settings_descr">വഴികാട്ടി സജ്ജീകരിക്കുക</string>
-    <string name="index_settings">ഭൂപട ഫയലുകള്‍ കൈകാര്യം ചെയ്യുക</string>
     <string name="choose_auto_follow_route">"സ്വയം ഭുപടദൃഷ്യം നടുവിലാക്കുക "</string>
     <string name="auto_follow_route_navigation">"നാവിഗേഷനില്‍ മാത്രം നടുവിലാക്കുക "</string>
     <string name="auto_follow_route_navigation_descr">നാവിഗേഷനില്‍ മാത്രം ഭുപടദൃഷ്യം സ്വയം- നടുവിലാക്കുക.</string>
@@ -850,7 +843,7 @@
     <string name="lang_nds">ലോ ജര്‍മന്‍ ഭാഷ</string>
     <string name="lang_mk">മാസിഡോണിയന്‍</string>
     <string name="read_more">കൂടുതല്‍ വായിക്കുക</string>
-    <string name="rendering_attr_hideProposed_name">പരിഗണന(മാത്രം)യിലുള്ള വസ്തുക്കള്‍</string>
+    <string name="rendering_attr_showProposed_name">പരിഗണന(മാത്രം)യിലുള്ള വസ്തുക്കള്‍</string>
     <string name="shared_string_update">പരിഷ്കരിക്കുക(അപ്ഡേറ്റ്)</string>
     <string name="shared_string_upload">അപ്ലോഡ്</string>
     <string name="world_map_download_descr">"അടിസ്ഥാന ലോക ഭൂപടം ഇല്ല അല്ലെങ്കില്‍ പഴയതായി.  ദയവായ് അത് ഡൗണ്‍ലോഡ് ചെയ്യുക(നിര്‍ബന്ധമല്ലാ )."</string>
@@ -913,7 +906,6 @@
     <string name="prefer_motorways">അതിവേഗപാതകള്‍ തെരഞ്ഞെടുക്കുക</string>
     <string name="prefer_in_routing_descr">അതിവേഗപാതകള്‍ തെരഞ്ഞെടുക്കുക</string>
     <string name="local_indexes_cat_srtm">"കോണ്ടൂര്‍ ലൈനുകള്‍ "</string>
-    <string name="index_srtm_ele">"കോണ്ടൂര്‍ ലൈനുകള്‍ "</string>
     <string name="map_widget_max_speed">വേഗപരിധി</string>
     <string name="map_widget_top_text">തെരുവ് നാമം</string>
     <string name="show_cameras">സ്പീഡ് ക്യാമറ</string>
@@ -974,7 +966,6 @@
     <string name="base_world_map">അടിസ്ഥാന ലോക ഭൂപടം</string>
     <string name="clear_destination">ലക്ഷ്യസ്ഥാനങ്ങള്‍ കളയുക</string>
     <string name="download_hillshade_maps">പര്‍വതഛായകള്‍</string>
-    <string name="index_srtm_parts">കഷണങ്ങള്‍</string>
     <string name="close_changeset">"ചേഞ്ച്സെറ്റ്  അടയ്ക്കുക"</string>
     <string name="show_warnings_title">മുന്നറിയിപ്പുകള്‍ കാണിക്കുക…</string>
     <string name="context_menu_item_add_parking_point">"പാര്‍ക്കിങ്ങ് ആയി രേഖപ്പെടുത്തുക "</string>
@@ -1077,7 +1068,6 @@
     <string name="gpx_info_diff_altitude">" ഉയര വ്യത്യാസം: %1$s"</string>
     <string name="gpx_info_asc_altitude">ഇറക്കം/കയറ്റം:%1$s</string>
     <string name="map_widget_map_rendering">വരച്ച് കാണിക്കുന്ന രീതി</string>
-    <string name="map_widget_fps_info">"എഫ്പിഎസ്  ഡീബഗ് വിവരങ്ങള്‍"</string>
     <string name="clear_intermediate_points">"ഇടലക്ഷ്യസ്ഥാനങ്ങള്‍ കളയുക "</string>
     <string name="context_menu_item_directions_from">ദിശ ഇവിടെ നിന്നും</string>
     <string name="contribution_activity">" ഇന്‍സ്റ്റോള്‍ ചെയ്യുന്ന പതിപ്പ്"</string>
@@ -1154,7 +1144,7 @@
     <string name="file_size_in_mb">%.1f MB</string>
     <string name="new_version">"പുതിയ പതിപ്പ് "</string>
     <string name="map_viewing_item">ഭൂപടം കാണിക്കുക</string>
-    <string name="contact_us">"സമ്പര്‍ക്കം "</string>
+    <string name="shared_string_contact">"സമ്പര്‍ക്കം "</string>
     <string name="dashboard_or_drawer_title">"മെനുവോ  ഡാഷ് ബോര്‍ഡോ  തീരുമാനം"</string>
     <string name="daily">ദിവസവും</string>
     <string name="shared_string_filters">അരിപ്പകള്‍</string>
@@ -1429,7 +1419,7 @@
     <string name="transport_searching_transport">ഗതാഗത പരിണതഫലം(ലക്ഷ്യസ്ഥാനമില്ല):</string>
     <string name="rotate_map_compass_opt">വടക്ക്നോക്കിയുടെ ദിശയില്‍</string>
     <string name="rotate_map_bearing_opt">യാത്രാ ദിശയില്‍</string>
-    <string name="rotate_map_to_bearing">ഭൂപട ദിശ : വടക്കോട്ട് ദര്‍ശനം/സഞ്ചാര ദിശ</string>
+    <string name="rotate_map_to">ഭൂപട ദിശ : വടക്കോട്ട് ദര്‍ശനം/സഞ്ചാര ദിശ</string>
     <string name="use_trackball_descr">ഭൂപടം നീക്കാനായി ട്രാക്ക്ബോള്‍ ഉപയോഗിക്കുക</string>
     <string name="int_seconds">സെക്കന്റുകള്‍</string>
     <string name="int_min">മി.</string>
@@ -1712,9 +1702,6 @@
     <string name="nearest_cities">അടുത്തുള്ള നഗരങ്ങള്‍</string>
     <string name="select_city">"നഗരം തെരഞ്ഞെടുക്കുക "</string>
     <string name="select_postcode">"പിന്‍കോഡ്   തെരഞ്ഞെടുക്കുക "</string>
-    <string name="quick_action_add_destination">"ലക്ഷ്യസ്ഥാനം ചേര്‍ക്കുക "</string>
-    <string name="quick_action_replace_destination">"ലക്ഷ്യസ്ഥാനം മാറ്റുക "</string>
-    <string name="quick_action_add_first_intermediate">"ഒന്നാമത്തെ ഇടലക്ഷ്യസ്ഥാനം ചേര്‍ക്കുക "</string>
     <string name="right_side_navigation">"റൈറ്റ്  ഹാന്റ് ഡ്രൈവിങ്ങ്"</string>
     <string name="routing_attr_relief_smoothness_factor_more_plains_name">"പരന്നത് "</string>
     <string name="routing_attr_driving_style_speed_name">ദൂരം കുറഞ്ഞ പാതകള്‍</string>
@@ -1746,13 +1733,13 @@
     <string name="add_point_after">"അടുത്ത ബിന്ദുവായ്  ചേര്‍ക്കുക "</string>
     <string name="shared_string_options">ഐച്ഛികങ്ങള്‍</string>
     <string name="shared_string_reset">വീണ്ടും തുടങ്ങുക</string>
-    <string name="mapillary_menu_title_dates">"തിയതി "</string>
+    <string name="shared_string_date">"തിയതി "</string>
     <string name="mapillary_menu_title_username">ഉപയോക്തൃനാമം</string>
     <string name="shared_string_install">സ്ഥാപിക്കുക</string>
     <string name="srtm_color_scheme">നിറങ്ങളുടെ സ്കീം</string>
     <string name="shared_string_overview">അവലോകനം</string>
     <string name="shared_string_visible">ദൃശ്യമായ</string>
-    <string name="driving_region_automatic">തനിയെയുള്ള</string>
+    <string name="shared_string_automatic">തനിയെയുള്ള</string>
     <string name="shared_string_color">നിറം</string>
     <string name="rendering_value_high_name">കൂടിയ</string>
     <string name="rendering_value_medium_w_name">ഇടത്തരം</string>
@@ -1763,9 +1750,7 @@
     <string name="lang_lo">ലാവോ</string>
     <string name="proxy_host_title">പ്രോക്സി ഹോസ്റ്റ്</string>
     <string name="average">ശരാശരി</string>
-    <string name="quick_action_add_favorite">"താല്‍പര്യമുള്ളവയില്‍ കൂട്ടുക "</string>
     <string name="quick_action_add_configure_map">ഭൂപടം സജ്ജീകരിക്കുക</string>
-    <string name="quick_action_add_navigation">ഗതിനിയന്ത്രണം</string>
     <string name="quick_action_bug_message">സന്ദേശം</string>
     <string name="add_route_points">പാതബിന്ദുക്കള്‍ ചേര്‍ക്കു</string>
     <string name="shared_string_restore">പുനഃസ്ഥാപിക്കുക</string>
@@ -1944,19 +1929,7 @@
     <string name="routing_attr_avoid_ice_roads_fords_description">"മഞ്ഞിലുള്ള (ice) റോഡുകളും  കടത്തുകളും (ford)  ഒഴിവാക്കുക "</string>
     <string name="use_location">സ്ഥാനം ഉപയോഗിക്കു</string>
     <string name="shared_string_gpx_tracks">"ജിപിഎക്സ്  പാതകള്‍"</string>
-    <string name="osmand_plus_extended_description_part8">"മാപ്പിന്റെ ഏകദേശ വ്യാപ്തിയും നിലവാരവും:
-\n. പടിഞ്ഞാറന്‍ യൂറോപ്പ് : ****
-\n .കിഴക്കന്‍ യൂറോപ്പ്  : ***
-\n.റഷ്യ: ***
-\n. വടക്കേ അമേരിക്ക: *** 
-\n. തെക്കേ അമേരിക്ക:**
-\n. ഏഷ്യ: **
-\n. ജപ്പാന്‍ &amp; കൊറിയ :***
-\n. ഗള്‍ഫ് : **
-\n. ആഫ്റിക്ക : **
-\n. അന്റാര്‍ട്ടിക്ക:*
-\nഅഫ്ഗാനിസ്ഥാന്‍ തുടങ്ങി സിംബാവേ വരെ ലോകത്തെ മിക്കവാറും എല്ലാ രാജ്യങ്ങളുടെ ഭൂപടങ്ങളും ഡൗണ്‍ലോഡ് ചെയ്യാനായ് ലഭ്യമാണ്, ഇന്ത്യ, അമേരിക്ക , ആസ്ട്രേലിയ, ഫ്രാന്‍സ്, റഷ്യ, ഇംഗ്ളണ്ട്  , സ്പെയ്ന്‍, ......   
-\n"</string>
+    <string name="osmand_plus_extended_description_part8">"മാപ്പിന്റെ ഏകദേശ വ്യാപ്തിയും നിലവാരവും:\n\n. പടിഞ്ഞാറന്‍ യൂറോപ്പ് : ****\n\n .കിഴക്കന്‍ യൂറോപ്പ്  : ***\n\n.റഷ്യ: ***\n\n. വടക്കേ അമേരിക്ക: *** \n\n. തെക്കേ അമേരിക്ക:**\n\n. ഏഷ്യ: **\n\n. ജപ്പാന്‍ &amp; കൊറിയ :***\n\n. ഗള്‍ഫ് : **\n\n. ആഫ്റിക്ക : **\n\n. അന്റാര്‍ട്ടിക്ക:*\n\nഅഫ്ഗാനിസ്ഥാന്‍ തുടങ്ങി സിംബാവേ വരെ ലോകത്തെ മിക്കവാറും എല്ലാ രാജ്യങ്ങളുടെ ഭൂപടങ്ങളും ഡൗണ്‍ലോഡ് ചെയ്യാനായ് ലഭ്യമാണ്, ഇന്ത്യ, അമേരിക്ക , ആസ്ട്രേലിയ, ഫ്രാന്‍സ്, റഷ്യ, ഇംഗ്ളണ്ട്  , സ്പെയ്ന്‍, ......   \n\n"</string>
     <string name="recalculate_route_to_your_location">ഗതാഗത രീതി:</string>
     <string name="show_lanes">ലേനുകള്‍</string>
     <string name="int_continuosly">തുടരെയുളള</string>
@@ -2039,7 +2012,6 @@
     <string name="save_track_to_gpx_globally_descr">"ജിപിഎക്സ് ഫയലിലേക്കു്  സ്ഥാനം ലോഗ്ഗിങ് ചെയ്യുന്നത്, ഭൂപടത്തിൽ ജിപിഎക്സ് ലോഗിങ് വിഡ്ജെറ്റ് ഉപയോഗിച്ചു് ഓണാക്കുന്നതാണു്."</string>
     <string name="save_current_track_descr">ഇപ്പോൾ നിലവിലുള്ള ട്രാക്ക് ജിപിഎക്സ് ഫയൽ ആയി സംരക്ഷിക്കുക.</string>
     <string name="save_track_to_gpx">നാവിഗേഷൻ സമയത്ത് ട്രാക്ക് ഓട്ടോമാറ്റിക്കായി റെക്കോർഡ് ചെയ്യുക</string>
-    <string name="save_track_to_gpx_descrp">നാവിഗേഷൻ സമയത്ത് GPX ട്രാക്ക്, ട്രാക്കുകളുടെ ഫോൾഡറിലേക്ക് ഓട്ടോമാറ്റിക്കായി സംരക്ഷിക്കുന്നു.</string>
     <string name="save_track_interval_descr">നാവിഗേഷൻ വേളയിൽ ട്രാക്ക് റെക്കോർഡിംഗിനുള്ള ലോഗിംഗ് ഇടവേള തിരഞ്ഞെടുക്കുക.</string>
     <string name="proxy_host_descr">നിങ്ങളുടെ പ്രോക്സി ഹോസ്റ്റിന്റെ പേര് കോൺഫിഗർ ചെയ്യുക (ഉദാ: 127.0.0.1).</string>
     <string name="proxy_port_title">പ്രോക്സി പോർട്ട്</string>
@@ -2099,15 +2071,12 @@
     <string name="precise_routing_mode_descr">തടസം കൂടാതെ കൃത്യമായ യാത്രാമാർഗങ്ങൾ കണക്കാക്കുക. ദൂരം കുറഞ്ഞതും വേഗത കുറഞ്ഞതും.</string>
     <string name="recording_photo_description">ഫോട്ടോ %1$s %2$s</string>
     <string name="srtm_paid_version_msg">കൂടുതല്‍ ഡെവലപ്പ്മെന്റിന് പിന്തുണ നൽകാൻ \'കോണ്ടൂർ ലൈനുകൾ\' പ്ലഗിനു വേണ്ടി പണമടയ്ക്കുക.</string>
-    <string name="av_def_action_choose">അഭ്യർത്ഥനയനുസരിച്ച് തിരഞ്ഞെടുക്കുക</string>
     <string name="recording_error">റെക്കോർഡിംഗ് പരാജയപ്പെട്ടു</string>
     <string name="recording_is_recorded">ഓഡിയോ / വീഡിയോ റെക്കോർഡുചെയ്യുന്നു. AV വിഡ്ജെറ്റ് ടാപ്പുചെയ്യുന്നതിലൂടെ നിർത്തുക.</string>
     <string name="recording_playing">റിക്കോഡിങ്ങില്‍ നിന്ന് ഒരു ഓഡിയോ പ്ളേ ചെയ്യുന്നു.
 \n%1$s</string>
     <string name="recording_open_external_player">"എക്സ്ടേണല്‍  പ്ലെയർ തുറക്കുക"</string>
     <string name="recording_delete_confirm">ഈ ഇനം ഇല്ലാതാക്കണോ\?</string>
-    <string name="rendering_attr_alpineHiking_name">അൽപൈൻ ഹൈക്കിംഗ് സ്കെയിൽ (എസ്എസി)</string>
-    <string name="rendering_attr_alpineHiking_description">SAC സ്കെയിൽ അനുസരിച്ച് പാതകൾ റെന്‍ഡര്‍ ചെയ്യുക.</string>
     <string name="rendering_attr_hikingRoutesOSMC_name">ഹൈക്കിംഗ് സിംബല്‍ ഓവർലേ</string>
     <string name="rendering_attr_hikingRoutesOSMC_description">OSMC ട്രെയ്സ് അനുസരിച്ച് പാതകൾ റെണ്ടര്‍ ചെയ്യുക.</string>
     <string name="search_villages_and_postcodes">കൂടുതൽ ഗ്രാമങ്ങൾ / പോസ്റ്റ് കോഡ് തിരയുക</string>
@@ -2226,8 +2195,8 @@
     <string name="transport_searching_route">ട്രാൻസ്പോർട്ട് ഫലങ്ങൾ (ലക്ഷ്യസ്ഥാനത്തേക്ക് {0}):</string>
     <string name="gpx_files_not_found">ട്രാക്കുകളുടെ ഫോൾഡറിൽ GPX ഫയലുകൾ ഒന്നും കണ്ടെത്തിയില്ല</string>
     <string name="poi_context_menu_modify">POI പരിഷ്ക്കരിക്കുക</string>
-    <string name="rotate_map_none_opt">പരിക്രമണമില്ല (വടക്ക് എപ്പോഴും മുകളിലേക്ക്)</string>
-    <string name="rotate_map_to_bearing_descr">മാപ്പ് സ്ക്രീൻ അലൈന്‍മെന്റ് തിരഞ്ഞെടുക്കുക.</string>
+    <string name="rotate_map_north_opt">പരിക്രമണമില്ല (വടക്ക് എപ്പോഴും മുകളിലേക്ക്)</string>
+    <string name="rotate_map_to_descr">മാപ്പ് സ്ക്രീൻ അലൈന്‍മെന്റ് തിരഞ്ഞെടുക്കുക.</string>
     <string name="none_region_found">മെമ്മറി കാർഡിൽ ഡൌൺലോഡ് ചെയ്ത മാപ്പുകൾ ഒന്നും കണ്ടെത്താൻ കഴിഞ്ഞില്ല.</string>
     <string name="poi_namefinder_query_empty">POI കണ്ടെത്താൻ ടൈപ്പുചെയ്യുക</string>
     <string name="thanks_yandex_traffic">ട്രാഫിക്ക് വിവരങ്ങള്‍ക്കായി യാണ്ടെക്സിന് നന്ദി.</string>
@@ -2275,7 +2244,7 @@
     <string name="poi_dialog_comment_default">POI മാറുന്നു</string>
     <string name="poi_dialog_other_tags_message">മറ്റെല്ലാ ടാഗുകളും സംരക്ഷിക്കപ്പെടും</string>
     <string name="plugin_install_needs_network">ഈ പ്ലഗിൻ ഇൻസ്റ്റാളുചെയ്യാൻ നിങ്ങൾ ഇന്റർനെറ്റിൽ കണക്റ്റുചെയ്യേണ്ടതുണ്ട്.</string>
-    <string name="get_plugin">നേടുക</string>
+    <string name="shared_string_get">നേടുക</string>
     <string name="rate_this_app">ഈ അപ്ലിക്കേഷൻ റേറ്റുചെയ്യുക</string>
     <string name="rate_this_app_long">Google Play- യിൽ OsmAnd-ന് സ്കോർ കൊടുക്കുക</string>
     <string name="poi_dialog_poi_type">POI തരം</string>
@@ -2293,7 +2262,6 @@
     <string name="morning">രാവിലെ</string>
     <string name="number_of_contributors">സംഭാവകരുടെ എണ്ണം</string>
     <string name="number_of_edits">എഡിറ്റുകളുടെ എണ്ണം</string>
-    <string name="translit_name_if_miss">%1$s പേര് ഇല്ലെങ്കില്‍ ലിപ്യന്തരണം (Transliterate) ചെയ്യുക</string>
     <string name="search_hint">നഗരം, വിലാസം, POI നാമം ടൈപ്പുചെയ്യുക</string>
     <string name="rendering_attr_surfaceIntegrity_name">റോഡ് പ്രതല നിലവാരം</string>
     <string name="save_track_min_speed_descr">ഫിൽറ്റർ: ഈ വേഗതക്ക് താഴെ പോയിന്റുകൾ ലോഗ് ചെയ്യുന്നില്ല.</string>
@@ -2317,18 +2285,10 @@
     <string name="configure_screen_quick_action">ദ്രുത പ്രവർത്തനം</string>
     <string name="quick_action_item_action">പ്രവൃത്തി %d</string>
     <string name="quick_action_item_screen">സ്ക്രീൻ %d</string>
-    <string name="quick_action_add_marker">മാപ്പ് മാർക്കർ ചേർക്കുക</string>
-    <string name="quick_action_add_poi">POI ചേർക്കുക</string>
-    <string name="quick_action_map_style">മാപ്പ് ശൈലി മാറ്റുക</string>
     <string name="quick_action_map_style_switch">\"%s\"ലേക്ക് മാപ്പ് ശൈലി മാറ്റിയിരിക്കുന്നു .</string>
-    <string name="quick_action_take_audio_note">പുതിയ ഓഡിയോ കുറിപ്പ്</string>
-    <string name="quick_action_take_video_note">പുതിയ വീഡിയോ കുറിപ്പ്</string>
-    <string name="quick_action_take_photo_note">പുതിയ ഫോട്ടോ നോട്ട്</string>
-    <string name="quick_action_add_osm_bug">OSM കുറിപ്പ് ചേർക്കുക</string>
     <string name="quick_action_navigation_voice">വോയ്സ് ഓൺ / ഓഫ്</string>
     <string name="quick_action_navigation_voice_off">ശബ്ദം അൺമ്യൂട്ട് ചെയ്യുക</string>
     <string name="quick_action_navigation_voice_on">ശബ്ദം മ്യൂട്ടുചെയ്യുക</string>
-    <string name="quick_action_add_parking">പാർക്കിംഗ് സ്ഥലം ചേർക്കുക</string>
     <string name="quick_action_new_action">പ്രവർത്തനം ചേർക്കുക</string>
     <string name="quick_action_edit_action">പ്രവർത്തനം എഡിറ്റുചെയ്യുക</string>
     <string name="dialog_add_action_title">പ്രവർത്തനം ചേർക്കുക</string>
@@ -2348,13 +2308,10 @@
     <string name="quick_action_map_style_action">ഒരു മാപ്പ് ശൈലി ചേർക്കുക</string>
     <string name="quick_action_empty_param_error">എല്ലാ വിവരങ്ങളും ചേര്‍ക്കുക(Fill out all parameters)</string>
     <string name="quick_action_map_styles">മാപ്പ് ശൈലികൾ</string>
-    <string name="quick_action_map_overlay">മാപ്പ് ഓവർലേ മാറ്റുക</string>
     <string name="quick_action_map_overlay_title">മാപ്പ് ഓവർലേകൾ</string>
     <string name="quick_action_map_overlay_action">ഓവർലേ(മേല്‍പ്പാളി) ചേർക്കുക</string>
-    <string name="quick_action_map_underlay">മാപ്പ് അണ്ടർലേ മാറ്റുക</string>
     <string name="quick_action_map_underlay_title">മാപ്പ് അണ്ടര്‍ലേയ്സ്(കീഴ്പാളികള്‍)</string>
     <string name="quick_action_map_underlay_action">അണ്ടര്‍ലേയ്സ്(കീഴ്പാളികള്‍) ചേര്‍ക്കുക</string>
-    <string name="quick_action_map_source">മാപ്പ് ഉറവിടം മാറ്റുക</string>
     <string name="quick_action_sh_poi_descr">മാപ്പിൽ പ്രദർശിപ്പിക്കുന്നതിന് ഒന്നോ അതിലധികമോ POI വിഭാഗങ്ങൾ ചേർക്കുക.</string>
     <string name="quick_action_add_marker_descr">ഈ പ്രവർത്തന ബട്ടൺ ടാപ്പുചെയ്യുന്നത് സ്ക്രീനിന്റെ നടുക്കായ് ഒരു മാപ്പ് മാർക്കർ ചേർക്കുന്നു.</string>
     <string name="quick_action_add_gpx_descr">സ്ക്രീനിന്റെ മധ്യത്തിൽ ഒരു GPX വേ പോയിന്റ് ചേർക്കാന്‍ ഈ പ്രവർത്തന ബട്ടൺ ടാപ്പുചെയ്യുക.</string>
@@ -2479,8 +2436,6 @@
     <string name="import_track_desc">%1$s ഫയലില്‍ -വേപോയിന്റ് ഇല്ല, ട്രാക്കായി ഇംപോർട്ട് ചെയ്യണോ\?</string>
     <string name="move_point">പോയിന്റ് നീക്കുക</string>
     <string name="show_direction">ദൂരം സൂചന</string>
-    <string name="map_orientation_change_in_accordance_with_speed">മാപ്പ് ഓറിയന്റേഷൻ ത്രെഷോൾഡ്</string>
-    <string name="map_orientation_change_in_accordance_with_speed_descr">"താഴെയുള്ള \'ചലന ദിശ\' നിന്നും \'Compass Directon\' എന്നതിലേക്കുള്ള സ്വിച്ചുചെയ്യാനുള്ള  വേഗത തിരഞ്ഞെടുക്കുക."</string>
     <string name="all_markers_moved_to_history">എല്ലാ മാപ്പ് മാർക്കറുകളും ചരിത്രത്തിലേക്ക് നീക്കി</string>
     <string name="marker_moved_to_history">മാപ്പ് മാർക്കർ ചരിത്രത്തിലേക്ക് നീക്കി</string>
     <string name="marker_moved_to_active">മാപ്പ് മാർക്കർ സജീവമാക്കി</string>
@@ -2588,10 +2543,8 @@
     <string name="start_editing_card_description">വിക്കിവൊയേജിലെ ഏതൊരു ആർട്ടിക്കിളും നിങ്ങള്‍ക്ക് തിരുത്താം. അറിവ്| അനുഭവം| കഴിവുകൾ| നിങ്ങളുടെ ശ്രദ്ധ എന്നിവ പങ്കിടാം</string>
     <string name="get_unlimited_access">പരിധിയില്ലാത്ത ആക്സസ്സ് നേടുക</string>
     <string name="welcome_to_open_beta">ബീറ്റയിലേക്ക് വേര്‍ഷനിലേക്ക് സ്വാഗതം</string>
-    <string name="contour_lines_hillshade_maps">കോണ്ടൂര്‍ ലൈനുകള്‍ &amp; ഹില്‍ഷേഡ് മാപ്പുകള്‍</string>
     <string name="open_wikipedia_link_online_description">വെബ് ബ്രൗസറിൽ ലിങ്ക് തുറക്കുക.</string>
     <string name="topo_render_descr">"ഹൈക്കിംങ്| ട്രക്കിങ്| സൈക്ലിംഗ് എന്നിവയ്ക്ക് വേണ്ടി രൂപകൽപ്പന ചെയ്ത കോൺട്രാസ്റ്റ് ശൈലി. സങ്കീർണ്ണമായ വെളിച്ചത്തില്‍ പോലും  വായിക്കാനായ്. പ്രധാന സവിശേഷതകൾ: റോഡുകളും സ്വാഭാവിക വസ്തുക്കളും വേര്‍തിരിച്ചറിയാം| വിവിധ തരത്തിലുള്ള റൂട്ടുകൾ| വിപുലമായ സജ്ജീകരണങ്ങൾ ഉള്ള കോണ്ടൂർ ലൈനുകൾ| ഒരേ സൂം ലെവലിൽ സാധരണ ശൈലിയേക്കാൾ കൂടുതൽ വിശദാംശങ്ങൾ. റോഡ് ഗുണനിലവാരത്തെ തിരിച്ചറിയാം. രാത്രി മോഡ് ഇല്ല."</string>
-    <string name="mapnik_render_descr">പഴയ \'മാപ്പ്നിക്ക്\' ശൈലിയുള്ള സ്ഥിര റെൻഡറിംഗ് ശൈലി. പ്രധാന സവിശേഷതകൾ: മാപ്പ്നിക്ക്\' ശൈലിക്ക് സമാനമായ കളര്‍.</string>
     <string name="default_render_descr">പൊതു ഉദ്ദേശ്യ ശൈലി. ജനസാന്ദ്രതയുള്ള നഗരങ്ങളിൽ ലളിതമായ ക്ലീനർ റെൻഡറിംഗ്. പ്രധാന സവിശേഷതകൾ: കോണ്ടൂർ ലൈനുകൾ| വഴികൾ| ഉപരിതല നിലവാരം| പ്രവേശന നിയന്ത്രണങ്ങൾ| റോഡ് ഷീൽഡുകൾ| പാതകള്‍ എസ്എസി സ്കെയിൽ റെന്‍ഡര്‍ ചെയ്തിരിക്കുന്നു | വാട്ടർ സ്പോർട്സ് സവിശേഷതകൾ</string>
     <string name="touring_view_render_descr">ടൂറിങ്ങ് ആവശ്യകതകൾക്കായി ഉയർന്ന വിശദാംശങ്ങളുള്ള ശൈലി. സാധാരണ ശൈലിയിലുള്ള എല്ലാ കോൺഫിഗറേഷൻ ഓപ്ഷനുകളും ഉൾപ്പെടുന്നു: സാധ്യമായത്രയും വിശദമായി| പ്രത്യേകിച്ച് എല്ലാ റോഡുകളും പാതകളും യാത്ര ചെയ്യാനുള്ള മറ്റ് വഴികളും എല്ലാം പ്രദർശിപ്പിക്കുന്നു. എല്ലാ വ്യത്യസ്ത തരം റോഡുകൾക്കും വ്യക്തമാക്കുക. ഔട്ട്ഡോർ ഉപയോഗത്തിനായി ഉയർന്ന ദൃശ്യതീവ്രത നിറം| ദിനം| രാത്രി മോഡ്.</string>
     <string name="access_intermediate_arrival_time">ഇട-ലക്ഷ്യസ്ഥാനത്തെത്തുന്ന സമയം</string>

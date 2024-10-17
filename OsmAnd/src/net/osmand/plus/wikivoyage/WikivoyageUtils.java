@@ -9,7 +9,7 @@ import androidx.fragment.app.FragmentActivity;
 import com.squareup.picasso.NetworkPolicy;
 import com.squareup.picasso.RequestCreator;
 
-import net.osmand.GPXUtilities.WptPt;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
 import net.osmand.plus.OsmandApplication;
@@ -31,11 +31,12 @@ import static net.osmand.util.MapUtils.ROUNDING_ERROR;
 
 public class WikivoyageUtils {
 
-	private final static Log LOG = PlatformUtil.getLog(WikivoyageUtils.class);
+	private static final Log LOG = PlatformUtil.getLog(WikivoyageUtils.class);
 
 	private static final String GEO_PARAMS = "?lat=";
 	public static final String ARTICLE_TITLE = "article_title";
 	public static final String ARTICLE_LANG = "article_lang";
+	public static final String EN_LANG_PREFIX = "en:";
 
 	public static void setupNetworkPolicy(OsmandSettings settings, RequestCreator rc) {
 		switch (settings.WIKI_ARTICLE_SHOW_IMAGES.get()) {
@@ -54,7 +55,7 @@ public class WikivoyageUtils {
 
 	public static WptPt findNearestPoint(@NonNull List<WptPt> points, @NonNull String coordinates) {
 		double lat = Algorithms.parseDoubleSilently(coordinates.substring(0, coordinates.indexOf(",")), 0);
-		double lon = Algorithms.parseDoubleSilently(coordinates.substring(coordinates.indexOf(",") + 1), 0);;
+		double lon = Algorithms.parseDoubleSilently(coordinates.substring(coordinates.indexOf(",") + 1), 0);
 		for (WptPt point : points) {
 			if (MapUtils.getDistance(point.getLatitude(), point.getLongitude(), lat, lon) < ROUNDING_ERROR) {
 				return point;
@@ -66,7 +67,7 @@ public class WikivoyageUtils {
 	public static void processWikivoyageDomain(@NonNull FragmentActivity activity,
 	                                           @NonNull String url, boolean nightMode) {
 		OsmandApplication app = (OsmandApplication) activity.getApplicationContext();
-		String lang = WikiArticleHelper.getLang(url);
+		String lang = WikiArticleHelper.getLanguageFromUrl(url);
 		String articleName = WikiArticleHelper.getArticleNameFromUrl(url, lang);
 		TravelArticleIdentifier articleId = app.getTravelHelper().getArticleId(articleName, lang);
 		if (articleId != null) {
@@ -118,6 +119,11 @@ public class WikivoyageUtils {
 			}
 		}
 		return null;
+	}
+
+	@NonNull
+	public static String getTitleWithoutPrefix(@NonNull String title) {
+		return title.startsWith(EN_LANG_PREFIX) ? title.substring(EN_LANG_PREFIX.length()) : title;
 	}
 
 }

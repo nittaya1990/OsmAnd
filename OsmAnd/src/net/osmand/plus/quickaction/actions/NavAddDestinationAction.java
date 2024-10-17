@@ -1,5 +1,7 @@
 package net.osmand.plus.quickaction.actions;
 
+import static net.osmand.plus.quickaction.QuickActionIds.NAV_ADD_DESTINATION_ACTION_ID;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,10 +18,10 @@ import net.osmand.plus.quickaction.QuickActionType;
 public class NavAddDestinationAction extends QuickAction {
 
 
-	public static final QuickActionType TYPE = new QuickActionType(20,
+	public static final QuickActionType TYPE = new QuickActionType(NAV_ADD_DESTINATION_ACTION_ID,
 			"nav.destination.add", NavAddDestinationAction.class).
-			nameRes(R.string.quick_action_add_destination).iconRes(R.drawable.ic_action_point_add_destination).nonEditable().
-			category(QuickActionType.NAVIGATION);
+			nameRes(R.string.quick_action_destination).iconRes(R.drawable.ic_action_point_add_destination).nonEditable().
+			category(QuickActionType.NAVIGATION).nameActionRes(R.string.shared_string_set);
 
 	public NavAddDestinationAction() {
 		super(TYPE);
@@ -31,8 +33,8 @@ public class NavAddDestinationAction extends QuickAction {
 
 	@Override
 	public void execute(@NonNull MapActivity mapActivity) {
-		LatLon latLon = mapActivity.getMapView().getCurrentRotatedTileBox().getCenterLatLon();
-		mapActivity.getMapLayers().getMapControlsLayer().addDestination(latLon);
+		LatLon latLon = getMapLocation(mapActivity);
+		mapActivity.getMapLayers().getMapActionsHelper().addDestination(latLon);
 	}
 
 	@Override

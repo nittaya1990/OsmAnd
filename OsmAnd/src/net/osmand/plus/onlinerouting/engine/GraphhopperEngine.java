@@ -5,12 +5,15 @@ import androidx.annotation.Nullable;
 
 import net.osmand.Location;
 import net.osmand.data.LatLon;
+import net.osmand.gpx.GPXFile;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.onlinerouting.EngineParameter;
 import net.osmand.plus.onlinerouting.VehicleType;
 import net.osmand.plus.routing.RouteDirectionInfo;
+import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.TurnType;
+import net.osmand.shared.gpx.GpxFile;
 import net.osmand.util.GeoPolylineParserUtil;
 
 import org.json.JSONArray;
@@ -56,6 +59,11 @@ public class GraphhopperEngine extends JsonOnlineRoutingEngine {
 	}
 
 	@Override
+	public OnlineRoutingResponse responseByGpxFile(@NonNull OsmandApplication app, @NonNull GpxFile gpxFile, boolean initialCalculation, @Nullable RouteCalculationProgress calculationProgress) {
+		return null;
+	}
+
+	@Override
 	protected void collectAllowedParameters(@NonNull Set<EngineParameter> params) {
 		params.add(EngineParameter.KEY);
 		params.add(EngineParameter.VEHICLE_KEY);
@@ -84,8 +92,7 @@ public class GraphhopperEngine extends JsonOnlineRoutingEngine {
 	}
 
 	@Override
-	protected void makeFullUrl(@NonNull StringBuilder sb,
-	                           @NonNull List<LatLon> path) {
+	protected void makeFullUrl(@NonNull StringBuilder sb, @NonNull List<LatLon> path, @Nullable Float startBearing) {
 		sb.append("?");
 		for (int i = 0; i < path.size(); i++) {
 			LatLon point = path.get(i);
@@ -99,13 +106,15 @@ public class GraphhopperEngine extends JsonOnlineRoutingEngine {
 		}
 		String vehicle = getVehicleKeyForUrl();
 		if (!isEmpty(vehicle)) {
-			sb.append('&').append("vehicle=").append(vehicle);
+			if (!isCustomParameterizedVehicle()) {
+				sb.append('&').append("profile=");
+			}
+			sb.append(vehicle);
 		}
 		String apiKey = get(EngineParameter.API_KEY);
 		if (!isEmpty(apiKey)) {
 			sb.append('&').append("key=").append(apiKey);
 		}
-		sb.append('&').append("details=").append("lanes");
 	}
 
 	@Nullable

@@ -12,6 +12,8 @@ import net.osmand.PlatformUtil;
 import net.osmand.data.RotatedTileBox;
 import net.osmand.osm.io.NetworkUtils;
 import net.osmand.map.TileSourceManager.TileSourceTemplate;
+import net.osmand.plus.views.layers.MapTileLayer;
+import net.osmand.plus.views.layers.base.OsmandMapLayer;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
@@ -20,14 +22,14 @@ import android.graphics.Canvas;
 
 public class YandexTrafficAdapter  extends MapTileAdapter {
 
-	private final static Log log = PlatformUtil.getLog(MapTileLayer.class);
-	private final static String YANDEX_PREFFIX = ".YandexTraffic_";
-	private final static String YANDEX_BASE_URL = "https://core-jams-rdr.maps.yandex.net";
+	private static final Log log = PlatformUtil.getLog(MapTileLayer.class);
+	private static final String YANDEX_PREFFIX = ".YandexTraffic_";
+	private static final String YANDEX_BASE_URL = "https://core-jams-rdr.maps.yandex.net";
 	private static final long DELTA = 10 * 60 * 1000;
 	
 	private long lastTimestampUpdated;
-	private String mTimestamp = null;
-	private boolean updateThreadRan = false;
+	private String mTimestamp;
+	private boolean updateThreadRan;
 	
 	
 	@Override
@@ -42,17 +44,7 @@ public class YandexTrafficAdapter  extends MapTileAdapter {
 	protected void updateTimeStamp() {
 		if ((mTimestamp == null || (System.currentTimeMillis() - lastTimestampUpdated) > DELTA) && !updateThreadRan) {
 			updateThreadRan = true;
-			new Thread(new Runnable() {
-				@Override
-				public void run() {
-					try {
-						updateTimeStampImpl();
-					} finally {
-
-					}
-
-				}
-			}, "UpdateYandexTraffic").start();
+			new Thread(this::updateTimeStampImpl, "UpdateYandexTraffic").start();
 		}
 	}
 

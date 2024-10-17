@@ -9,7 +9,7 @@ import android.widget.ProgressBar;
 import androidx.appcompat.app.ActionBar;
 import androidx.appcompat.widget.Toolbar;
 
-import net.osmand.AndroidUtils;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.plus.R;
 
 public class ActionBarProgressActivity extends OsmandActionBarActivity {
@@ -41,7 +41,7 @@ public class ActionBarProgressActivity extends OsmandActionBarActivity {
 	}
 
 	public Toolbar getClearToolbar(boolean visible) {
-		final Toolbar tb = (Toolbar) findViewById(R.id.bottomControls);
+		Toolbar tb = findViewById(R.id.bottomControls);
 		if (tb != null) {
 			tb.setTitle(null);
 			tb.getMenu().clear();

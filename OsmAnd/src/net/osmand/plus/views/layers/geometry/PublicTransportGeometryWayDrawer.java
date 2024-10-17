@@ -6,15 +6,20 @@ import android.graphics.Matrix;
 import android.graphics.Paint;
 import android.graphics.Path;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import net.osmand.core.jni.VectorLinesCollection;
 import net.osmand.data.QuadRect;
 import net.osmand.data.QuadTree;
 import net.osmand.data.RotatedTileBox;
 import net.osmand.data.TransportStop;
-import net.osmand.plus.views.OsmandMapLayer;
-import net.osmand.plus.views.OsmandMapLayer.RenderingLineAttributes;
+import net.osmand.plus.views.layers.base.OsmandMapLayer;
+import net.osmand.plus.views.layers.base.OsmandMapLayer.RenderingLineAttributes;
 import net.osmand.plus.views.layers.geometry.PublicTransportGeometryWay.GeometryAnchorWayStyle;
 import net.osmand.plus.views.layers.geometry.PublicTransportGeometryWay.GeometryTransportWayStyle;
 import net.osmand.router.TransportRoutePlanner.TransportRouteResultSegment;
+import net.osmand.util.Algorithms;
 
 import java.util.ArrayList;
 import java.util.HashSet;
@@ -39,11 +44,11 @@ public class PublicTransportGeometryWayDrawer extends GeometryWayDrawer<PublicTr
 		GeometryWayStyle<?> style = pathData.style;
 		if (style instanceof GeometryTransportWayStyle) {
 			RenderingLineAttributes attrsPT = getContext().getAttrsPT();
-			attrsPT.customColor = style.getStrokeColor();
+			attrsPT.customColor = style.getStrokeColor(0);
 			attrsPT.customColorPaint.setStrokeWidth(attrsPT.paint2.getStrokeWidth());
 			attrsPT.drawPath(canvas, path);
 			attrsPT.customColorPaint.setStrokeWidth(attrsPT.paint.getStrokeWidth());
-			attrsPT.customColor = style.getColor();
+			attrsPT.customColor = style.getColor(0);
 			attrsPT.drawPath(canvas, path);
 		} else {
 			super.drawPath(canvas, pathData);
@@ -51,8 +56,41 @@ public class PublicTransportGeometryWayDrawer extends GeometryWayDrawer<PublicTr
 	}
 
 	@Override
-	public void drawArrowsOverPath(Canvas canvas, RotatedTileBox tb, List<Float> tx, List<Float> ty,
-								   List<Double> angles, List<Double> distances, double distPixToFinish, List<GeometryWayStyle<?>> styles) {
+	public void drawPath(@NonNull VectorLinesCollection collection, int baseOrder,
+	                     boolean shouldDrawArrows, @NonNull List<DrawPathData31> pathsData) {
+		int lineId = LINE_ID;
+		GeometryWayStyle<?> prevStyle = null;
+		List<DrawPathData31> dataArr = new ArrayList<>();
+		RenderingLineAttributes attrsPT = getContext().getAttrsPT();
+		float width = attrsPT.paint.getStrokeWidth();
+		float outlineWidth = attrsPT.paint2.getStrokeWidth();
+		for (DrawPathData31 data : pathsData) {
+			if (prevStyle != null && (!Algorithms.objectEquals(data.style, prevStyle) || data.style.isUnique())) {
+				if (prevStyle instanceof GeometryTransportWayStyle) {
+					int outlineColor = prevStyle.getStrokeColor(0);
+					drawVectorLine(collection, lineId++, baseOrder--, shouldDrawArrows, prevStyle,
+							prevStyle.getColor(0), width, outlineColor, outlineWidth, null, false, dataArr);
+				} else {
+					drawVectorLine(collection, lineId++, baseOrder--, shouldDrawArrows, true, prevStyle, dataArr);
+				}
+				dataArr.clear();
+			}
+			prevStyle = data.style;
+			dataArr.add(data);
+		}
+		if (!dataArr.isEmpty() && prevStyle != null) {
+			if (prevStyle instanceof GeometryTransportWayStyle) {
+				int outlineColor = prevStyle.getStrokeColor(0);
+				drawVectorLine(collection, lineId, baseOrder, shouldDrawArrows, prevStyle,
+						prevStyle.getColor(0), width, outlineColor, outlineWidth, null, false, dataArr);
+			} else {
+				drawVectorLine(collection, lineId, baseOrder, shouldDrawArrows, true, prevStyle, dataArr);
+			}
+		}
+	}
+
+	@Override
+	public void drawArrowsOverPath(@NonNull Canvas canvas, @NonNull RotatedTileBox tb, List<GeometryWayPoint> points, double distPixToFinish) {
 		PublicTransportGeometryWayContext context = getContext();
 
 		List<PathPoint> arrows = new ArrayList<>();
@@ -68,7 +106,6 @@ public class PublicTransportGeometryWayDrawer extends GeometryWayDrawer<PublicTr
 		int top = - h/4;
 		int bottom = h + h/4;
 
-		boolean hasStyles = styles != null && styles.size() == tx.size();
 		double zoomCoef = tb.getZoomAnimation() > 0 ? (Math.pow(2, tb.getZoomAnimation() + tb.getZoomFloatPart())) : 1f;
 
 		Bitmap arrow = context.getArrowBitmap();
@@ -81,14 +118,15 @@ public class PublicTransportGeometryWayDrawer extends GeometryWayDrawer<PublicTr
 		}
 
 		GeometryWayStyle<?> prevStyle = null;
-		for (int i = tx.size() - 2; i >= 0; i --) {
-			GeometryWayStyle<?> style = hasStyles ? styles.get(i) : null;
-			float px = tx.get(i);
-			float py = ty.get(i);
-			float x = tx.get(i + 1);
-			float y = ty.get(i + 1);
-			double distSegment = distances.get(i + 1);
-			double angle = angles.get(i + 1);
+		for (int i = points.size() - 2; i >= 0; i --) {
+			GeometryWayPoint pnt = points.get(i);
+			GeometryWayStyle<?> style = pnt.style;
+			float px = points.get(i).tx;
+			float py = points.get(i).ty;
+			float x = points.get(i + 1).tx;
+			float y = points.get(i + 1).ty;
+			double distSegment = points.get(i + 1).distance;
+			double angle = points.get(i + 1).angle;
 			if (distSegment == 0) {
 				continue;
 			}
@@ -112,7 +150,7 @@ public class PublicTransportGeometryWayDrawer extends GeometryWayDrawer<PublicTr
 				double pdy = (y - py) * percent;
 				float iconx = (float) (px + pdx);
 				float icony = (float) (py + pdy);
-				if (GeometryWay.isIn(iconx, icony, left, top, right, bottom)) {
+				if (GeometryWayPathAlgorithms.isIn(iconx, icony, left, top, right, bottom)) {
 					arrows.add(new PathPoint(iconx, icony, angle, style));
 				}
 				dist -= pxStep;
@@ -131,7 +169,7 @@ public class PublicTransportGeometryWayDrawer extends GeometryWayDrawer<PublicTr
 				double lon = stop.getLocation().getLongitude();
 				float x = tb.getPixXFromLatLon(lat, lon);
 				float y = tb.getPixYFromLatLon(lat, lon);
-				if (GeometryWay.isIn(x, y, left, top, right, bottom)) {
+				if (GeometryWayPathAlgorithms.isIn(x, y, left, top, right, bottom)) {
 					if (i != start && i != end) {
 						stops.add(new PathTransportStop(x, y, style));
 					}
@@ -204,21 +242,29 @@ public class PublicTransportGeometryWayDrawer extends GeometryWayDrawer<PublicTr
 			return (GeometryTransportWayStyle) style;
 		}
 
+		@Nullable
+		@Override
+		protected Bitmap getPointBitmap() {
+			return smallPoint
+					? getTransportWayStyle().getStopSmallBitmap()
+					: getTransportWayStyle().getStopBitmap();
+		}
 
 		@Override
-		void draw(Canvas canvas, GeometryWayContext context) {
-			Bitmap stopBitmap = smallPoint ?
-					getTransportWayStyle().getStopSmallBitmap() : getTransportWayStyle().getStopBitmap();
-			float paintH2 = stopBitmap.getHeight() / 2f;
-			float paintW2 = stopBitmap.getWidth() / 2f;
+		protected void draw(@NonNull Canvas canvas, @NonNull GeometryWayContext context) {
+			Bitmap stopBitmap = getPointBitmap();
+			if (stopBitmap != null) {
+				float paintH2 = stopBitmap.getHeight() / 2f;
+				float paintW2 = stopBitmap.getWidth() / 2f;
 
-			Matrix matrix = getMatrix();
-			matrix.reset();
-			matrix.postRotate(0f, paintW2, paintH2);
-			matrix.postTranslate(x - paintW2, y - paintH2);
-			Paint paint = context.getPaintIconCustom();
-			paint.setColorFilter(null);
-			canvas.drawBitmap(stopBitmap, matrix, paint);
+				Matrix matrix = getMatrix();
+				matrix.reset();
+				matrix.postRotate(0f, paintW2, paintH2);
+				matrix.postTranslate(x - paintW2, y - paintH2);
+				Paint paint = context.getPaintIconCustom();
+				paint.setColorFilter(null);
+				canvas.drawBitmap(stopBitmap, matrix, paint);
+			}
 		}
 	}
 }

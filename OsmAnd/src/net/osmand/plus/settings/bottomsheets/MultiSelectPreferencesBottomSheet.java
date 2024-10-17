@@ -9,13 +9,12 @@ import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
 import net.osmand.PlatformUtil;
-import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.base.bottomsheetmenu.BaseBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.BottomSheetItemWithCompoundButton;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.LongDescriptionItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.TitleItem;
+import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.settings.fragments.OnPreferenceChanged;
 import net.osmand.plus.settings.preferences.MultiSelectBooleanPreference;
 import net.osmand.util.Algorithms;
@@ -41,13 +40,13 @@ public class MultiSelectPreferencesBottomSheet extends BasePreferenceBottomSheet
 
 	private String[] prefsIds;
 	private CharSequence[] entries;
-	private Set<String> enabledPrefs = new HashSet<>();
+	private final Set<String> enabledPrefs = new HashSet<>();
 
 	private boolean prefChanged;
 
 	@Override
 	public void createMenuItems(Bundle savedInstanceState) {
-		final OsmandApplication app = getMyApplication();
+		OsmandApplication app = getMyApplication();
 		multiSelectBooleanPreference = getListPreference();
 		if (app == null || multiSelectBooleanPreference == null) {
 			return;
@@ -68,8 +67,8 @@ public class MultiSelectPreferencesBottomSheet extends BasePreferenceBottomSheet
 			String prefTitle = entries[i].toString();
 			boolean selected = enabledPrefs.contains(prefId);
 
-			final int index = i;
-			final BottomSheetItemWithCompoundButton[] item = new BottomSheetItemWithCompoundButton[1];
+			int index = i;
+			BottomSheetItemWithCompoundButton[] item = new BottomSheetItemWithCompoundButton[1];
 			item[0] = (BottomSheetItemWithCompoundButton) new BottomSheetItemWithCompoundButton.Builder()
 					.setChecked(selected)
 					.setTitle(prefTitle)
@@ -96,17 +95,6 @@ public class MultiSelectPreferencesBottomSheet extends BasePreferenceBottomSheet
 	}
 
 	@Override
-	public void onResume() {
-		super.onResume();
-		for (BaseBottomSheetItem item : items) {
-			if (item instanceof BottomSheetItemWithCompoundButton) {
-				String prefId = (String) item.getTag();
-				((BottomSheetItemWithCompoundButton) item).setChecked(enabledPrefs.contains(prefId));
-			}
-		}
-	}
-
-	@Override
 	public void onSaveInstanceState(@NonNull Bundle outState) {
 		super.onSaveInstanceState(outState);
 		outState.putBoolean(PREFERENCE_CHANGED, prefChanged);
@@ -123,7 +111,7 @@ public class MultiSelectPreferencesBottomSheet extends BasePreferenceBottomSheet
 	@Override
 	protected void onRightBottomButtonClick() {
 		if (prefChanged) {
-			final Set<String> values = enabledPrefs;
+			Set<String> values = enabledPrefs;
 			if (multiSelectBooleanPreference.callChangeListener(values)) {
 				multiSelectBooleanPreference.setValues(values);
 

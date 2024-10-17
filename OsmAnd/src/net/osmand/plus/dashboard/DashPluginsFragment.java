@@ -1,8 +1,6 @@
 package net.osmand.plus.dashboard;
 
-import android.content.Intent;
 import android.content.res.TypedArray;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -13,20 +11,19 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentActivity;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.OsmandPlugin;
 import net.osmand.plus.R;
-import net.osmand.plus.activities.PluginsFragment;
-import net.osmand.plus.chooseplan.ChoosePlanFragment;
-import net.osmand.plus.chooseplan.OsmAndFeature;
+import net.osmand.plus.chooseplan.ChoosePlanUtils;
 import net.osmand.plus.dashboard.tools.DashFragmentData;
-import net.osmand.plus.development.OsmandDevelopmentPlugin;
-import net.osmand.plus.openseamapsplugin.NauticalMapsPlugin;
-import net.osmand.plus.skimapsplugin.SkiMapsPlugin;
-import net.osmand.plus.srtmplugin.SRTMPlugin;
+import net.osmand.plus.plugins.OsmandPlugin;
+import net.osmand.plus.plugins.PluginsFragment;
+import net.osmand.plus.plugins.PluginsHelper;
+import net.osmand.plus.plugins.development.OsmandDevelopmentPlugin;
+import net.osmand.plus.plugins.openseamaps.NauticalMapsPlugin;
+import net.osmand.plus.plugins.skimaps.SkiMapsPlugin;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -49,48 +46,34 @@ public class DashPluginsFragment extends DashBaseFragment {
 			};
 	private List<OsmandPlugin> plugins;
 
-	private View.OnClickListener getListener(final OsmandPlugin plugin) {
+	private View.OnClickListener getListener(@NonNull OsmandPlugin plugin) {
 		return view -> {
-			FragmentActivity activity = getActivity();
-			if (activity != null) {
-				if (plugin instanceof SRTMPlugin) {
-					ChoosePlanFragment.showInstance(activity, OsmAndFeature.TERRAIN);
-				} else {
-					Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(plugin.getInstallURL()));
-					AndroidUtils.startActivityIfSafe(activity, intent);
-				}
-			}
+			ChoosePlanUtils.onGetPlugin(getActivity(), plugin);
 			closeDashboard();
 		};
 	}
 
-	private final View.OnClickListener pluginDetailsListener() {
-		return new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				FragmentActivity activity = getActivity();
-				if (activity != null) {
-					PluginsFragment.showInstance(activity.getSupportFragmentManager());
-				}
-				closeDashboard();
+	private View.OnClickListener pluginDetailsListener() {
+		return view -> {
+			FragmentActivity activity = getActivity();
+			if (activity != null) {
+				PluginsFragment.showInstance(activity.getSupportFragmentManager());
 			}
+			closeDashboard();
 		};
 	}
 
 	@Override
 	public View initView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
 		View view = inflater.inflate(R.layout.dash_common_fragment, container, false);
-		TextView header = ((TextView) view.findViewById(R.id.fav_text));
+		TextView header = view.findViewById(R.id.fav_text);
 		header.setText(TITLE_ID);
-		view.findViewById(R.id.show_all).setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				FragmentActivity activity = getActivity();
-				if (activity != null) {
-					PluginsFragment.showInstance(activity.getSupportFragmentManager());
-				}
-				closeDashboard();
+		view.findViewById(R.id.show_all).setOnClickListener(v -> {
+			FragmentActivity activity = getActivity();
+			if (activity != null) {
+				PluginsFragment.showInstance(activity.getSupportFragmentManager());
 			}
+			closeDashboard();
 		});
 		initPlugins();
 		return view;
@@ -98,16 +81,16 @@ public class DashPluginsFragment extends DashBaseFragment {
 
 
 	private void initPlugins() {
-		List<OsmandPlugin> notFunctionalPlugins = OsmandPlugin.getNotActivePlugins();
-		notFunctionalPlugins.remove(OsmandPlugin.getPlugin(SkiMapsPlugin.class));
-		notFunctionalPlugins.remove(OsmandPlugin.getPlugin(NauticalMapsPlugin.class));
+		List<OsmandPlugin> notFunctionalPlugins = PluginsHelper.getNotActivePlugins();
+		notFunctionalPlugins.remove(PluginsHelper.getPlugin(SkiMapsPlugin.class));
+		notFunctionalPlugins.remove(PluginsHelper.getPlugin(NauticalMapsPlugin.class));
 		Collections.shuffle(notFunctionalPlugins);
 
-		List<OsmandPlugin> enabledPlugins = OsmandPlugin.getActivePlugins();
-		enabledPlugins.remove(OsmandPlugin.getPlugin(SkiMapsPlugin.class));
-		enabledPlugins.remove(OsmandPlugin.getPlugin(NauticalMapsPlugin.class));
+		List<OsmandPlugin> enabledPlugins = PluginsHelper.getActivePlugins();
+		enabledPlugins.remove(PluginsHelper.getPlugin(SkiMapsPlugin.class));
+		enabledPlugins.remove(PluginsHelper.getPlugin(NauticalMapsPlugin.class));
 
-		plugins = new ArrayList<OsmandPlugin>();
+		plugins = new ArrayList<>();
 		Iterator<OsmandPlugin> nit = notFunctionalPlugins.iterator();
 		Iterator<OsmandPlugin> it = enabledPlugins.iterator();
 		addPluginsToLimit(nit, 1);
@@ -130,7 +113,7 @@ public class DashPluginsFragment extends DashBaseFragment {
 	public void onOpenDash() {
 		View contentView = getView();
 		LayoutInflater inflater = getActivity().getLayoutInflater();
-		LinearLayout pluginsContainer = (LinearLayout) contentView.findViewById(R.id.items);
+		LinearLayout pluginsContainer = contentView.findViewById(R.id.items);
 		pluginsContainer.removeAllViews();
 		for (OsmandPlugin p : plugins) {
 			inflatePluginView(inflater, pluginsContainer, p);
@@ -138,8 +121,8 @@ public class DashPluginsFragment extends DashBaseFragment {
 	}
 
 	private void updatePluginState(View pluginView, OsmandPlugin plugin) {
-		CompoundButton enableDisableButton = (CompoundButton) pluginView.findViewById(R.id.plugin_enable_disable);
-		Button getButton = (Button) pluginView.findViewById(R.id.get_plugin);
+		CompoundButton enableDisableButton = pluginView.findViewById(R.id.plugin_enable_disable);
+		Button getButton = pluginView.findViewById(R.id.get_plugin);
 		enableDisableButton.setOnCheckedChangeListener(null);
 		if (plugin.isLocked()) {
 			getButton.setVisibility(View.VISIBLE);
@@ -151,47 +134,43 @@ public class DashPluginsFragment extends DashBaseFragment {
 		}
 		setListener(plugin, enableDisableButton, pluginView);
 
-		ImageButton logoView = (ImageButton) pluginView.findViewById(R.id.plugin_logo);
+		ImageButton logoView = pluginView.findViewById(R.id.plugin_logo);
 		if (plugin.isEnabled()) {
 			logoView.setBackgroundResource(R.drawable.bg_plugin_logo_enabled_light);
 			logoView.setContentDescription(getString(R.string.shared_string_disable));
 		} else {
 			TypedArray attributes = getActivity().getTheme().obtainStyledAttributes(
 					new int[]{R.attr.bg_plugin_logo_disabled});
-			logoView.setBackgroundDrawable(attributes.getDrawable(0));
+			logoView.setBackground(attributes.getDrawable(0));
 			logoView.setContentDescription(getString(plugin.isLocked() ? R.string.access_shared_string_not_installed : R.string.shared_string_enable));
 			attributes.recycle();
 		}
 	}
 
-	private void inflatePluginView(LayoutInflater inflater, ViewGroup container, final OsmandPlugin plugin) {
+	private void inflatePluginView(LayoutInflater inflater, ViewGroup container, OsmandPlugin plugin) {
 		View view = inflater.inflate(R.layout.dash_plugin_item, container, false);
 		view.setOnClickListener(pluginDetailsListener());
 
-		TextView nameView = (TextView) view.findViewById(R.id.plugin_name);
+		TextView nameView = view.findViewById(R.id.plugin_name);
 		nameView.setText(plugin.getName());
 
-		ImageButton logoView = (ImageButton) view.findViewById(R.id.plugin_logo);
+		ImageButton logoView = view.findViewById(R.id.plugin_logo);
 		logoView.setImageResource(plugin.getLogoResourceId());
 
-		CompoundButton enableDisableButton = (CompoundButton) view.findViewById(R.id.plugin_enable_disable);
-		Button getButton = (Button) view.findViewById(R.id.get_plugin);
-		getButton.setText(plugin.isPaid() ? R.string.get_plugin : R.string.shared_string_install);
+		CompoundButton enableDisableButton = view.findViewById(R.id.plugin_enable_disable);
+		Button getButton = view.findViewById(R.id.get_plugin);
+		getButton.setText(plugin.isPaid() ? R.string.shared_string_get : R.string.shared_string_install);
 		getButton.setOnClickListener(getListener(plugin));
 		enableDisableButton.setOnCheckedChangeListener(null);
 		updatePluginState(view, plugin);
-		final View pluginView = view;
-		setListener(plugin, enableDisableButton, pluginView);
+		setListener(plugin, enableDisableButton, view);
 		container.addView(view);
 	}
 
-	private void setListener(final OsmandPlugin plugin, CompoundButton enableDisableButton, final View pluginView) {
-		enableDisableButton.setOnCheckedChangeListener(new CompoundButton.OnCheckedChangeListener() {
-			@Override
-			public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-				if (OsmandPlugin.enablePluginIfNeeded(getActivity(), getMyApplication(), plugin, isChecked)) {
-					updatePluginState(pluginView, plugin);
-				}
+	private void setListener(OsmandPlugin plugin, CompoundButton enableDisableButton, View pluginView) {
+		enableDisableButton.setOnCheckedChangeListener((buttonView, isChecked) -> {
+			if (PluginsHelper.enablePluginIfNeeded(getActivity(), getMyApplication(), plugin, isChecked)) {
+				updatePluginState(pluginView, plugin);
 			}
 		});
 	}

@@ -11,18 +11,18 @@ import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
-import net.osmand.GPXUtilities.WptPt;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.Location;
 import net.osmand.data.LatLon;
 import net.osmand.data.PointDescription;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.GeocodingLookupService.AddressLookupRequest;
 import net.osmand.plus.GeocodingLookupService.OnAddressLookupResult;
 import net.osmand.plus.mapmarkers.MapMarker;
-import net.osmand.plus.OsmAndFormatter;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.util.MapUtils;
 
@@ -37,8 +37,8 @@ public class MapMarkersListAdapter extends RecyclerView.Adapter<MapMarkerItemVie
 	private static final int LOCATION_ITEM_ID = 0;
 	private static final int ROUND_TRIP_FINISH_ITEM_ID = 1;
 
-	private MapActivity mapActivity;
-	private List<Object> items = new LinkedList<>();
+	private final MapActivity mapActivity;
+	private final List<Object> items = new LinkedList<>();
 	private MapMarkersListAdapterListener listener;
 
 	private int startPos = -1;
@@ -48,7 +48,7 @@ public class MapMarkersListAdapter extends RecyclerView.Adapter<MapMarkerItemVie
 	private boolean showLocationItem;
 	private Location myLoc;
 	private AddressLookupRequest locRequest;
-	private PointDescription locDescription;
+	private final PointDescription locDescription;
 
 	private Map<Pair<WptPt, WptPt>, List<WptPt>> snappedToRoadPoints;
 
@@ -85,7 +85,7 @@ public class MapMarkersListAdapter extends RecyclerView.Adapter<MapMarkerItemVie
 	}
 
 	@Override
-	public void onBindViewHolder(final MapMarkerItemViewHolder holder, int pos) {
+	public void onBindViewHolder(MapMarkerItemViewHolder holder, int pos) {
 		OsmandApplication app = mapActivity.getMyApplication();
 		boolean night = app.getDaynightHelper().isNightModeForMapControls();
 		UiUtilities iconsCache = app.getUIUtilities();
@@ -94,7 +94,7 @@ public class MapMarkersListAdapter extends RecyclerView.Adapter<MapMarkerItemVie
 		boolean firstMarkerItem = showLocationItem ? pos == 1 : pos == 0;
 		boolean lastMarkerItem = pos == getItemCount() - 1;
 		boolean start = pos == startPos;
-		final boolean finish = pos == finishPos && startPos != finishPos;
+		boolean finish = pos == finishPos && startPos != finishPos;
 		boolean firstSelectedMarker = pos == firstSelectedMarkerPos;
 		boolean roundTripFinishItem = finish && showRoundTripItem;
 
@@ -110,7 +110,7 @@ public class MapMarkersListAdapter extends RecyclerView.Adapter<MapMarkerItemVie
 		}
 
 		holder.mainLayout.setBackgroundColor(ColorUtilities.getListBgColor(mapActivity, night));
-		holder.title.setTextColor(ContextCompat.getColor(mapActivity, night ? R.color.color_white : R.color.color_black));
+		holder.title.setTextColor(ContextCompat.getColor(mapActivity, night ? R.color.card_and_list_background_light : R.color.activity_background_color_dark));
 		holder.title.setText(location != null ? mapActivity.getString(R.string.shared_string_my_location) : marker.getName(mapActivity));
 		holder.iconDirection.setVisibility(View.GONE);
 		holder.optionsBtn.setVisibility(roundTripFinishItem ? View.VISIBLE : View.GONE);
@@ -126,7 +126,7 @@ public class MapMarkersListAdapter extends RecyclerView.Adapter<MapMarkerItemVie
 				}
 			});
 		}
-		holder.divider.setBackgroundColor(ContextCompat.getColor(mapActivity, night ? R.color.app_bar_color_dark : R.color.divider_color_light));
+		holder.divider.setBackgroundColor(ContextCompat.getColor(mapActivity, night ? R.color.app_bar_main_dark : R.color.divider_color_light));
 		holder.divider.setVisibility(lastMarkerItem ? View.GONE : View.VISIBLE);
 		holder.checkBox.setVisibility(roundTripFinishItem ? View.GONE : View.VISIBLE);
 		if (!roundTripFinishItem) {
@@ -221,19 +221,19 @@ public class MapMarkersListAdapter extends RecyclerView.Adapter<MapMarkerItemVie
 			float dist = 0;
 			if (first != null && marker != null) {
 				WptPt pt1 = new WptPt();
-				pt1.lat = first.getLatitude();
-				pt1.lon = first.getLongitude();
+				pt1.setLat(first.getLatitude());
+				pt1.setLon(first.getLongitude());
 				WptPt pt2 = new WptPt();
-				pt2.lat = marker.getLatitude();
-				pt2.lon = marker.getLongitude();
+				pt2.setLat(marker.getLatitude());
+				pt2.setLon(marker.getLongitude());
 				List<WptPt> points = snappedToRoadPoints.get(new Pair<>(pt1, pt2));
 				if (points != null) {
 					for (int i = 0; i < points.size() - 1; i++) {
-						dist += (float) MapUtils.getDistance(points.get(i).lat, points.get(i).lon,
-								points.get(i + 1).lat, points.get(i + 1).lon);
+						dist += (float) MapUtils.getDistance(points.get(i).getLat(), points.get(i).getLon(),
+								points.get(i + 1).getLat(), points.get(i + 1).getLon());
 					}
 				} else {
-					dist = (float) MapUtils.getDistance(pt1.lat, pt1.lon, pt2.lat, pt2.lon);
+					dist = (float) MapUtils.getDistance(pt1.getLat(), pt1.getLon(), pt2.getLat(), pt2.getLon());
 				}
 			}
 			holder.distance.setText(OsmAndFormatter.getFormattedDistance(dist, app));

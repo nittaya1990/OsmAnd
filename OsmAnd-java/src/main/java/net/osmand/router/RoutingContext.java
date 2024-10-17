@@ -5,11 +5,11 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
-import java.util.Date;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.HashSet;
 import java.util.Map.Entry;
 
 import org.apache.commons.logging.Log;
@@ -29,9 +29,11 @@ import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
 import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.QuadPoint;
+import net.osmand.data.QuadPointDouble;
 import net.osmand.data.QuadRect;
 import net.osmand.router.BinaryRoutePlanner.FinalRouteSegment;
 import net.osmand.router.BinaryRoutePlanner.RouteSegment;
+import net.osmand.router.BinaryRoutePlanner.RouteSegmentPoint;
 import net.osmand.router.BinaryRoutePlanner.RouteSegmentVisitor;
 import net.osmand.router.RoutePlannerFrontEnd.RouteCalculationMode;
 import net.osmand.router.RoutingConfiguration.DirectionPoint;
@@ -41,6 +43,7 @@ import net.osmand.util.MapUtils;
 public class RoutingContext {
 
 	public static boolean SHOW_GC_SIZE = false;
+	public static boolean PRINT_ROUTING_ALERTS = false;
 	 
 	
 	private final static Log log = PlatformUtil.getLog(RoutingContext.class);
@@ -48,9 +51,9 @@ public class RoutingContext {
 	// Final context variables
 	public final RoutingConfiguration config;
 	public final RouteCalculationMode calculationMode;
-	public final NativeLibrary nativeLib;
 	public final Map<BinaryMapIndexReader, List<RouteSubregion>> map = new LinkedHashMap<BinaryMapIndexReader, List<RouteSubregion>>();
 	public final Map<RouteRegion, BinaryMapIndexReader> reverseMap = new LinkedHashMap<RouteRegion, BinaryMapIndexReader>();
+	public NativeLibrary nativeLib;
 	
 	// 0. Reference to native routingcontext for multiple routes
 	public long nativeRoutingContext;
@@ -64,14 +67,18 @@ public class RoutingContext {
 	public boolean startTransportStop;
 	public int targetX;
 	public int targetY;
+	public int[] intermediatesX;
+	public int[] intermediatesY;
 	public long targetRoadId;
 	public int targetSegmentInd;
 	public boolean targetTransportStop;
-	
+	public int dijkstraMode;
 	public boolean publicTransport;
+	public HashSet<BinaryMapIndexReader> mapIndexReaderFilter = new HashSet<>();
 	
 	
 	public RouteCalculationProgress calculationProgress;
+	public RouteCalculationProgress calculationProgressFirstPhase;
 	public boolean leftSideNavigation;
 	public List<RouteSegmentResult> previouslyCalculatedRoute;
 	public PrecalculatedRouteDirection precalculatedRouteDirection;
@@ -97,10 +104,12 @@ public class RoutingContext {
 	// callback of processing segments
 	RouteSegmentVisitor visitor = null;
 
+	public int alertFasterRoadToVisitedSegments;
+	public int alertSlowerSegmentedWasVisitedEarlier;
+	
 	// old planner
 	public FinalRouteSegment finalRouteSegment;
-
-
+	
 	
 	RoutingContext(RoutingContext cp) {
 		this.config = cp.config;
@@ -109,27 +118,13 @@ public class RoutingContext {
 		this.leftSideNavigation = cp.leftSideNavigation;
 		this.reverseMap.putAll(cp.reverseMap);
 		this.nativeLib = cp.nativeLib;
-		// copy local data and clear caches
-		for(RoutingSubregionTile tl : subregionTiles) {
-			if(tl.isLoaded()) {
-				subregionTiles.add(tl);
-				for (RouteSegment rs : tl.routes.valueCollection()) {
-					RouteSegment s = rs;
-					while (s != null) {
-						s.parentRoute = null;
-						s.parentSegmentEnd = 0;
-						s.distanceFromStart = 0;
-						s.distanceToEnd = 0;
-						s = s.next;
-					}
-				}
-			}
-		}
+		this.visitor = cp.visitor;
+		this.calculationProgress = cp.calculationProgress;
 	}
 	
-	RoutingContext(RoutingConfiguration config, NativeLibrary nativeLibrary, BinaryMapIndexReader[] map, RouteCalculationMode calcMode) {
+	RoutingContext(RoutingConfiguration config, NativeLibrary nativeLibrary, BinaryMapIndexReader[] list, RouteCalculationMode calcMode) {
 		this.calculationMode = calcMode;
-		for (BinaryMapIndexReader mr : map) {
+		for (BinaryMapIndexReader mr : list) {
 			List<RouteRegion> rr = mr.getRoutingIndexes();
 			List<RouteSubregion> subregions = new ArrayList<BinaryMapRouteReaderAdapter.RouteSubregion>();
 			for (RouteRegion r : rr) {
@@ -144,6 +139,8 @@ public class RoutingContext {
 		}
 		this.config = config;
 		this.nativeLib = nativeLibrary;
+		this.intermediatesX = new int[0];
+		this.intermediatesY = new int[0];
 	}
 	
 	
@@ -190,23 +187,17 @@ public class RoutingContext {
 		return config.planRoadDirection;
 	}
 
-
-	public int roadPriorityComparator(double o1DistanceFromStart, double o1DistanceToEnd, double o2DistanceFromStart, double o2DistanceToEnd) {
-		return BinaryRoutePlanner.roadPriorityComparator(o1DistanceFromStart, o1DistanceToEnd, o2DistanceFromStart, o2DistanceToEnd,
-				config.heuristicCoefficient);
-	}
-	
-	public void initStartAndTargetPoints(RouteSegment start, RouteSegment end) {
+	public void initStartAndTargetPoints(RouteSegmentPoint start, RouteSegmentPoint end) {
 		initTargetPoint(end);
-		startX = start.road.getPoint31XTile(start.getSegmentStart());
-		startY = start.road.getPoint31YTile(start.getSegmentStart());
+		startX = start.preciseX;
+		startY = start.preciseY;
 		startRoadId = start.road.getId();
 		startSegmentInd = start.getSegmentStart();
 	}
 
-	public void initTargetPoint(RouteSegment end) {
-		targetX = end.road.getPoint31XTile(end.getSegmentStart());
-		targetY = end.road.getPoint31YTile(end.getSegmentStart());
+	public void initTargetPoint(RouteSegmentPoint end) {
+		targetX = end.preciseX;
+		targetY = end.preciseY;
 		targetRoadId = end.road.getId();
 		targetSegmentInd = end.getSegmentStart();
 	}
@@ -220,7 +211,7 @@ public class RoutingContext {
 			if (tl.isLoaded()) {
 				if(except == null || except.searchSubregionTile(tl.subregion) < 0){
 					tl.unload();
-					if(calculationProgress != null) {
+					if (calculationProgress != null) {
 						calculationProgress.unloadedTiles ++;
 					}
 					global.size -= tl.tileStatistics.size;
@@ -229,6 +220,7 @@ public class RoutingContext {
 		}
 		subregionTiles.clear();
 		indexedSubregions.clear();
+		mapIndexReaderFilter = new HashSet<>();
 	}
 	
 	private int searchSubregionTile(RouteSubregion subregion){
@@ -256,8 +248,11 @@ public class RoutingContext {
 		return ind;
 	}
 	
-	
 	public RouteSegment loadRouteSegment(int x31, int y31, long memoryLimit) {
+		return loadRouteSegment(x31, y31, memoryLimit, false);
+	}
+	
+	public RouteSegment loadRouteSegment(int x31, int y31, long memoryLimit, boolean reverseWaySearch) {
 		long tileId = getRoutingTile(x31, y31, memoryLimit);
 		TLongObjectHashMap<RouteDataObject> excludeDuplications = new TLongObjectHashMap<RouteDataObject>();
 		RouteSegment original = null;
@@ -265,17 +260,17 @@ public class RoutingContext {
 		if (subregions != null) {
 			for (int j = 0; j < subregions.size(); j++) {
 				original = subregions.get(j).loadRouteSegment(x31, y31, this, excludeDuplications, 
-						original, subregions, j);
+						original, subregions, j, reverseWaySearch);
 			}
 		}
 		return original;
 	}
 	
 	public void loadSubregionTile(final RoutingSubregionTile ts, boolean loadObjectsInMemory, List<RouteDataObject> toLoad, TLongHashSet excludeNotAllowed) {
+		long now = System.nanoTime();
 		boolean wasUnloaded = ts.isUnloaded();
 		int ucount = ts.getUnloadCont();
 		if (nativeLib == null) {
-			long now = System.nanoTime();
 
 			List<DirectionPoint> points = Collections.emptyList();
 			if (config.getDirectionPoints() != null) {
@@ -330,18 +325,11 @@ public class RoutingContext {
 			} catch (IOException e) {
 				throw new RuntimeException("Loading data exception", e);
 			}
-			if (calculationProgress != null) {
-				calculationProgress.timeToLoad += (System.nanoTime() - now);
-			}
-			
 		} else {
-			long now = System.nanoTime();
+			
 			NativeRouteSearchResult ns = nativeLib.loadRouteRegion(ts.subregion, loadObjectsInMemory);
 //			System.out.println(ts.subregion.shiftToData + " " + Arrays.toString(ns.objects));
 			ts.setLoadedNative(ns, this);
-			if (calculationProgress != null) {
-				calculationProgress.timeToLoad += (System.nanoTime() - now);
-			}
 		}
 		if (calculationProgress != null) {
 			calculationProgress.loadedTiles++;
@@ -363,37 +351,8 @@ public class RoutingContext {
 			}
 		}
 		global.size += ts.tileStatistics.size;
-	}
-
-	
-
-	private List<RoutingSubregionTile> loadTileHeaders(final int x31, final int y31) {
-		final int zoomToLoad = 31 - config.ZOOM_TO_LOAD_TILES;
-		int tileX = x31 >> zoomToLoad;
-		int tileY = y31 >> zoomToLoad;
-		return loadTileHeaders(zoomToLoad, tileX, tileY);
-	}
-	
-	public void checkOldRoutingFiles(BinaryMapIndexReader key) {
-		if(calculationMode == RouteCalculationMode.BASE && key.getDateCreated() < 1390172400000l) { // new SimpleDateFormat("dd-MM-yyyy").parse("20-01-2014").getTime()
-			System.err.println("Old routing file : " + key.getDateCreated() + " " + new Date(key.getDateCreated()));
-			String map = "";
-			for (RouteRegion r : key.getRoutingIndexes()) {
-				map = r.getName();
-			}
- 			throw new RuntimeException("Update map '"+map+ "' !");
-		}		
-	}
-	
-	public void checkOldRoutingFiles(int x31, int y31) {
-		for (Entry<BinaryMapIndexReader, List<RouteSubregion>> r : map.entrySet()) {
-			BinaryMapIndexReader reader = r.getKey();
-			for(RouteRegion reg : reader.getRoutingIndexes()) {
-				if(reg.contains(x31, y31)) {
-					checkOldRoutingFiles(reader);
-					break;
-				}
-			}
+		if (calculationProgress != null) {
+			calculationProgress.timeToLoad += (System.nanoTime() - now);
 		}
 	}
 	
@@ -408,20 +367,38 @@ public class RoutingContext {
 		return list;
 	}
 
-	public List<RoutingSubregionTile> loadTileHeaders(final int zoomToLoadM31, int tileX, int tileY) {
-		SearchRequest<RouteDataObject> request = BinaryMapIndexReader.buildSearchRouteRequest(tileX << zoomToLoadM31,
-				(tileX + 1) << zoomToLoadM31, tileY << zoomToLoadM31, (tileY + 1) << zoomToLoadM31, null);
+	public List<RoutingSubregionTile> loadTileHeaders(int x31, int y31) {
+		final int zoomToLoad = 31 - config.ZOOM_TO_LOAD_TILES;
+		int tileX = x31 >> zoomToLoad;
+		int tileY = y31 >> zoomToLoad;
+		
+		long now = System.nanoTime();
+		SearchRequest<RouteDataObject> request = BinaryMapIndexReader.buildSearchRouteRequest(tileX << zoomToLoad,
+				(tileX + 1) << zoomToLoad, tileY << zoomToLoad, (tileY + 1) << zoomToLoad, null);
 		List<RoutingSubregionTile> collection = null;
 		for (Entry<BinaryMapIndexReader, List<RouteSubregion>> r : map.entrySet()) {
+			BinaryMapIndexReader reader = r.getKey();
+			boolean isLiveUpdate = reader.getHHRoutingIndexes().size() == 0;
+			if (!isLiveUpdate && mapIndexReaderFilter.size() > 0 && !mapIndexReaderFilter.contains(r.getKey())) {
+				continue;
+			}
 			// NOTE: load headers same as we do in non-native (it is not native optimized)
 			try {
-				if (r.getValue().size() > 0) {
-					long now = System.nanoTime();
-					// int rg = r.getValue().get(0).routeReg.regionsRead;
-					List<RouteSubregion> subregs = r.getKey().searchRouteIndexTree(request, r.getValue());
-					if(subregs.size() > 0) {
-						checkOldRoutingFiles(r.getKey());
+				boolean intersect = false;
+				for (RouteSubregion rs : r.getValue()) {
+					if (request.intersects(rs.left, rs.top, rs.right, rs.bottom)) {
+						intersect = true;
+						break;
 					}
+				}
+				if (intersect) {
+//					long now = System.nanoTime();
+					// int rg = r.getValue().get(0).routeReg.regionsRead;
+					
+					List<RouteSubregion> subregs = r.getKey().searchRouteIndexTree(request, r.getValue());
+//					if (calculationProgress != null) {
+//						calculationProgress.timeToLoadHeaders += (System.nanoTime() - now);
+//					}
 					for (RouteSubregion sr : subregs) {
 						int ind = searchSubregionTile(sr);
 						RoutingSubregionTile found;
@@ -436,14 +413,17 @@ public class RoutingContext {
 						}
 						collection.add(found);
 					}
-					if (calculationProgress != null) {
-						calculationProgress.timeToLoadHeaders += (System.nanoTime() - now);
-					}
+					
+					
 				}
 			} catch (IOException e) {
 				throw new RuntimeException("Loading data exception", e);
 			}
 		}
+		if (calculationProgress != null) {
+			calculationProgress.timeToLoadHeaders += (System.nanoTime() - now);
+		}
+	
 		return collection;
 	}
 
@@ -462,11 +442,11 @@ public class RoutingContext {
 		}
 		
 		TLongHashSet ts = new TLongHashSet(); 
-		for(int i = -t; i <= t; i++) {
-			for(int j = -t; j <= t; j++) {
-				ts.add(getRoutingTile(x31 +i*coordinatesShift, y31 + j*coordinatesShift, 0));		
-			}
-		}
+        for (int i = -t; i <= t; i++) {
+            for (int j = -t; j <= t; j++) {
+                ts.add(getRoutingTile(x31 + i * coordinatesShift, y31 + j * coordinatesShift, 0));
+            }
+        }
 		TLongIterator it = ts.iterator();
 		TLongObjectHashMap<RouteDataObject> excludeDuplications = new TLongObjectHashMap<RouteDataObject>();
 		while (it.hasNext()) {
@@ -499,7 +479,6 @@ public class RoutingContext {
 			unloadUnusedTiles(memoryLimit);
 			if (h1 != 0 && getCurrentlyLoadedTiles() != clt) {
 				int sz2 = getCurrentEstimatedSize();
-				runGCUsedMemory();
 				long h2 = runGCUsedMemory();
 				float mb = (1 << 20);
 				log.warn("Unload tiles :  estimated " + (sz1 - sz2) / mb + " ?= " + (h1 - h2) / mb + " actual");
@@ -510,7 +489,7 @@ public class RoutingContext {
 				log.warn("Unload tiles :  occupied before " + sz1 / mb + " Mb - now  " + sz2 / mb + "MB "
 						+ memoryLimit / mb + " limit MB " + config.memoryLimitation / mb);
 				long us2 = (Runtime.getRuntime().totalMemory() - Runtime.getRuntime().freeMemory());
-				log.warn("Used memory before " + us1 / mb + "after " + us1 / mb );
+				log.warn("Used memory before " + us1 / mb + " after " + us1 / mb );
 			}
 		}
 		if (!indexedSubregions.containsKey(tileId)) {
@@ -577,7 +556,7 @@ public class RoutingContext {
 					checkPreciseProjection = dist < config.directionPointsRadius;
 				}
 				if (checkPreciseProjection) {
-					QuadPoint pnt = MapUtils.getProjectionPoint31(wptX, wptY, x, y, nx, ny);
+					QuadPointDouble pnt = MapUtils.getProjectionPoint31(wptX, wptY, x, y, nx, ny);
 					int projx = (int) pnt.x;
 					int projy = (int) pnt.y;
 					double dist = MapUtils.squareRootDist31(wptX, wptY, projx, projy);
@@ -588,7 +567,6 @@ public class RoutingContext {
 						mprojy = projy;
 					}
 				}
-
 
 				x = nx;
 				y = ny;
@@ -735,17 +713,11 @@ public class RoutingContext {
 	protected static long runGCUsedMemory()  {
 		Runtime runtime = Runtime.getRuntime();
 		long usedMem1 = runtime.totalMemory() - runtime.freeMemory();
-		long usedMem2 = Long.MAX_VALUE;
-		int cnt = 4;
+		int cnt = 1;
 		while (cnt-- >= 0) {
-			for (int i = 0; (usedMem1 < usedMem2) && (i < 1000); ++i) {
-				runtime.runFinalization();
-				runtime.gc();
-				Thread.yield();
-
-				usedMem2 = usedMem1;
-				usedMem1 = runtime.totalMemory() - runtime.freeMemory();
-			}
+			runtime.runFinalization();
+			runtime.gc();
+			usedMem1 = runtime.totalMemory() - runtime.freeMemory();
 		}
 		return usedMem1;
 	}
@@ -786,7 +758,7 @@ public class RoutingContext {
 							excludeDuplications.put(ro.id, ro);
 							toFillIn.add(ro);
 						}
-						rs = rs.next;
+						rs = rs.nextLoaded;
 					}
 				}
 			} else if(searchResult != null) {
@@ -803,7 +775,8 @@ public class RoutingContext {
 		}
 		
 		private RouteSegment loadRouteSegment(int x31, int y31, RoutingContext ctx,
-				TLongObjectHashMap<RouteDataObject> excludeDuplications, RouteSegment original, List<RoutingSubregionTile> subregions, int subregionIndex) {
+				TLongObjectHashMap<RouteDataObject> excludeDuplications, RouteSegment original, List<RoutingSubregionTile> subregions, int subregionIndex, 
+				boolean reverseWaySearch) {
 			access++;
 			if (routes != null) {
 				long l = (((long) x31) << 31) + (long) y31;
@@ -814,11 +787,22 @@ public class RoutingContext {
 					if (!isExcluded(ro.id, subregions, subregionIndex)
 							&& (toCmp == null || toCmp.getPointsLength() < ro.getPointsLength())) {
 						excludeDuplications.put(calcRouteId(ro, segment.getSegmentStart()), ro);
-						RouteSegment s = new RouteSegment(ro, segment.getSegmentStart());
-						s.next = original;
-						original = s;
+						// RouteSegment s = new RouteSegment(ro, segment.getSegmentStart());
+						// s.next = original;
+						// original = s;
+						if (reverseWaySearch) {
+							if (segment.reverseSearch == null) {
+								segment.reverseSearch = new RouteSegment(ro, segment.getSegmentStart());
+								segment.reverseSearch.reverseSearch = segment;
+								segment.reverseSearch.nextLoaded = segment.nextLoaded;
+							}
+							segment = segment.reverseSearch;
+						}
+						segment.next = original;
+						original = segment;
+
 					}
-					segment = segment.next;
+					segment = segment.nextLoaded;
 				}
 			} else {
 				throw new UnsupportedOperationException("Not clear how it could be used with native");
@@ -878,10 +862,10 @@ public class RoutingContext {
 					routes.put(l, segment);
 				} else {
 					RouteSegment orig = routes.get(l);
-					while (orig.next != null) {
-						orig = orig.next;
+					while (orig.nextLoaded != null) {
+						orig = orig.nextLoaded;
 					}
-					orig.next = segment;
+					orig.nextLoaded = segment;
 				}
 			}
 		}
@@ -963,8 +947,8 @@ public class RoutingContext {
 	}
 
 	public int getVisitedSegments() {
-		if(calculationProgress != null) {
-			return calculationProgress.visitedSegments; 
+		if (calculationProgress != null) {
+			return calculationProgress.visitedSegments;
 		}
 		return 0;
 	}
@@ -983,6 +967,7 @@ public class RoutingContext {
 		nativeRoutingContext = 0;
 	}
 	
+	@SuppressWarnings("deprecation")
 	@Override
 	protected void finalize() throws Throwable {
 		deleteNativeRoutingContext();

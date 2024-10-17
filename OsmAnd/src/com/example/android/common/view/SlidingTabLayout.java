@@ -16,8 +16,8 @@
  
 package com.example.android.common.view;
 
+
 import android.content.Context;
-import android.graphics.Typeface;
 import android.os.Build;
 import android.util.AttributeSet;
 import android.util.TypedValue;
@@ -30,7 +30,9 @@ import android.widget.TextView;
 import androidx.fragment.app.Fragment;
 import androidx.viewpager.widget.PagerAdapter;
 import androidx.viewpager.widget.ViewPager;
- 
+
+import net.osmand.plus.utils.FontCache;
+
 /**
  * To be used with ViewPager to provide a tab indicator component which give constant feedback as to
  * the user's scroll progress.
@@ -71,7 +73,7 @@ public class SlidingTabLayout extends HorizontalScrollView {
     private static final int TAB_VIEW_PADDING_DIPS = 16;
     private static final int TAB_VIEW_TEXT_SIZE_SP = 12;
  
-    private int mTitleOffset;
+    private final int mTitleOffset;
  
     private int mTabViewLayoutId;
     private int mTabViewTextViewId;
@@ -175,7 +177,7 @@ public class SlidingTabLayout extends HorizontalScrollView {
         TextView textView = new TextView(context);
         textView.setGravity(Gravity.CENTER);
         textView.setTextSize(TypedValue.COMPLEX_UNIT_SP, TAB_VIEW_TEXT_SIZE_SP);
-        textView.setTypeface(Typeface.DEFAULT_BOLD);
+        textView.setTypeface(FontCache.getMediumFont(textView.getTypeface()));
  
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.HONEYCOMB) {
             // If we're running on Honeycomb or newer, then we can use the Theme's
@@ -198,8 +200,8 @@ public class SlidingTabLayout extends HorizontalScrollView {
     }
  
     private void populateTabStrip() {
-        final PagerAdapter adapter = mViewPager.getAdapter();
-        final View.OnClickListener tabClickListener = new TabClickListener();
+        PagerAdapter adapter = mViewPager.getAdapter();
+        View.OnClickListener tabClickListener = new TabClickListener();
  
         for (int i = 0; i < adapter.getCount(); i++) {
             View tabView = null;
@@ -209,7 +211,7 @@ public class SlidingTabLayout extends HorizontalScrollView {
                 // If there is a custom tab view layout id set, try and inflate it
                 tabView = LayoutInflater.from(getContext()).inflate(mTabViewLayoutId, mTabStrip,
                         false);
-                tabTitleView = (TextView) tabView.findViewById(mTabViewTextViewId);
+                tabTitleView = tabView.findViewById(mTabViewTextViewId);
             }
  
             if (tabView == null) {
@@ -237,7 +239,7 @@ public class SlidingTabLayout extends HorizontalScrollView {
     }
  
     private void scrollToTab(int tabIndex, int positionOffset) {
-        final int tabStripChildCount = mTabStrip.getChildCount();
+        int tabStripChildCount = mTabStrip.getChildCount();
         if (tabStripChildCount == 0 || tabIndex < 0 || tabIndex >= tabStripChildCount) {
             return;
         }

@@ -4,12 +4,12 @@ import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.mapillary.MapillaryPlugin;
+import net.osmand.plus.plugins.mapillary.MapillaryPlugin;
 
 public class NoImagesCard extends AbstractCard {
 
@@ -30,8 +30,8 @@ public class NoImagesCard extends AbstractCard {
 			MapActivity ctx = getMapActivity();
 			AndroidUtils.setBackgroundColor(ctx, view, ColorUtilities.getListBgColorId(night));
 			((ImageView) view.findViewById(R.id.icon_sadface)).setImageDrawable(ic.getIcon(R.drawable.ic_action_sadface,
-					night ? R.color.color_white : R.color.icon_color_default_light));
-			AndroidUtils.setTextPrimaryColor(ctx, (TextView) view.findViewById(R.id.title), night);
+					night ? R.color.card_and_list_background_light : R.color.icon_color_default_light));
+			AndroidUtils.setTextPrimaryColor(ctx, view.findViewById(R.id.title), night);
 			AndroidUtils.setBackgroundColor(ctx, view.findViewById(R.id.button_background), night,
 					R.color.inactive_buttons_and_links_bg_light, R.color.inactive_buttons_and_links_bg_dark);
 			((ImageView) view.findViewById(R.id.icon_add_photos)).setImageDrawable(

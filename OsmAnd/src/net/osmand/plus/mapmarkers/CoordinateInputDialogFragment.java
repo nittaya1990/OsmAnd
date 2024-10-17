@@ -12,7 +12,6 @@ import android.content.res.ColorStateList;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.text.Editable;
@@ -20,14 +19,12 @@ import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.TypedValue;
 import android.view.GestureDetector;
-import android.view.KeyEvent;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
-import android.view.ViewTreeObserver;
 import android.view.Window;
 import android.view.WindowManager;
 import android.view.inputmethod.EditorInfo;
@@ -57,31 +54,34 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.snackbar.Snackbar;
 
-import net.osmand.AndroidUtils;
-import net.osmand.FileUtils;
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.IndexConstants;
 import net.osmand.Location;
-import net.osmand.plus.ColorUtilities;
-import net.osmand.plus.GpxSelectionHelper;
+import net.osmand.plus.shared.SharedUtil;
 import net.osmand.plus.OsmAndLocationProvider.OsmAndCompassListener;
 import net.osmand.plus.OsmAndLocationProvider.OsmAndLocationListener;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.Version;
-import net.osmand.plus.activities.SavingTrackHelper;
+import net.osmand.shared.gpx.TrackItem;
 import net.osmand.plus.helpers.AndroidUiHelper;
 import net.osmand.plus.mapmarkers.CoordinateInputBottomSheetDialogFragment.CoordinateInputFormatChangeListener;
 import net.osmand.plus.mapmarkers.CoordinateInputFormats.DDM;
 import net.osmand.plus.mapmarkers.CoordinateInputFormats.DMS;
 import net.osmand.plus.mapmarkers.CoordinateInputFormats.Format;
 import net.osmand.plus.mapmarkers.adapters.CoordinateInputAdapter;
-import net.osmand.plus.settings.backend.OsmandPreference;
-import net.osmand.plus.track.TrackMenuFragment;
+import net.osmand.plus.plugins.monitoring.SavingTrackHelper;
+import net.osmand.plus.settings.backend.preferences.OsmandPreference;
+import net.osmand.plus.track.GpxSelectionParams;
+import net.osmand.plus.track.fragments.TrackMenuFragment;
+import net.osmand.plus.track.helpers.GpxSelectionHelper;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.FileUtils;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.widgets.EditTextEx;
+import net.osmand.plus.widgets.tools.SimpleTextWatcher;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.Algorithms;
 import net.osmand.util.LocationParser;
 import net.osmand.util.MapUtils;
@@ -101,7 +101,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 	private static final String SELECTED_POINT_KEY = "selected_point_key";
 	public static final double SOFT_KEYBOARD_MIN_DETECTION_SIZE = 0.15;
 
-	private GPXFile newGpxFile;
+	private GpxFile newGpxFile;
 	private OnPointsSavedListener listener;
 	private WptPt selectedWpt;
 	private SavingTrackHelper savingTrackHelper;
@@ -141,17 +141,17 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 
 		lightTheme = app.getSettings().isLightContent();
 		setStyle(STYLE_NO_FRAME, lightTheme ? R.style.OsmandLightTheme : R.style.OsmandDarkTheme);
-		newGpxFile = new GPXFile(Version.getFullVersion(app));
+		newGpxFile = new GpxFile(Version.getFullVersion(app));
 		savingTrackHelper = app.getSavingTrackHelper();
 		selectedGpxHelper = app.getSelectedGpxHelper();
 	}
 
 	@Nullable
-	private GPXFile getGpx() {
+	private GpxFile getGpx() {
 		return newGpxFile;
 	}
 
-	private void syncGpx(GPXFile gpxFile) {
+	private void syncGpx(GpxFile gpxFile) {
 		MapMarkersHelper helper = getMyApplication().getMapMarkersHelper();
 		MapMarkersGroup group = helper.getMarkersGroup(gpxFile);
 		if (group != null) {
@@ -159,34 +159,37 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 		}
 	}
 
-	protected void addWpt(GPXFile gpx, String description, String name, String category, int color, double lat, double lon) {
+	protected void addWpt(GpxFile gpx, String description, String name, String category, int color, double lat, double lon) {
 		if (gpx != null) {
-			if (gpx.showCurrentTrack) {
-				savingTrackHelper.insertPointData(lat, lon, System.currentTimeMillis(), description, name, category, color);
+			if (gpx.isShowCurrentTrack()) {
+				savingTrackHelper.insertPointData(lat, lon, description, name, category, color);
 				selectedGpxHelper.setGpxFileToDisplay(gpx);
 			} else {
-				gpx.addWptPt(lat, lon, System.currentTimeMillis(), description, name, category, color);
+				WptPt point = WptPt.Companion.createAdjustedPoint(lat, lon, description, name, category, color, null, null, null, null);
+				gpx.addPoint(point);
 			}
 		}
 	}
 
-	protected void updateWpt(GPXFile gpx, String description, String name, String category, int color, double lat, double lon) {
+	protected void updateWpt(GpxFile gpx, @Nullable String description, String name, String category, int color, double lat, double lon) {
 		if (gpx != null) {
-			if (gpx.showCurrentTrack) {
-				savingTrackHelper.updatePointData(selectedWpt, lat, lon, System.currentTimeMillis(), description, name, category, color);
+			if (gpx.isShowCurrentTrack()) {
+				savingTrackHelper.updatePointData(selectedWpt, lat, lon, description, name, category, color, null, null);
 				selectedGpxHelper.setGpxFileToDisplay(gpx);
 			} else {
-				gpx.updateWptPt(selectedWpt, lat, lon, System.currentTimeMillis(), description, name, category, color);
+				WptPt wptInfo = new WptPt(lat, lon, description, name, category,
+						Algorithms.colorToString(color), null, null);
+				gpx.updateWptPt(selectedWpt, wptInfo, true);
 			}
 		}
 	}
 
 	private void quit() {
 		if (getGpx().hasWptPt() && hasUnsavedChanges) {
-			if (Algorithms.isEmpty(getGpx().path)) {
+			if (Algorithms.isEmpty(getGpx().getPath())) {
 				showSaveDialog();
 			} else {
-				GPXFile gpx = getGpx();
+				GpxFile gpx = getGpx();
 				new SaveGpxAsyncTask(getMyApplication(), gpx, null, false).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 				syncGpx(gpx);
 				if (listener != null) {
@@ -227,14 +230,14 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 		Window window = dialog.getWindow();
 		if (window != null) {
 			window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_STATE_HIDDEN);
-			if (!lightTheme && Build.VERSION.SDK_INT >= 21) {
-				window.setStatusBarColor(getResolvedColor(R.color.status_bar_coordinate_input_dark));
+			if (!lightTheme) {
+				window.setStatusBarColor(getResolvedColor(R.color.status_bar_main_dark));
 			}
 		}
 		return dialog;
 	}
 
-	public void setGpx(GPXFile gpx) {
+	public void setGpx(GpxFile gpx) {
 		this.newGpxFile = gpx;
 		adapter.setGpx(gpx);
 	}
@@ -257,45 +260,37 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 
 		mainView = inflater.inflate(R.layout.fragment_coordinate_input_dialog, container);
 
-		ImageButton backBtn = (ImageButton) mainView.findViewById(R.id.back_button);
-		backBtn.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				quit();
-			}
-		});
+		ImageButton backBtn = mainView.findViewById(R.id.back_button);
+		backBtn.setOnClickListener(view -> quit());
 
 		TextView optionsButton = mainView.findViewById(R.id.options_button);
 
 		if (orientationPortrait) {
-			Drawable icBack = getColoredIcon(AndroidUtils.getNavigationIconResId(getContext()), lightTheme ? R.color.color_black : R.color.active_buttons_and_links_text_dark);
+			Drawable icBack = getColoredIcon(AndroidUtils.getNavigationIconResId(getContext()), lightTheme ? R.color.activity_background_color_dark : R.color.active_buttons_and_links_text_dark);
 			backBtn.setImageDrawable(icBack);
 			optionsButton.setTextColor(ColorUtilities.getActiveColor(getContext(), !lightTheme));
-			TextView toolbar = (TextView) mainView.findViewById(R.id.toolbar_text);
+			TextView toolbar = mainView.findViewById(R.id.toolbar_text);
 			toolbar.setTextColor(ColorUtilities.getPrimaryTextColor(getContext(), !lightTheme));
 			toolbar.setText(R.string.coord_input_add_point);
-			setBackgroundColor(R.id.app_bar, lightTheme ? R.color.route_info_bg_light : R.color.route_info_bg_dark);
+			setBackgroundColor(R.id.app_bar, lightTheme ? R.color.card_and_list_background_light : R.color.card_and_list_background_dark);
 			setBackgroundColor(mainView, ColorUtilities.getActivityBgColorId(!lightTheme));
 		} else {
 			int resId = AndroidUtils.getNavigationIconResId(getContext());
 			int color = ColorUtilities.getActiveButtonsAndLinksTextColorId(!lightTheme);
 			Drawable icBack = getColoredIcon(resId, color);
 			backBtn.setImageDrawable(icBack);
-			optionsButton.setTextColor(getResolvedColor(lightTheme ? R.color.color_white : R.color.active_color_primary_dark));
-			TextView toolbar = (TextView) mainView.findViewById(R.id.toolbar_text);
-			toolbar.setTextColor(getResolvedColor(lightTheme ? R.color.color_white : R.color.text_color_primary_dark));
+			optionsButton.setTextColor(getResolvedColor(lightTheme ? R.color.card_and_list_background_light : R.color.active_color_primary_dark));
+			TextView toolbar = mainView.findViewById(R.id.toolbar_text);
+			toolbar.setTextColor(getResolvedColor(lightTheme ? R.color.card_and_list_background_light : R.color.text_color_primary_dark));
 			toolbar.setText(R.string.coord_input_add_point);
-			setBackgroundColor(R.id.app_bar, lightTheme ? R.color.app_bar_color_light : R.color.route_info_bottom_view_bg_dark);
+			setBackgroundColor(R.id.app_bar, lightTheme ? R.color.app_bar_main_light : R.color.card_and_list_background_dark);
 		}
 
-		optionsButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				CoordinateInputBottomSheetDialogFragment fragment = new CoordinateInputBottomSheetDialogFragment();
-				fragment.setUsedOnMap(false);
-				fragment.setListener(createCoordinateInputFormatChangeListener());
-				fragment.show(getChildFragmentManager(), CoordinateInputBottomSheetDialogFragment.TAG);
-			}
+		optionsButton.setOnClickListener(view -> {
+			CoordinateInputBottomSheetDialogFragment fragment = new CoordinateInputBottomSheetDialogFragment();
+			fragment.setUsedOnMap(false);
+			fragment.setListener(createCoordinateInputFormatChangeListener());
+			fragment.show(getChildFragmentManager(), CoordinateInputBottomSheetDialogFragment.TAG);
 		});
 
 		registerMainView();
@@ -304,38 +299,35 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 	}
 
 	private void registerMainView() {
-		final Context ctx = getContext();
+		Context ctx = getContext();
 		if (ctx == null) {
 			return;
 		}
 
 		if (orientationPortrait) {
-			View.OnClickListener backspaceOnClickListener = new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					if (v.getId() == R.id.lat_backspace_btn) {
-						clearInputs(R.id.lat_first_input_et, R.id.lat_second_input_et, R.id.lat_third_input_et);
-					} else {
-						clearInputs(R.id.lon_first_input_et, R.id.lon_second_input_et, R.id.lon_third_input_et);
-					}
+			View.OnClickListener backspaceOnClickListener = v -> {
+				if (v.getId() == R.id.lat_backspace_btn) {
+					clearInputs(R.id.lat_first_input_et, R.id.lat_second_input_et, R.id.lat_third_input_et);
+				} else {
+					clearInputs(R.id.lon_first_input_et, R.id.lon_second_input_et, R.id.lon_third_input_et);
 				}
 			};
 
-			ImageView latBackspaceBtn = (ImageView) mainView.findViewById(R.id.lat_backspace_btn);
+			ImageView latBackspaceBtn = mainView.findViewById(R.id.lat_backspace_btn);
 			latBackspaceBtn.setImageDrawable(getActiveIcon(R.drawable.ic_action_clear_all_fields));
 			latBackspaceBtn.setOnClickListener(backspaceOnClickListener);
 
-			ImageView lonBackspaceBtn = (ImageView) mainView.findViewById(R.id.lon_backspace_btn);
+			ImageView lonBackspaceBtn = mainView.findViewById(R.id.lon_backspace_btn);
 			lonBackspaceBtn.setImageDrawable(getActiveIcon(R.drawable.ic_action_clear_all_fields));
 			lonBackspaceBtn.setOnClickListener(backspaceOnClickListener);
 
 		} else {
 			boolean rightHand = getMyApplication().getSettings().COORDS_INPUT_USE_RIGHT_SIDE.get();
-			LinearLayout handContainer = (LinearLayout) mainView.findViewById(R.id.hand_container);
+			LinearLayout handContainer = mainView.findViewById(R.id.hand_container);
 
 			View dataAreaView = View.inflate(ctx, R.layout.coordinate_input_land_data_area, null);
 			View keyboardAndListView = View.inflate(ctx, R.layout.coordinate_input_land_keyboard_and_list, null);
-			setBackgroundColor(dataAreaView, lightTheme ? R.color.route_info_bg_light : R.color.route_info_bg_dark);
+			setBackgroundColor(dataAreaView, lightTheme ? R.color.card_and_list_background_light : R.color.card_and_list_background_dark);
 			setBackgroundColor(keyboardAndListView, ColorUtilities.getActivityBgColorId(!lightTheme));
 			((FrameLayout) handContainer.findViewById(R.id.left_container)).addView(rightHand ? dataAreaView : keyboardAndListView, 0);
 			((FrameLayout) handContainer.findViewById(R.id.right_container)).addView(rightHand ? keyboardAndListView : dataAreaView, 0);
@@ -355,10 +347,10 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 
 		setupSideOfTheWorldBtns(R.id.lat_side_of_the_world_btn, R.id.lon_side_of_the_world_btn);
 
-		setBackgroundColor(R.id.point_name_divider, lightTheme ? R.color.ctx_menu_buttons_divider_light : R.color.ctx_menu_buttons_divider_dark);
-		setBackgroundColor(R.id.point_name_et_container, lightTheme ? R.color.keyboard_item_control_light_bg : R.color.route_info_bottom_view_bg_dark);
+		setBackgroundColor(R.id.point_name_divider, lightTheme ? R.color.divider_color_light : R.color.divider_color_dark);
+		setBackgroundColor(R.id.point_name_et_container, lightTheme ? R.color.activity_background_color_light : R.color.card_and_list_background_dark);
 
-		ImageView pointNameKeyboardBtn = (ImageView) mainView.findViewById(R.id.point_name_keyboard_btn);
+		ImageView pointNameKeyboardBtn = mainView.findViewById(R.id.point_name_keyboard_btn);
 		pointNameKeyboardBtn.setImageDrawable(getColoredIcon(R.drawable.ic_action_keyboard, R.color.icon_color_default_light));
 		pointNameKeyboardBtn.setOnClickListener(new View.OnClickListener() {
 			@Override
@@ -374,14 +366,14 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 						et.requestFocus();
 					}
 				}
-				final View focusedView = getDialog().getCurrentFocus();
+				View focusedView = getDialog().getCurrentFocus();
 				if (focusedView != null) {
 					AndroidUtils.softKeyboardDelayed(getActivity(), focusedView);
 				}
 			}
 		});
-		adapter = new CoordinateInputAdapter(getMyApplication(), getGpx());
-		recyclerView = (RecyclerView) mainView.findViewById(R.id.markers_recycler_view);
+		adapter = new CoordinateInputAdapter(ctx, getGpx());
+		recyclerView = mainView.findViewById(R.id.markers_recycler_view);
 		recyclerView.setLayoutManager(new LinearLayoutManager(ctx));
 		recyclerView.setAdapter(adapter);
 		recyclerView.addOnScrollListener(new RecyclerView.OnScrollListener() {
@@ -391,96 +383,81 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 				compassUpdateAllowed = newState == RecyclerView.SCROLL_STATE_IDLE;
 			}
 		});
-		adapter.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				int pos = recyclerView.getChildAdapterPosition(v);
+		adapter.setOnClickListener(v -> {
+			int pos = recyclerView.getChildAdapterPosition(v);
+			if (pos == RecyclerView.NO_POSITION) {
+				return;
+			}
+			enterEditingMode(adapter.getItem(pos));
+		});
+		adapter.setOnActionsClickListener(v -> {
+			RecyclerView.ViewHolder viewHolder = recyclerView.findContainingViewHolder(v);
+			if (viewHolder != null) {
+				int pos = viewHolder.getAdapterPosition();
 				if (pos == RecyclerView.NO_POSITION) {
 					return;
 				}
-				enterEditingMode(adapter.getItem(pos));
-			}
-		});
-		adapter.setOnActionsClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				RecyclerView.ViewHolder viewHolder = recyclerView.findContainingViewHolder(v);
-				if (viewHolder != null) {
-					int pos = viewHolder.getAdapterPosition();
-					if (pos == RecyclerView.NO_POSITION) {
-						return;
-					}
-					Bundle args = new Bundle();
-					args.putInt(CoordinateInputAdapter.ADAPTER_POSITION_KEY, pos);
-					CoordinateInputActionsBottomSheet fragment = new CoordinateInputActionsBottomSheet();
-					fragment.setUsedOnMap(false);
-					fragment.setArguments(args);
-					fragment.setListener(createCoordinateInputActionsListener());
-					fragment.show(getChildFragmentManager(), CoordinateInputActionsBottomSheet.TAG);
-				}
+				Bundle args = new Bundle();
+				args.putInt(CoordinateInputAdapter.ADAPTER_POSITION_KEY, pos);
+				CoordinateInputActionsBottomSheet fragment = new CoordinateInputActionsBottomSheet();
+				fragment.setUsedOnMap(false);
+				fragment.setArguments(args);
+				fragment.setListener(createCoordinateInputActionsListener());
+				fragment.show(getChildFragmentManager(), CoordinateInputActionsBottomSheet.TAG);
 			}
 		});
 
 		setBackgroundColor(R.id.bottom_controls_container, lightTheme
-				? R.color.keyboard_item_control_light_bg : R.color.keyboard_item_control_dark_bg);
-		TextView addButton = (TextView) mainView.findViewById(R.id.add_marker_button);
-		@ColorRes int colorId = lightTheme ? R.color.wikivoyage_active_light : R.color.wikivoyage_active_dark;
+				? R.color.activity_background_color_light : R.color.card_and_list_background_dark);
+		TextView addButton = mainView.findViewById(R.id.add_marker_button);
+		@ColorRes int colorId = lightTheme ? R.color.active_color_primary_light : R.color.active_color_primary_dark;
 		addButton.setCompoundDrawablesWithIntrinsicBounds(null, null, getColoredIcon(R.drawable.ic_action_type_add, colorId), null);
 		addButton.setText(R.string.shared_string_add);
-		addButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				addWptPt();
-				hasUnsavedChanges = true;
-			}
+		addButton.setOnClickListener(view -> {
+			addWptPt();
+			hasUnsavedChanges = true;
 		});
 
-		TextView cancelButton = (TextView) mainView.findViewById(R.id.cancel_button);
+		TextView cancelButton = mainView.findViewById(R.id.cancel_button);
 		cancelButton.setText(R.string.shared_string_cancel);
-		cancelButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				dismissEditingMode();
-				clearInputs();
-			}
+		cancelButton.setOnClickListener(view -> {
+			dismissEditingMode();
+			clearInputs();
 		});
-		final View keyboardLayout = mainView.findViewById(R.id.keyboard_layout);
+		View keyboardLayout = mainView.findViewById(R.id.keyboard_layout);
 		keyboardLayout.setBackgroundResource(lightTheme
 				? R.drawable.bg_bottom_menu_light : R.drawable.bg_coordinate_input_keyboard_dark);
 
 		View keyboardView = mainView.findViewById(R.id.keyboard_view);
 
-		int dividersColorResId = lightTheme ? R.color.keyboard_divider_light : R.color.keyboard_divider_dark;
+		int dividersColorResId = lightTheme ? R.color.divider_color_light : R.color.divider_color_dark;
 		setBackgroundColor(keyboardView, dividersColorResId);
 		setBackgroundColor(R.id.keyboard_divider, dividersColorResId);
 
-		View.OnClickListener onClickListener = new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				if (isOsmandKeyboardOn()) {
-					View focusedView = getDialog().getCurrentFocus();
-					if (focusedView != null && focusedView instanceof EditText) {
-						EditText focusedEditText = (EditText) focusedView;
-						int id = v.getId();
-						if (id == R.id.keyboard_item_clear) {
-							focusedEditText.setText("");
-						} else if (id == R.id.keyboard_item_backspace) {
-							String str = focusedEditText.getText().toString();
-							if (str.length() > 0) {
-								str = str.substring(0, str.length() - 1);
-								focusedEditText.setText(str);
-								focusedEditText.setSelection(str.length());
-							} else {
-								switchEditText(focusedEditText.getId(), false);
-							}
-						} else if (id == R.id.keyboard_item_next_field) {
-							switchEditText(focusedEditText.getId(), true);
-						} else if (id == R.id.keyboard_item_hide) {
-							changeOsmandKeyboardVisibility(false);
+		View.OnClickListener onClickListener = v -> {
+			if (isOsmandKeyboardOn()) {
+				View focusedView = getDialog().getCurrentFocus();
+				if (focusedView != null && focusedView instanceof EditText) {
+					EditText focusedEditText = (EditText) focusedView;
+					int id = v.getId();
+					if (id == R.id.keyboard_item_clear) {
+						focusedEditText.setText("");
+					} else if (id == R.id.keyboard_item_backspace) {
+						String str = focusedEditText.getText().toString();
+						if (str.length() > 0) {
+							str = str.substring(0, str.length() - 1);
+							focusedEditText.setText(str);
+							focusedEditText.setSelection(str.length());
 						} else {
-							focusedEditText.setText(focusedEditText.getText().toString() + getItemObjectById(id));
-							focusedEditText.setSelection(focusedEditText.getText().length());
+							switchEditText(focusedEditText.getId(), false);
 						}
+					} else if (id == R.id.keyboard_item_next_field) {
+						switchEditText(focusedEditText.getId(), true);
+					} else if (id == R.id.keyboard_item_hide) {
+						changeOsmandKeyboardVisibility(false);
+					} else {
+						focusedEditText.setText(focusedEditText.getText().toString() + getItemObjectById(id));
+						focusedEditText.setSelection(focusedEditText.getText().length());
 					}
 				}
 			}
@@ -513,34 +490,31 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 			enterEditingMode(selectedWpt);
 		}
 
-		mainView.getViewTreeObserver().addOnGlobalLayoutListener(new ViewTreeObserver.OnGlobalLayoutListener() {
-			@Override
-			public void onGlobalLayout() {
-				Rect r = new Rect();
-				mainView.getWindowVisibleDisplayFrame(r);
-				int screenHeight = mainView.getRootView().getHeight();
-				int keypadHeight = screenHeight - r.bottom;
-				boolean softKeyboardVisible = keypadHeight > screenHeight * SOFT_KEYBOARD_MIN_DETECTION_SIZE;
-				if (softKeyboardShown && !softKeyboardVisible) {
-					if (shouldShowOsmandKeyboard) {
-						changeOsmandKeyboardVisibility(true);
-						shouldShowOsmandKeyboard = false;
-					}
-				} else if (!softKeyboardShown && softKeyboardVisible && selectedWpt == null) {
-					scrollToLastPoint();
+		mainView.getViewTreeObserver().addOnGlobalLayoutListener(() -> {
+			Rect r = new Rect();
+			mainView.getWindowVisibleDisplayFrame(r);
+			int screenHeight = mainView.getRootView().getHeight();
+			int keypadHeight = screenHeight - r.bottom;
+			boolean softKeyboardVisible = keypadHeight > screenHeight * SOFT_KEYBOARD_MIN_DETECTION_SIZE;
+			if (softKeyboardShown && !softKeyboardVisible) {
+				if (shouldShowOsmandKeyboard) {
+					changeOsmandKeyboardVisibility(true);
+					shouldShowOsmandKeyboard = false;
 				}
-				softKeyboardShown = softKeyboardVisible;
+			} else if (!softKeyboardShown && softKeyboardVisible && selectedWpt == null) {
+				scrollToLastPoint();
+			}
+			softKeyboardShown = softKeyboardVisible;
 
-				int height = keyboardLayout.getHeight();
+			int height = keyboardLayout.getHeight();
 
-				if (height > keyboardViewHeight) {
-					keyboardViewHeight = height;
-					if (isOsmandKeyboardCurrentlyVisible()) {
-						if (selectedWpt == null && adapter.getItemCount() > 1) {
-							scrollToLastPoint();
-						} else {
-							setPaddingToRecyclerViewBottom(keyboardViewHeight);
-						}
+			if (height > keyboardViewHeight) {
+				keyboardViewHeight = height;
+				if (isOsmandKeyboardCurrentlyVisible()) {
+					if (selectedWpt == null && adapter.getItemCount() > 1) {
+						scrollToLastPoint();
+					} else {
+						setPaddingToRecyclerViewBottom(keyboardViewHeight);
 					}
 				}
 			}
@@ -589,7 +563,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 
 		Context ctx = requireContext();
 		ColorStateList clearItemTextColorStateList = AndroidUtils.createPressedColorStateList(ctx,
-				R.color.keyboard_item_divider_control_color_light, R.color.keyboard_item_divider_control_color_light_pressed);
+				R.color.icon_color_default_light, R.color.keyboard_item_divider_control_color_light_pressed);
 		ColorStateList numberColorStateList = AndroidUtils.createPressedColorStateList(ctx,
 				R.color.keyboard_item_text_color_light, R.color.keyboard_item_text_color_light_pressed);
 
@@ -598,7 +572,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 		for (@IdRes int id : itemsIds) {
 			View itemView = keyboardView.findViewById(id);
 			Object item = getItemObjectById(id);
-			final boolean controlItem = id == R.id.keyboard_item_next_field
+			boolean controlItem = id == R.id.keyboard_item_next_field
 					|| id == R.id.keyboard_item_backspace
 					|| id == R.id.keyboard_item_hide;
 
@@ -607,8 +581,8 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 
 			View itemTopSpace = itemView.findViewById(R.id.keyboard_item_top_spacing);
 			View itemBottomSpace = itemView.findViewById(R.id.keyboard_item_bottom_spacing);
-			TextView itemTv = (TextView) itemView.findViewById(R.id.keyboard_item_text);
-			ImageView itemIv = (ImageView) itemView.findViewById(R.id.keyboard_item_image);
+			TextView itemTv = itemView.findViewById(R.id.keyboard_item_text);
+			ImageView itemIv = itemView.findViewById(R.id.keyboard_item_image);
 
 			if (item instanceof String) {
 				boolean clearItem = id == R.id.keyboard_item_clear;
@@ -621,7 +595,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 				if (lightTheme) {
 					itemTv.setTextColor(clearItem ? clearItemTextColorStateList : numberColorStateList);
 				} else {
-					itemTv.setTextColor(clearItem ? getResolvedColor(R.color.keyboard_item_divider_control_color_dark) : textColorDark);
+					itemTv.setTextColor(clearItem ? getResolvedColor(R.color.icon_color_default_dark) : textColorDark);
 				}
 				itemTopSpace.setVisibility(View.VISIBLE);
 				itemTv.setVisibility(View.VISIBLE);
@@ -637,7 +611,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 				if (lightTheme) {
 					DrawableCompat.setTintList(icon, numberColorStateList);
 				} else {
-					int color = ContextCompat.getColor(ctx, R.color.keyboard_item_divider_control_color_dark);
+					int color = ContextCompat.getColor(ctx, R.color.icon_color_default_dark);
 					DrawableCompat.setTint(icon, color);
 				}
 				itemIv.setImageDrawable(icon);
@@ -689,7 +663,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 
 		startLocationUpdate();
 
-		final View focusedView = getDialog().getCurrentFocus();
+		View focusedView = getDialog().getCurrentFocus();
 		if (focusedView != null) {
 			if (!isOsmandKeyboardOn()) {
 				AndroidUtils.softKeyboardDelayed(getActivity(), focusedView);
@@ -722,12 +696,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 			}
 			sideOfTheWorldBtn.setBackgroundResource(lightTheme
 					? R.drawable.context_menu_controller_bg_light : R.drawable.context_menu_controller_bg_dark);
-			sideOfTheWorldBtn.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					updateSideOfTheWorldBtn(v, true);
-				}
-			});
+			sideOfTheWorldBtn.setOnClickListener(v -> updateSideOfTheWorldBtn(v, true));
 
 			int colorId = ColorUtilities.getActiveColorId(!lightTheme);
 			boolean lat = id == R.id.lat_side_of_the_world_btn;
@@ -780,25 +749,20 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 		editTexts.clear();
 		for (int id : ids) {
 			View v = mainView.findViewById(id);
-			if (v != null && v instanceof EditTextEx && v.getVisibility() == View.VISIBLE) {
-				editTexts.add((EditTextEx) mainView.findViewById(id));
+			if (v instanceof EditTextEx && v.getVisibility() == View.VISIBLE) {
+				editTexts.add(mainView.findViewById(id));
 			}
 		}
 	}
 
 	private void registerInputs() {
-		TextWatcher textWatcher = new TextWatcher() {
+		TextWatcher textWatcher = new SimpleTextWatcher() {
 
 			private int strLength;
 
 			@Override
 			public void beforeTextChanged(CharSequence charSequence, int i, int i1, int i2) {
 				strLength = charSequence.length();
-			}
-
-			@Override
-			public void onTextChanged(CharSequence charSequence, int i, int i1, int i2) {
-
 			}
 
 			@Override
@@ -822,9 +786,9 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 			}
 		};
 
-		final GestureDetector gestureDetector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
+		GestureDetector gestureDetector = new GestureDetector(getContext(), new GestureDetector.SimpleOnGestureListener() {
 			@Override
-			public boolean onDoubleTap(MotionEvent e) {
+			public boolean onDoubleTap(@NonNull MotionEvent e) {
 				return true;
 			}
 		});
@@ -864,64 +828,54 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 			}
 		};
 
-		View.OnLongClickListener inputEditTextOnLongClickListener = new View.OnLongClickListener() {
-			@Override
-			public boolean onLongClick(final View view) {
-				if (isOsmandKeyboardOn()) {
-					final EditText inputEditText = (EditText) view;
-					PopupMenu popupMenu = new PopupMenu(getContext(), inputEditText);
-					Menu menu = popupMenu.getMenu();
-					popupMenu.getMenuInflater().inflate(R.menu.copy_paste_menu, menu);
-					final ClipboardManager clipboardManager = ((ClipboardManager) getContext().getSystemService(CLIPBOARD_SERVICE));
-					MenuItem pasteMenuItem = menu.findItem(R.id.action_paste);
-					if (clipboardManager == null || !clipboardManager.hasPrimaryClip() ||
-							!clipboardManager.getPrimaryClipDescription().hasMimeType(MIMETYPE_TEXT_PLAIN)) {
-						pasteMenuItem.setEnabled(false);
-					} else {
-						pasteMenuItem.setEnabled(true);
-					}
-					if (clipboardManager != null) {
-						popupMenu.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
-							@Override
-							public boolean onMenuItemClick(MenuItem item) {
-								int i = item.getItemId();
-								if (i == R.id.action_copy) {
-									ClipData clip = ClipData.newPlainText("", inputEditText.getText().toString());
-									clipboardManager.setPrimaryClip(clip);
-									return true;
-								} else if (i == R.id.action_paste) {
-									ClipData.Item pasteItem = clipboardManager.getPrimaryClip().getItemAt(0);
-									CharSequence pasteData = pasteItem.getText();
-									if (pasteData != null) {
-										String str = inputEditText.getText().toString();
-										inputEditText.setText(str + pasteData.toString());
-										inputEditText.setSelection(inputEditText.getText().length());
-									}
-									return true;
+		View.OnLongClickListener inputEditTextOnLongClickListener = view -> {
+			if (isOsmandKeyboardOn()) {
+				EditText inputEditText = (EditText) view;
+				PopupMenu popupMenu = new PopupMenu(getContext(), inputEditText);
+				Menu menu = popupMenu.getMenu();
+				popupMenu.getMenuInflater().inflate(R.menu.copy_paste_menu, menu);
+				ClipboardManager clipboardManager = ((ClipboardManager) getContext().getSystemService(CLIPBOARD_SERVICE));
+				MenuItem pasteMenuItem = menu.findItem(R.id.action_paste);
+				pasteMenuItem.setEnabled(clipboardManager != null && clipboardManager.hasPrimaryClip() &&
+						clipboardManager.getPrimaryClipDescription().hasMimeType(MIMETYPE_TEXT_PLAIN));
+				if (clipboardManager != null) {
+					popupMenu.setOnMenuItemClickListener(new PopupMenu.OnMenuItemClickListener() {
+						@Override
+						public boolean onMenuItemClick(MenuItem item) {
+							int i = item.getItemId();
+							if (i == R.id.action_copy) {
+								ClipData clip = ClipData.newPlainText("", inputEditText.getText().toString());
+								clipboardManager.setPrimaryClip(clip);
+								return true;
+							} else if (i == R.id.action_paste) {
+								ClipData.Item pasteItem = clipboardManager.getPrimaryClip().getItemAt(0);
+								CharSequence pasteData = pasteItem.getText();
+								if (pasteData != null) {
+									String str = inputEditText.getText().toString();
+									inputEditText.setText(str + pasteData);
+									inputEditText.setSelection(inputEditText.getText().length());
 								}
-								return false;
+								return true;
 							}
-						});
-						popupMenu.show();
-					}
-					return true;
-				} else {
-					return false;
+							return false;
+						}
+					});
+					popupMenu.show();
 				}
+				return true;
+			} else {
+				return false;
 			}
 		};
 
-		TextView.OnEditorActionListener inputTextViewOnEditorActionListener = new TextView.OnEditorActionListener() {
-			@Override
-			public boolean onEditorAction(TextView textView, int i, KeyEvent keyEvent) {
-				if (i == EditorInfo.IME_ACTION_NEXT) {
-					switchEditText(textView.getId(), true);
-				} else if (i == EditorInfo.IME_ACTION_DONE) {
-					addWptPt();
-					hasUnsavedChanges = true;
-				}
-				return false;
+		TextView.OnEditorActionListener inputTextViewOnEditorActionListener = (textView, i, keyEvent) -> {
+			if (i == EditorInfo.IME_ACTION_NEXT) {
+				switchEditText(textView.getId(), true);
+			} else if (i == EditorInfo.IME_ACTION_DONE) {
+				addWptPt();
+				hasUnsavedChanges = true;
 			}
+			return false;
 		};
 
 		clearInputs();
@@ -968,12 +922,9 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 			if (et.getId() != R.id.point_name_et) {
 				et.addTextChangedListener(textWatcher);
 			} else {
-				et.setOnFocusChangeListener(new View.OnFocusChangeListener() {
-					@Override
-					public void onFocusChange(View v, boolean hasFocus) {
-						if (!hasFocus && isOsmandKeyboardOn() && (isOsmandKeyboardCurrentlyVisible() || softKeyboardShown)) {
-							AndroidUtils.hideSoftKeyboard(getActivity(), v);
-						}
+				et.setOnFocusChangeListener((v, hasFocus) -> {
+					if (!hasFocus && isOsmandKeyboardOn() && (isOsmandKeyboardCurrentlyVisible() || softKeyboardShown)) {
+						AndroidUtils.hideSoftKeyboard(getActivity(), v);
 					}
 				});
 			}
@@ -988,7 +939,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 	}
 
 	private void setupEditTextEx(@IdRes int etId, int symbols, boolean lat) {
-		EditTextEx et = (EditTextEx) mainView.findViewById(etId);
+		EditTextEx et = mainView.findViewById(etId);
 		et.setMaxSymbolsCount(symbols);
 		et.setHint(createString(symbols, lat ? 'x' : 'y'));
 		((LinearLayout.LayoutParams) et.getLayoutParams()).weight = symbols;
@@ -1016,17 +967,12 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 		changeOsmandKeyboardSetting();
 		boolean useOsmandKeyboard = isOsmandKeyboardOn();
 		changeOsmandKeyboardVisibility(useOsmandKeyboard);
-		final View focusedView = getDialog().getCurrentFocus();
+		View focusedView = getDialog().getCurrentFocus();
 		if (focusedView != null) {
 			if (useOsmandKeyboard) {
 				AndroidUtils.hideSoftKeyboard(getActivity(), focusedView);
 			} else {
-				new Handler().postDelayed(new Runnable() {
-					@Override
-					public void run() {
-						AndroidUtils.showSoftKeyboard(getActivity(), focusedView);
-					}
-				}, 200);
+				new Handler().postDelayed(() -> AndroidUtils.showSoftKeyboard(getActivity(), focusedView), 200);
 			}
 		}
 		changeEditTextSelections();
@@ -1072,7 +1018,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 			final OsmandApplication app = getMyApplication();
 
 			@Override
-			public void saveGpx(final String fileName) {
+			public void saveGpx(String fileName) {
 				new SaveGpxAsyncTask(app, getGpx(), fileName, false).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 				hasUnsavedChanges = false;
 				app.getMapMarkersHelper().addOrEnableGroup(getGpx());
@@ -1080,12 +1026,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 					listener.onPointsSaved();
 				}
 				snackbar = Snackbar.make(mainView, String.format(getString(R.string.shared_string_file_is_saved), fileName) + ".", Snackbar.LENGTH_LONG)
-						.setAction(R.string.shared_string_show, new View.OnClickListener() {
-							@Override
-							public void onClick(View view) {
-								TrackMenuFragment.openTrack(app, new File(getGpx().path), null);
-							}
-						});
+						.setAction(R.string.shared_string_show, view -> TrackMenuFragment.openTrack(app, new File(getGpx().getPath()), null));
 				UiUtilities.setupSnackbar(snackbar, !lightTheme);
 				snackbar.show();
 			}
@@ -1096,8 +1037,8 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 		return new CoordinateInputActionsBottomSheet.CoordinateInputActionsListener() {
 
 			@Override
-			public void removeItem(final int position) {
-				final WptPt wpt = adapter.getItem(position);
+			public void removeItem(int position) {
+				WptPt wpt = adapter.getItem(position);
 				if (selectedWpt == wpt) {
 					dismissEditingMode();
 					clearInputs();
@@ -1105,13 +1046,10 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 				}
 				adapter.removeItem(position);
 				hasUnsavedChanges = true;
-				snackbar = Snackbar.make(mainView, getString(R.string.point_deleted, wpt.name), Snackbar.LENGTH_LONG)
-						.setAction(R.string.shared_string_undo, new View.OnClickListener() {
-							@Override
-							public void onClick(View view) {
-								getGpx().addPoint(position, wpt);
-								adapter.notifyDataSetChanged();
-							}
+				snackbar = Snackbar.make(mainView, getString(R.string.point_deleted, wpt.getName()), Snackbar.LENGTH_LONG)
+						.setAction(R.string.shared_string_undo, view -> {
+							getGpx().addPoint(position, wpt);
+							adapter.notifyDataSetChanged();
 						});
 				UiUtilities.setupSnackbar(snackbar, !lightTheme);
 				snackbar.show();
@@ -1193,9 +1131,9 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 
 	private void dismissEditingMode() {
 		selectedWpt = null;
-		TextView addButton = (TextView) mainView.findViewById(R.id.add_marker_button);
+		TextView addButton = mainView.findViewById(R.id.add_marker_button);
 		addButton.setText(R.string.shared_string_add);
-		@ColorRes int colorId = lightTheme ? R.color.wikivoyage_active_light : R.color.wikivoyage_active_dark;
+		@ColorRes int colorId = lightTheme ? R.color.active_color_primary_light : R.color.active_color_primary_dark;
 		addButton.setCompoundDrawablesWithIntrinsicBounds(null, null, getColoredIcon(R.drawable.ic_action_type_add, colorId), null);
 		((TextView) mainView.findViewById(R.id.toolbar_text)).setText(R.string.coord_input_add_point);
 	}
@@ -1203,8 +1141,8 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 	private void enterEditingMode(WptPt wptPt) {
 		selectedWpt = wptPt;
 		Format format = getMyApplication().getSettings().COORDS_INPUT_FORMAT.get();
-		double lat = Math.abs(wptPt.lat);
-		double lon = Math.abs(wptPt.lon);
+		double lat = Math.abs(wptPt.getLat());
+		double lon = Math.abs(wptPt.getLon());
 		if (format == Format.DD_MM_MMM || format == Format.DD_MM_MMMM) {
 			int accuracy = format.getThirdPartSymbolsCount();
 			updateInputsDdm(true, CoordinateInputFormats.ddToDdm(lat), accuracy);
@@ -1217,19 +1155,19 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 			updateInputsDms(true, CoordinateInputFormats.ddToDms(lat));
 			updateInputsDms(false, CoordinateInputFormats.ddToDms(lon));
 		}
-		boolean latPositive = wptPt.lat > 0;
+		boolean latPositive = wptPt.getLat() > 0;
 		if ((latPositive && !north) || (!latPositive && north)) {
 			updateSideOfTheWorldBtn(mainView.findViewById(R.id.lat_side_of_the_world_btn), true);
 		}
-		boolean lonPositive = wptPt.lon > 0;
+		boolean lonPositive = wptPt.getLon() > 0;
 		if ((lonPositive && !east) || (!lonPositive && east)) {
 			updateSideOfTheWorldBtn(mainView.findViewById(R.id.lon_side_of_the_world_btn), true);
 		}
-		((EditText) mainView.findViewById(R.id.point_name_et)).setText(wptPt.name);
+		((EditText) mainView.findViewById(R.id.point_name_et)).setText(wptPt.getName());
 		((TextView) mainView.findViewById(R.id.toolbar_text)).setText(R.string.coord_input_edit_point);
-		TextView addButton = (TextView) mainView.findViewById(R.id.add_marker_button);
+		TextView addButton = mainView.findViewById(R.id.add_marker_button);
 		addButton.setText(R.string.shared_string_apply);
-		@ColorRes int colorId = lightTheme ? R.color.wikivoyage_active_light : R.color.wikivoyage_active_dark;
+		@ColorRes int colorId = lightTheme ? R.color.active_color_primary_light : R.color.active_color_primary_dark;
 		addButton.setCompoundDrawablesWithIntrinsicBounds(null, null, getColoredIcon(R.drawable.ic_action_type_apply, colorId), null);
 		showKeyboard();
 	}
@@ -1301,8 +1239,8 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 	}
 
 	private void addWptPt() {
-		final String latitude = getStringCoordinate(true);
-		final String longitude = getStringCoordinate(false);
+		String latitude = getStringCoordinate(true);
+		String longitude = getStringCoordinate(false);
 		if (latitude.isEmpty() && longitude.isEmpty()) {
 			Toast.makeText(getContext(), R.string.enter_lat_and_lon, Toast.LENGTH_SHORT).show();
 		} else if (latitude.isEmpty()) {
@@ -1433,12 +1371,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 		Activity activity = getActivity();
 		if (activity != null && adapter != null) {
 			OsmandApplication app = (OsmandApplication) activity.getApplication();
-			app.runInUIThread(new Runnable() {
-				@Override
-				public void run() {
-					adapter.notifyDataSetChanged();
-				}
-			});
+			app.runInUIThread(adapter::notifyDataSetChanged);
 		}
 	}
 
@@ -1465,11 +1398,11 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 
 	private static class SaveGpxAsyncTask extends AsyncTask<Void, Void, Void> {
 		private final OsmandApplication app;
-		private final GPXFile gpx;
+		private final GpxFile gpx;
 		private final boolean gpxSelected;
 		private final String fileName;
 
-		SaveGpxAsyncTask(OsmandApplication app, GPXFile gpx, String fileName, boolean gpxSelected) {
+		SaveGpxAsyncTask(OsmandApplication app, GpxFile gpx, String fileName, boolean gpxSelected) {
 			this.app = app;
 			this.gpx = gpx;
 			this.fileName = fileName;
@@ -1478,7 +1411,7 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 
 		@Override
 		protected Void doInBackground(Void... params) {
-			if (Algorithms.isEmpty(gpx.path)) {
+			if (Algorithms.isEmpty(gpx.getPath())) {
 				if (!Algorithms.isEmpty(fileName)) {
 					String dirName = IndexConstants.GPX_INDEX_DIR + IndexConstants.MAP_MARKERS_INDEX_DIR;
 					File dir = app.getAppPath(dirName);
@@ -1487,18 +1420,21 @@ public class CoordinateInputDialogFragment extends DialogFragment implements Osm
 					}
 					String uniqueFileName = FileUtils.createUniqueFileName(app, fileName, dirName, IndexConstants.GPX_FILE_EXT);
 					File fout = new File(dir, uniqueFileName + IndexConstants.GPX_FILE_EXT);
-					GPXUtilities.writeGpxFile(fout, gpx);
+					SharedUtil.writeGpxFile(fout, gpx);
 				}
 			} else {
-				GPXUtilities.writeGpxFile(new File(gpx.path), gpx);
+				SharedUtil.writeGpxFile(new File(gpx.getPath()), gpx);
 			}
+			app.getSmartFolderHelper().addTrackItemToSmartFolder(new TrackItem(gpx));
 			return null;
 		}
 
 		@Override
 		protected void onPostExecute(Void aVoid) {
 			if (!gpxSelected) {
-				app.getSelectedGpxHelper().selectGpxFile(gpx, true, false, true, true, false);
+				GpxSelectionParams params = GpxSelectionParams.newInstance()
+						.showOnMap().syncGroup().selectedByUser().addToHistory().saveSelection();
+				app.getSelectedGpxHelper().selectGpxFile(gpx, params);
 			}
 		}
 	}

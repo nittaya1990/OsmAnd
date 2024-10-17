@@ -14,6 +14,7 @@ import net.osmand.plus.ProgressImplementation;
  * Created by GaidamakUA on 12/7/15.
  */
 public class ProgressDialogFragment extends DialogFragment {
+
 	public static final String TAG = "progress";
 	private static final String TITLE_ID = "title_id";
 	private static final String MESSAGE_ID = "message_id";
@@ -29,7 +30,7 @@ public class ProgressDialogFragment extends DialogFragment {
 		int titleId = args.getInt(TITLE_ID);
 		int messageId = args.getInt(MESSAGE_ID);
 		int style = args.getInt(STYLE);
-		final ProgressDialog dialog = ProgressImplementation.createProgressDialog(getActivity(),
+		ProgressDialog dialog = ProgressImplementation.createProgressDialog(getActivity(),
 				getString(titleId), getString(messageId),
 				style).getDialog();
 
@@ -39,7 +40,7 @@ public class ProgressDialogFragment extends DialogFragment {
 		return dialog;
 	}
 
-	public void setMax(final int max) {
+	public void setMax(int max) {
 		mMax = max;
 		if (getDialog() != null) {
 			getProgressDialog().setMax(mMax);

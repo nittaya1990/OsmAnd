@@ -1,57 +1,50 @@
 package net.osmand.plus.liveupdates;
 
-import android.annotation.SuppressLint;
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
-import android.widget.ArrayAdapter;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.ProgressBar;
 import android.widget.Spinner;
 import android.widget.TextView;
 
+import androidx.annotation.DrawableRes;
+import androidx.annotation.IdRes;
 import androidx.annotation.NonNull;
 
-import com.google.gson.Gson;
-import com.google.gson.JsonSyntaxException;
-
-import net.osmand.AndroidUtils;
 import net.osmand.PlatformUtil;
-import net.osmand.osm.io.NetworkUtils;
 import net.osmand.plus.R;
 import net.osmand.plus.base.BaseOsmAndFragment;
 import net.osmand.plus.liveupdates.CountrySelectionFragment.CountryItem;
+import net.osmand.plus.liveupdates.CountrySelectionFragment.OnFragmentInteractionListener;
+import net.osmand.plus.liveupdates.Protocol.RecipientsByMonth;
+import net.osmand.plus.liveupdates.Protocol.TotalChangesByMonthResponse;
+import net.osmand.plus.liveupdates.GetJsonAsyncTask.OnErrorListener;
+import net.osmand.plus.liveupdates.GetJsonAsyncTask.OnResponseListener;
+import net.osmand.plus.utils.AndroidUtils;
 
 import org.apache.commons.logging.Log;
 
-import java.text.SimpleDateFormat;
-import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.Locale;
+public class ReportsFragment extends BaseOsmAndFragment implements OnFragmentInteractionListener {
 
-public class ReportsFragment extends BaseOsmAndFragment implements CountrySelectionFragment.OnFragmentInteractionListener {
-	public static final int TITLE = R.string.report;
 	public static final String DOMAIN = "https://osmand.net/";
 	public static final String TOTAL_CHANGES_BY_MONTH_URL_PATTERN = DOMAIN +
 			"reports/query_report?report=total_changes_by_month&month=%s&region=%s";
-	public static final String USERS_RANKING_BY_MONTH =  DOMAIN +
+	public static final String USERS_RANKING_BY_MONTH = DOMAIN +
 			"reports/query_report?report=ranking_users_by_month&month=%s&region=%s";
-	public static final String RECIPIENTS_BY_MONTH =  DOMAIN +
+	public static final String RECIPIENTS_BY_MONTH = DOMAIN +
 			"reports/query_report?report=recipients_by_month&month=%s&region=%s";
 
 
 	private static final Log LOG = PlatformUtil.getLog(ReportsFragment.class);
-	public static final String OSM_LIVE_URL = "https://osmand.net/osm_live";
 	public static final String EDITS_FRAGMENT = "NumberOfEditsFragment";
 	public static final String RECIPIENTS_FRAGMENT = "RecipientsFragment";
 
@@ -63,8 +56,8 @@ public class ReportsFragment extends BaseOsmAndFragment implements CountrySelect
 	private Spinner monthReportsSpinner;
 	private MonthsForReportsAdapter monthsForReportsAdapter;
 
-	private CountrySelectionFragment countrySelectionFragment = new CountrySelectionFragment();
-	private UsersReportFragment userReportFragment = new UsersReportFragment();
+	private final CountrySelectionFragment countrySelectionFragment = new CountrySelectionFragment();
+	private final UsersReportFragment userReportFragment = new UsersReportFragment();
 	private TextView countryNameTextView;
 	private CountryItem selectedCountryItem;
 
@@ -88,69 +81,56 @@ public class ReportsFragment extends BaseOsmAndFragment implements CountrySelect
 
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container,
-							 Bundle savedInstanceState) {
-		View view = inflater.inflate(R.layout.fragment_reports, container, false);
-		monthReportsSpinner = (Spinner) view.findViewById(R.id.monthReportsSpinner);
-		final View monthButton = view.findViewById(R.id.monthButton);
-		monthReportsSpinner.setOnTouchListener(new View.OnTouchListener() {
-			@Override
-			public boolean onTouch(View v, MotionEvent event) {
-				event.offsetLocation(AndroidUtils.dpToPx(getActivity(), 48f), 0);
-				monthButton.onTouchEvent(event);
-				return true;
-			}
+	                         Bundle savedInstanceState) {
+		updateNightMode();
+		View view = themedInflater.inflate(R.layout.fragment_reports, container, false);
+		monthReportsSpinner = view.findViewById(R.id.monthReportsSpinner);
+		View monthButton = view.findViewById(R.id.monthButton);
+		monthReportsSpinner.setOnTouchListener((v, event) -> {
+			event.offsetLocation(AndroidUtils.dpToPx(app, 48f), 0);
+			monthButton.onTouchEvent(event);
+			return true;
 		});
 		monthsForReportsAdapter = new MonthsForReportsAdapter(getActivity());
 		monthReportsSpinner.setAdapter(monthsForReportsAdapter);
 
-		monthButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				monthReportsSpinner.performClick();
-			}
-		});
+		monthButton.setOnClickListener(v -> monthReportsSpinner.performClick());
 
+		String osmLiveUrl = getString(R.string.url_osm_live_info);
 		view.findViewById(R.id.show_all).setOnClickListener(v -> {
 			Activity activity = getActivity();
 			if (activity != null) {
-				Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(OSM_LIVE_URL));
+				Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(osmLiveUrl));
 				AndroidUtils.startActivityIfSafe(activity, intent);
 			}
 		});
-		((TextView) view.findViewById(R.id.osm_live_url_label)).setText(OSM_LIVE_URL);
+		((TextView) view.findViewById(R.id.osm_live_url_label)).setText(osmLiveUrl);
 
 		View regionReportsButton = view.findViewById(R.id.reportsButton);
-		regionReportsButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				countrySelectionFragment.show(getChildFragmentManager(), "CountriesSearchSelectionFragment");
-			}
+		regionReportsButton.setOnClickListener(v -> {
+			countrySelectionFragment.show(getChildFragmentManager(), "CountriesSearchSelectionFragment");
 		});
-		OnClickListener listener = new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				int monthItemPosition = monthReportsSpinner.getSelectedItemPosition();
-				String monthUrlString = monthsForReportsAdapter.getQueryString(monthItemPosition);
-				String countryUrlString = selectedCountryItem.getDownloadName();
-				boolean isRecipientsReport = v.getId() == R.id.numberOfRecipientsLayout;
-				if (countryUrlString.length() > 0 || isRecipientsReport) {
-					Bundle bl = new Bundle();
-					bl.putString(UsersReportFragment.URL_REQUEST,
-							String.format(isRecipientsReport ? RECIPIENTS_BY_MONTH : USERS_RANKING_BY_MONTH, monthUrlString, countryUrlString));
-					userReportFragment.setArguments(bl);
-					userReportFragment.show(getChildFragmentManager(), isRecipientsReport ? RECIPIENTS_FRAGMENT : EDITS_FRAGMENT);
-				}
+		OnClickListener listener = v -> {
+			int monthItemPosition = monthReportsSpinner.getSelectedItemPosition();
+			String monthUrlString = monthsForReportsAdapter.getQueryString(monthItemPosition);
+			String countryUrlString = selectedCountryItem.getDownloadName();
+			boolean isRecipientsReport = v.getId() == R.id.numberOfRecipientsLayout;
+			if (countryUrlString.length() > 0 || isRecipientsReport) {
+				Bundle bl = new Bundle();
+				bl.putString(UsersReportFragment.URL_REQUEST,
+						String.format(isRecipientsReport ? RECIPIENTS_BY_MONTH : USERS_RANKING_BY_MONTH, monthUrlString, countryUrlString));
+				userReportFragment.setArguments(bl);
+				userReportFragment.show(getChildFragmentManager(), isRecipientsReport ? RECIPIENTS_FRAGMENT : EDITS_FRAGMENT);
 			}
 		};
 		view.findViewById(R.id.numberOfContributorsLayout).setOnClickListener(listener);
 		view.findViewById(R.id.numberOfEditsLayout).setOnClickListener(listener);
 		view.findViewById(R.id.numberOfRecipientsLayout).setOnClickListener(listener);
 
-		countrySelectionFragment.initCountries(getMyApplication());
+		countrySelectionFragment.initCountries(app);
 		selectedCountryItem = countrySelectionFragment.getCountryItems().get(0);
-		
 
-		countryNameTextView = (TextView) regionReportsButton.findViewById(android.R.id.text1);
+		countryNameTextView = regionReportsButton.findViewById(android.R.id.text1);
 		countryNameTextView.setText(selectedCountryItem.getLocalName());
 
 		setThemedDrawable(view, R.id.calendarImageView, R.drawable.ic_action_data);
@@ -158,33 +138,33 @@ public class ReportsFragment extends BaseOsmAndFragment implements CountrySelect
 		setThemedDrawable(view, R.id.regionIconImageView, R.drawable.ic_world_globe_dark);
 		setThemedDrawable(view, R.id.countryDropDownIcon, R.drawable.ic_action_arrow_drop_down);
 
-		numberOfContributorsIcon = (ImageView) view.findViewById(R.id.numberOfContributorsIcon);
-		numberOfEditsIcon = (ImageView) view.findViewById(R.id.numberOfEditsIcon);
-		numberOfRecipientsIcon = (ImageView) view.findViewById(R.id.numberOfRecipientsIcon);
-		donationsIcon = (ImageView) view.findViewById(R.id.donationsIcon);
-		donationsTotalIcon = (ImageView) view.findViewById(R.id.donationsTotalIcon);
+		numberOfContributorsIcon = view.findViewById(R.id.numberOfContributorsIcon);
+		numberOfEditsIcon = view.findViewById(R.id.numberOfEditsIcon);
+		numberOfRecipientsIcon = view.findViewById(R.id.numberOfRecipientsIcon);
+		donationsIcon = view.findViewById(R.id.donationsIcon);
+		donationsTotalIcon = view.findViewById(R.id.donationsTotalIcon);
 		setThemedDrawable(numberOfContributorsIcon, R.drawable.ic_action_group2);
 		setThemedDrawable(numberOfRecipientsIcon, R.drawable.ic_group);
 		setThemedDrawable(donationsIcon, R.drawable.ic_action_bitcoin);
 		setThemedDrawable(donationsTotalIcon, R.drawable.ic_action_bitcoin);
 		setThemedDrawable(numberOfEditsIcon, R.drawable.ic_map);
-		
-		
-		numberOfContributorsTitle = (TextView) view.findViewById(R.id.numberOfContributorsTitle);
-		numberOfEditsTitle = (TextView) view.findViewById(R.id.numberOfEditsTitle);
-		donationsTitle = (TextView) view.findViewById(R.id.donationsTitle);
-		numberOfRecipientsTitle = (TextView) view.findViewById(R.id.numberOfRecipientsTitle);
-		donationsTotalLayout = (LinearLayout) view.findViewById(R.id.donationsTotal);
-		donationsTotalTitle = (TextView) view.findViewById(R.id.donationsTotalTitle);
-		donationsTotalTextView = (TextView) view.findViewById(R.id.donationsTotalTextView);
 
-		
-		progressBar = (ProgressBar) view.findViewById(R.id.progress);
 
-		contributorsTextView = (TextView) view.findViewById(R.id.contributorsTextView);
-		editsTextView = (TextView) view.findViewById(R.id.editsTextView);
-		donationsTextView = (TextView) view.findViewById(R.id.donationsTextView);
-		recipientsTextView = (TextView) view.findViewById(R.id.recipientsTextView);
+		numberOfContributorsTitle = view.findViewById(R.id.numberOfContributorsTitle);
+		numberOfEditsTitle = view.findViewById(R.id.numberOfEditsTitle);
+		donationsTitle = view.findViewById(R.id.donationsTitle);
+		numberOfRecipientsTitle = view.findViewById(R.id.numberOfRecipientsTitle);
+		donationsTotalLayout = view.findViewById(R.id.donationsTotal);
+		donationsTotalTitle = view.findViewById(R.id.donationsTotalTitle);
+		donationsTotalTextView = view.findViewById(R.id.donationsTotalTextView);
+
+
+		progressBar = view.findViewById(R.id.progress);
+
+		contributorsTextView = view.findViewById(R.id.contributorsTextView);
+		editsTextView = view.findViewById(R.id.editsTextView);
+		donationsTextView = view.findViewById(R.id.donationsTextView);
+		recipientsTextView = view.findViewById(R.id.recipientsTextView);
 
 		requestAndUpdateUi();
 
@@ -216,65 +196,53 @@ public class ReportsFragment extends BaseOsmAndFragment implements CountrySelect
 		tryUpdateData(monthUrlString, countryUrlString);
 	}
 
-	private void tryUpdateData(String monthUrlString, final String regionUrlString) {
-		GetJsonAsyncTask.OnResponseListener<Protocol.TotalChangesByMonthResponse> onResponseListener =
-				new GetJsonAsyncTask.OnResponseListener<Protocol.TotalChangesByMonthResponse>() {
-					@Override
-					public void onResponse(Protocol.TotalChangesByMonthResponse response) {
-						if (response != null) {
-							if (contributorsTextView != null) {
-								contributorsTextView.setText(String.valueOf(response.users));
-							}
-							if (editsTextView != null) {
-								editsTextView.setText(String.valueOf(response.changes));
-							}
-						}
-						disableProgress();
-					}
-				};
-		GetJsonAsyncTask.OnErrorListener onErrorListener =
-				new GetJsonAsyncTask.OnErrorListener() {
-					@Override
-					public void onError(String error) {
-						if (contributorsTextView != null) {
-							contributorsTextView.setText(R.string.data_is_not_available);
-						}
-						if (editsTextView != null) {
-							editsTextView.setText(R.string.data_is_not_available);
-						}
-						disableProgress();
-					}
-				};
+	private void tryUpdateData(String monthUrlString, String regionUrlString) {
+		OnResponseListener<TotalChangesByMonthResponse> onResponseListener = response -> {
+			if (response != null) {
+				if (contributorsTextView != null) {
+					contributorsTextView.setText(String.valueOf(response.users));
+				}
+				if (editsTextView != null) {
+					editsTextView.setText(String.valueOf(response.changes));
+				}
+			}
+			disableProgress();
+		};
+		OnErrorListener onErrorListener = error -> {
+			if (contributorsTextView != null) {
+				contributorsTextView.setText(R.string.data_is_not_available);
+			}
+			if (editsTextView != null) {
+				editsTextView.setText(R.string.data_is_not_available);
+			}
+			disableProgress();
+		};
 		enableProgress();
-		GetJsonAsyncTask<Protocol.TotalChangesByMonthResponse> totalChangesByMontAsyncTask =
-				new GetJsonAsyncTask<>(Protocol.TotalChangesByMonthResponse.class);
+		GetJsonAsyncTask<TotalChangesByMonthResponse> totalChangesByMontAsyncTask =
+				new GetJsonAsyncTask<>(TotalChangesByMonthResponse.class);
 		totalChangesByMontAsyncTask.setOnResponseListener(onResponseListener);
 		totalChangesByMontAsyncTask.setOnErrorListener(onErrorListener);
 		String finalUrl = String.format(TOTAL_CHANGES_BY_MONTH_URL_PATTERN, monthUrlString, regionUrlString);
 		totalChangesByMontAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, finalUrl);
-		
-		GetJsonAsyncTask<Protocol.RecipientsByMonth> recChangesByMontAsyncTask =
+
+		GetJsonAsyncTask<RecipientsByMonth> recChangesByMontAsyncTask =
 				new GetJsonAsyncTask<>(Protocol.RecipientsByMonth.class);
-		GetJsonAsyncTask.OnResponseListener<Protocol.RecipientsByMonth> recResponseListener =
-				new GetJsonAsyncTask.OnResponseListener<Protocol.RecipientsByMonth>() {
-					@Override
-					public void onResponse(Protocol.RecipientsByMonth response) {
-						if (response != null) {
-							if (recipientsTextView != null) {
-								recipientsTextView.setText(String.valueOf(response.regionCount));
-							}
-							if (donationsTextView != null) {
-								donationsTextView.setText(String.format("%.3f", response.regionBtc*1000f) + " mBTC");
-							}
-							if (donationsTotalLayout != null &&
-									donationsTotalTextView != null) {
-								donationsTotalLayout.setVisibility(regionUrlString.isEmpty() ? View.VISIBLE : View.GONE);
-								donationsTotalTextView.setText(String.format("%.3f", response.btc*1000f) + " mBTC");
-							}
-						}
-						disableProgress();
-					}
-				};
+		OnResponseListener<RecipientsByMonth> recResponseListener = response -> {
+			if (response != null) {
+				if (recipientsTextView != null) {
+					recipientsTextView.setText(String.valueOf(response.regionCount));
+				}
+				if (donationsTextView != null) {
+					donationsTextView.setText(String.format("%.3f", response.regionBtc * 1000f) + " mBTC");
+				}
+				if (donationsTotalLayout != null &&
+						donationsTotalTextView != null) {
+					donationsTotalLayout.setVisibility(regionUrlString.isEmpty() ? View.VISIBLE : View.GONE);
+					donationsTotalTextView.setText(String.format("%.3f", response.btc * 1000f) + " mBTC");
+				}
+			}
+			disableProgress();
+		};
 		recChangesByMontAsyncTask.setOnResponseListener(recResponseListener);
 		clearTextViewResult(recipientsTextView);
 		clearTextViewResult(donationsTextView);
@@ -282,6 +250,14 @@ public class ReportsFragment extends BaseOsmAndFragment implements CountrySelect
 
 		String recfinalUrl = String.format(RECIPIENTS_BY_MONTH, monthUrlString, regionUrlString);
 		recChangesByMontAsyncTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR, recfinalUrl);
+	}
+
+	private void setThemedDrawable(View parent, @IdRes int viewId, @DrawableRes int iconId) {
+		((ImageView) parent.findViewById(viewId)).setImageDrawable(getContentIcon(iconId));
+	}
+
+	private void setThemedDrawable(View view, @DrawableRes int iconId) {
+		((ImageView) view).setImageDrawable(getContentIcon(iconId));
 	}
 
 	private void clearTextViewResult(TextView textView) {
@@ -297,102 +273,19 @@ public class ReportsFragment extends BaseOsmAndFragment implements CountrySelect
 		requestAndUpdateUi();
 	}
 
-	private static class MonthsForReportsAdapter extends ArrayAdapter<String> {
-		private static final SimpleDateFormat queryFormat = new SimpleDateFormat("yyyy-MM", Locale.US);
-		@SuppressLint("SimpleDateFormat")
-		private static final SimpleDateFormat humanFormat = new SimpleDateFormat("LLLL yyyy");
-
-		ArrayList<String> queryString = new ArrayList<>();
-
-		public MonthsForReportsAdapter(Context context) {
-			super(context, android.R.layout.simple_spinner_item);
-			Calendar startDate = Calendar.getInstance();
-			startDate.set(Calendar.MONTH, Calendar.SEPTEMBER);
-			startDate.set(Calendar.YEAR, 2015);
-			startDate.set(Calendar.DAY_OF_MONTH, 1);
-			startDate.set(Calendar.HOUR_OF_DAY, 0);
-			Calendar endDate = Calendar.getInstance();
-			while (startDate.before(endDate)) {
-				queryString.add(queryFormat.format(endDate.getTime()));
-				add(humanFormat.format(endDate.getTime()));
-				endDate.add(Calendar.MONTH, -1);
-			}
-			setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-		}
-
-		public String getQueryString(int position) {
-			return queryString.get(position);
-		}
-	}
-
-	public static class GetJsonAsyncTask<P> extends AsyncTask<String, Void, P> {
-		private static final Log LOG = PlatformUtil.getLog(GetJsonAsyncTask.class);
-		private final Class<P> protocolClass;
-		private final Gson gson = new Gson();
-		private OnResponseListener<P> onResponseListener;
-		private OnErrorListener onErrorListener;
-		private volatile String error;
-
-		public GetJsonAsyncTask(Class<P> protocolClass) {
-			this.protocolClass = protocolClass;
-		}
-
-		@Override
-		protected P doInBackground(String... params) {
-			StringBuilder response = new StringBuilder();
-			error = NetworkUtils.sendGetRequest(params[0], null, response);
-			if (error == null) {
-				try {
-					return gson.fromJson(response.toString(), protocolClass);
-				} catch (JsonSyntaxException e) {
-					error = e.getLocalizedMessage();
-				}
-			}
-			LOG.error(error);
-			return null;
-		}
-
-		@Override
-		protected void onPostExecute(P protocol) {
-			if (protocol != null) {
-				if(onResponseListener != null) {
-					onResponseListener.onResponse(protocol);
-				}
-			} else if (onErrorListener != null) {
-				onErrorListener.onError(error);
-			}
-		}
-
-		public void setOnResponseListener(OnResponseListener<P> onResponseListener) {
-			this.onResponseListener = onResponseListener;
-		}
-
-		public void setOnErrorListener(OnErrorListener onErrorListener) {
-			this.onErrorListener = onErrorListener;
-		}
-
-		public interface OnResponseListener<Protocol> {
-			void onResponse(Protocol response);
-		}
-
-		public interface OnErrorListener {
-			void onError(String error);
-		}
-	}
-
 	private void enableProgress() {
 		numberOfContributorsIcon.setImageDrawable(getPaintedContentIcon(R.drawable.ic_group, inactiveColor));
 		numberOfEditsIcon.setImageDrawable(getPaintedContentIcon(R.drawable.ic_map, inactiveColor));
 		numberOfRecipientsIcon.setImageDrawable(getPaintedContentIcon(R.drawable.ic_group, inactiveColor));
 		donationsIcon.setImageDrawable(getPaintedContentIcon(R.drawable.ic_action_bitcoin, inactiveColor));
 		donationsTotalIcon.setImageDrawable(getPaintedContentIcon(R.drawable.ic_action_bitcoin, inactiveColor));
-		
+
 		numberOfContributorsTitle.setTextColor(inactiveColor);
 		numberOfEditsTitle.setTextColor(inactiveColor);
 		numberOfRecipientsTitle.setTextColor(inactiveColor);
 		donationsTitle.setTextColor(inactiveColor);
 		donationsTotalTitle.setTextColor(inactiveColor);
-		
+
 		progressBar.setVisibility(View.VISIBLE);
 
 		contributorsTextView.setTextColor(inactiveColor);
@@ -408,13 +301,13 @@ public class ReportsFragment extends BaseOsmAndFragment implements CountrySelect
 		numberOfRecipientsIcon.setImageDrawable(getContentIcon(R.drawable.ic_group));
 		donationsIcon.setImageDrawable(getContentIcon(R.drawable.ic_action_bitcoin));
 		donationsTotalIcon.setImageDrawable(getContentIcon(R.drawable.ic_action_bitcoin));
-		
+
 		numberOfContributorsTitle.setTextColor(textColorSecondary);
 		numberOfEditsTitle.setTextColor(textColorSecondary);
 		numberOfRecipientsTitle.setTextColor(textColorSecondary);
 		donationsTitle.setTextColor(textColorSecondary);
 		donationsTotalTitle.setTextColor(textColorSecondary);
-		
+
 		progressBar.setVisibility(View.INVISIBLE);
 
 		contributorsTextView.setTextColor(textColorPrimary);

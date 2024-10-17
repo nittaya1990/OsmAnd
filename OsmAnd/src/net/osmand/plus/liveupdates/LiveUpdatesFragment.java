@@ -1,29 +1,20 @@
 package net.osmand.plus.liveupdates;
 
-import static net.osmand.plus.liveupdates.LiveUpdatesHelper.formatShortDateTime;
-import static net.osmand.plus.liveupdates.LiveUpdatesHelper.getNameToDisplay;
-import static net.osmand.plus.liveupdates.LiveUpdatesHelper.getPendingIntent;
-import static net.osmand.plus.liveupdates.LiveUpdatesHelper.preferenceForLocalIndex;
-import static net.osmand.plus.liveupdates.LiveUpdatesHelper.preferenceLastCheck;
-import static net.osmand.plus.liveupdates.LiveUpdatesHelper.preferenceLatestUpdateAvailable;
-import static net.osmand.plus.liveupdates.LiveUpdatesHelper.preferenceTimeOfDayToUpdate;
-import static net.osmand.plus.liveupdates.LiveUpdatesHelper.preferenceUpdateFrequency;
-import static net.osmand.plus.liveupdates.LiveUpdatesHelper.runLiveUpdate;
-import static net.osmand.plus.liveupdates.LiveUpdatesHelper.setAlarmForPendingIntent;
-import static net.osmand.plus.monitoring.TripRecordingBottomSheet.getOsmandIconColorId;
-import static net.osmand.plus.monitoring.TripRecordingBottomSheet.getSecondaryIconColorId;
+import static net.osmand.IndexConstants.BINARY_MAP_INDEX_EXT;
+import static net.osmand.IndexConstants.BINARY_ROAD_MAP_INDEX_EXT;
+import static net.osmand.plus.liveupdates.LiveUpdatesHelper.*;
+import static net.osmand.plus.plugins.monitoring.TripRecordingBottomSheet.getOsmandIconColorId;
+import static net.osmand.plus.plugins.monitoring.TripRecordingBottomSheet.getSecondaryIconColorId;
 
 import android.app.Activity;
 import android.app.AlarmManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.content.DialogInterface;
-import android.graphics.Typeface;
 import android.graphics.drawable.ColorDrawable;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.AsyncTask;
-import android.os.Build;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
@@ -31,13 +22,12 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.CompoundButton;
 import android.widget.ExpandableListView;
-import android.widget.FrameLayout;
+import android.widget.ImageButton;
 import android.widget.ImageView;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.appcompat.content.res.AppCompatResources;
-import androidx.appcompat.widget.AppCompatImageButton;
 import androidx.appcompat.widget.AppCompatImageView;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.appcompat.widget.Toolbar;
@@ -50,33 +40,31 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 
 import com.google.android.material.appbar.AppBarLayout;
 
-import net.osmand.AndroidNetworkUtils;
-import net.osmand.AndroidUtils;
 import net.osmand.PlatformUtil;
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
-import net.osmand.plus.UiUtilities.CompoundButtonType;
-import net.osmand.plus.activities.LocalIndexInfo;
-import net.osmand.plus.activities.OsmandBaseExpandableListAdapter;
 import net.osmand.plus.base.BaseOsmAndDialogFragment;
+import net.osmand.plus.base.OsmandBaseExpandableListAdapter;
 import net.osmand.plus.chooseplan.ChoosePlanFragment;
 import net.osmand.plus.chooseplan.OsmAndFeature;
+import net.osmand.plus.download.local.LocalItem;
+import net.osmand.plus.download.local.LocalItemUtils;
 import net.osmand.plus.helpers.AndroidUiHelper;
-import net.osmand.plus.helpers.FontCache;
 import net.osmand.plus.inapp.InAppPurchaseHelper;
+import net.osmand.plus.inapp.InAppPurchaseUtils;
 import net.osmand.plus.inapp.InAppPurchases.InAppSubscription;
 import net.osmand.plus.liveupdates.LiveUpdatesClearBottomSheet.RefreshLiveUpdates;
-import net.osmand.plus.liveupdates.LiveUpdatesHelper.LiveUpdateListener;
-import net.osmand.plus.liveupdates.LiveUpdatesHelper.TimeOfDay;
-import net.osmand.plus.liveupdates.LiveUpdatesHelper.UpdateFrequency;
 import net.osmand.plus.liveupdates.LiveUpdatesSettingsBottomSheet.OnLiveUpdatesForLocalChange;
 import net.osmand.plus.liveupdates.LoadLiveMapsTask.LocalIndexInfoAdapter;
-import net.osmand.plus.settings.backend.CommonPreference;
 import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.settings.backend.preferences.CommonPreference;
+import net.osmand.plus.utils.AndroidNetworkUtils;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.FontCache;
+import net.osmand.plus.utils.UiUtilities;
+import net.osmand.plus.utils.UiUtilities.CompoundButtonType;
 import net.osmand.plus.widgets.TextViewEx;
-import net.osmand.plus.wikipedia.WikipediaDialogFragment;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
@@ -86,7 +74,6 @@ import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -96,12 +83,7 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 
 	public static final String URL = "https://osmand.net/api/osmlive_status";
 	public static final String TAG = LiveUpdatesFragment.class.getSimpleName();
-	private final static Log LOG = PlatformUtil.getLog(LiveUpdatesFragment.class);
-	private static final String SUBSCRIPTION_URL = "https://osmand.net/features/subscription";
-
-	private OsmandApplication app;
-	private OsmandSettings settings;
-	private boolean nightMode;
+	private static final Log LOG = PlatformUtil.getLog(LiveUpdatesFragment.class);
 
 	private View toolbarSwitchContainer;
 	private ExpandableListView listView;
@@ -119,17 +101,12 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 		}
 	}
 
-	public static void showUpdateDialog(Activity context, FragmentManager fragmentManager, final LiveUpdateListener listener) {
-		List<LocalIndexInfo> mapsToUpdate = listener.getMapsToUpdate();
+	public static void showUpdateDialog(Activity activity, FragmentManager fragmentManager, LiveUpdateListener listener) {
+		List<LocalItem> mapsToUpdate = listener.getMapsToUpdate();
 		if (!Algorithms.isEmpty(mapsToUpdate)) {
 			int countEnabled = listener.getMapsToUpdate().size();
 			if (countEnabled == 1) {
-				runLiveUpdate(context, mapsToUpdate.get(0).getFileName(), false, new Runnable() {
-					@Override
-					public void run() {
-						listener.processFinish();
-					}
-				});
+				runLiveUpdate(activity, getFileNameWithoutRoadSuffix(mapsToUpdate.get(0)), false, listener::processFinish);
 			} else if (countEnabled > 1) {
 				Fragment target = null;
 				if (listener instanceof Fragment) {
@@ -143,59 +120,54 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		app = getMyApplication();
-		settings = getSettings();
-		nightMode = isNightMode(false);
 		setHasOptionsMenu(true);
 	}
 
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-		View view = inflater.inflate(R.layout.fragment_live_updates, container, false);
-		createToolbar((ViewGroup) view.findViewById(R.id.app_bar));
+		updateNightMode();
+		View view = themedInflater.inflate(R.layout.fragment_live_updates, container, false);
+		createToolbar(view.findViewById(R.id.app_bar));
 
-		listView = (ExpandableListView) view.findViewById(android.R.id.list);
+		listView = view.findViewById(android.R.id.list);
+
+		View headerView = inflater.inflate(R.layout.list_item_import, listView, false);
+		View bottomShadowView = inflater.inflate(R.layout.card_bottom_divider, listView, false);
+
+		listView.addHeaderView(headerView);
+		listView.addFooterView(bottomShadowView);
+
 		adapter = new LiveMapsAdapter();
 		listView.setAdapter(adapter);
 		expandAllGroups();
 
-		View bottomShadowView = inflater.inflate(R.layout.card_bottom_divider, listView, false);
-		listView.addFooterView(bottomShadowView);
-		listView.setOnChildClickListener(new ExpandableListView.OnChildClickListener() {
-			@Override
-			public boolean onChildClick(ExpandableListView parent, View v, int groupPosition, int childPosition, long id) {
-				if (InAppPurchaseHelper.isSubscribedToLiveUpdates(app) && settings.IS_LIVE_UPDATES_ON.get()) {
-					if (getFragmentManager() != null) {
-						LiveUpdatesSettingsBottomSheet
-								.showInstance(getFragmentManager(), LiveUpdatesFragment.this,
-										adapter.getChild(groupPosition, childPosition).getFileName());
-					}
-					return true;
-				} else {
-					return false;
+		listView.setOnChildClickListener((parent, v, groupPosition, childPosition, id) -> {
+			if (InAppPurchaseUtils.isLiveUpdatesAvailable(app) && settings.IS_LIVE_UPDATES_ON.get()) {
+				if (getFragmentManager() != null) {
+					LiveUpdatesSettingsBottomSheet
+							.showInstance(getFragmentManager(), LiveUpdatesFragment.this,
+									getFileNameWithoutRoadSuffix(adapter.getChild(groupPosition, childPosition)));
 				}
+				return true;
+			} else {
+				return false;
 			}
 		});
 
-		final SwipeRefreshLayout swipeRefresh = view.findViewById(R.id.swipe_refresh);
+		SwipeRefreshLayout swipeRefresh = view.findViewById(R.id.swipe_refresh);
 		int swipeColor = ContextCompat.getColor(app, nightMode ? R.color.osmand_orange_dark : R.color.osmand_orange);
 		swipeRefresh.setColorSchemeColors(swipeColor);
-		swipeRefresh.setOnRefreshListener(new SwipeRefreshLayout.OnRefreshListener() {
-			@Override
-			public void onRefresh() {
-				if (settings.IS_LIVE_UPDATES_ON.get()) {
-					showUpdateDialog(getActivity(), getFragmentManager(), LiveUpdatesFragment.this);
-					startUpdateDateAsyncTask();
-				}
-				swipeRefresh.setRefreshing(false);
+		swipeRefresh.setOnRefreshListener(() -> {
+			if (settings.IS_LIVE_UPDATES_ON.get()) {
+				showUpdateDialog(getActivity(), getFragmentManager(), LiveUpdatesFragment.this);
+				startUpdateDateAsyncTask();
 			}
+			swipeRefresh.setRefreshing(false);
 		});
 
-		View headerView = inflater.inflate(R.layout.list_item_import, listView, false);
 		View timeContainer = headerView.findViewById(R.id.item_import_container);
 		AndroidUtils.setListItemBackground(app, timeContainer, nightMode);
 		AndroidUiHelper.setVisibility(View.VISIBLE, headerView.findViewById(R.id.bottom_divider));
-		listView.addHeaderView(headerView);
 
 		AppCompatImageView descriptionIcon = timeContainer.findViewById(R.id.icon);
 		Drawable icon = UiUtilities.createTintedDrawable(app, R.drawable.ic_action_time,
@@ -206,17 +178,13 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 		AndroidUtils.setTextSecondaryColor(app, title, nightMode);
 		title.setText(R.string.latest_openstreetmap_update);
 		title.setTextSize(TypedValue.COMPLEX_UNIT_PX, getResources().getDimensionPixelSize(R.dimen.default_desc_text_size));
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-			title.setLetterSpacing(AndroidUtils.getFloatValueFromRes(app, R.dimen.description_letter_spacing));
-		}
+		title.setLetterSpacing(AndroidUtils.getFloatValueFromRes(app, R.dimen.description_letter_spacing));
 
 		descriptionTime = timeContainer.findViewById(R.id.sub_title);
 		AndroidUtils.setTextPrimaryColor(app, descriptionTime, nightMode);
-		Typeface typeface = FontCache.getFont(app, getString(R.string.font_roboto_medium));
-		descriptionTime.setTypeface(typeface);
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-			descriptionTime.setLetterSpacing(AndroidUtils.getFloatValueFromRes(app, R.dimen.description_letter_spacing));
-		}
+		descriptionTime.setTypeface(FontCache.getMediumFont());
+		descriptionTime.setLetterSpacing(AndroidUtils.getFloatValueFromRes(app, R.dimen.description_letter_spacing));
+
 		return view;
 	}
 
@@ -267,43 +235,38 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 		}
 	}
 
-	protected void createToolbar(ViewGroup appBar) {
+	protected void createToolbar(@NonNull ViewGroup appBar) {
 		AppBarLayout appBarLayout = (AppBarLayout) UiUtilities.getInflater(getActivity(), nightMode)
 				.inflate(R.layout.global_preferences_toolbar_with_switch, appBar);
 
-		Toolbar toolbar = (Toolbar) appBarLayout.findViewById(R.id.toolbar);
-		TextViewEx toolbarTitle = (TextViewEx) toolbar.findViewById(R.id.toolbar_title);
+		Toolbar toolbar = appBarLayout.findViewById(R.id.toolbar);
+		TextViewEx toolbarTitle = toolbar.findViewById(R.id.toolbar_title);
 		toolbarTitle.setText(R.string.osm_live);
 
-		ImageView closeButton = (ImageView) toolbar.findViewById(R.id.close_button);
+		ImageView closeButton = toolbar.findViewById(R.id.close_button);
 		UiUtilities.rotateImageByLayoutDirection(closeButton);
-		closeButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				dismiss();
-			}
-		});
+		closeButton.setOnClickListener(v -> dismiss());
 
-		FrameLayout iconHelpContainer = toolbar.findViewById(R.id.action_button);
-		int iconColorResId = ColorUtilities.getActiveButtonsAndLinksTextColorId(nightMode);
-		AppCompatImageButton iconHelp = toolbar.findViewById(R.id.action_button_icon);
-		Drawable helpDrawable = app.getUIUtilities().getIcon(R.drawable.ic_action_help_online, iconColorResId);
-		iconHelp.setImageDrawable(helpDrawable);
-		iconHelpContainer.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				Activity activity = getActivity();
-				if (activity != null) {
-					WikipediaDialogFragment.showFullArticle(activity, Uri.parse(SUBSCRIPTION_URL), nightMode);
-				}
+		LayoutInflater inflater = UiUtilities.getInflater(toolbar.getContext(), nightMode);
+		ViewGroup container = toolbar.findViewById(R.id.actions_container);
+
+		int colorId = ColorUtilities.getActiveButtonsAndLinksTextColorId(nightMode);
+		ImageButton button = (ImageButton) inflater.inflate(R.layout.action_button, container, false);
+		button.setImageDrawable(getIcon(R.drawable.ic_action_help_online, colorId));
+		button.setOnClickListener(view -> {
+			Activity activity = getActivity();
+			if (activity != null) {
+				String docsUrl = getString(R.string.docs_osmand_live);
+				AndroidUtils.openUrl(activity, Uri.parse(docsUrl), nightMode);
 			}
 		});
+		container.addView(button);
 
 		toolbarSwitchContainer = appBarLayout.findViewById(R.id.toolbar_switch_container);
 		updateToolbarSwitch(settings.IS_LIVE_UPDATES_ON.get());
 	}
 
-	private void updateToolbarSwitch(final boolean isChecked) {
+	private void updateToolbarSwitch(boolean isChecked) {
 		int switchColor = ContextCompat.getColor(app,
 				isChecked ? ColorUtilities.getActiveColorId(nightMode) : ColorUtilities.getSecondaryTextColorId(nightMode));
 		AndroidUtils.setBackground(toolbarSwitchContainer, new ColorDrawable(switchColor));
@@ -312,30 +275,27 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 		switchView.setChecked(isChecked);
 		UiUtilities.setupCompoundButton(switchView, nightMode, CompoundButtonType.TOOLBAR);
 
-		toolbarSwitchContainer.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				boolean visible = !isChecked;
-				if (visible) {
-					if (InAppPurchaseHelper.isSubscribedToLiveUpdates(app)) {
-						switchOnLiveUpdates();
-						updateToolbarSwitch(true);
-					} else {
-						updateToolbarSwitch(false);
-						app.showToastMessage(getString(R.string.osm_live_ask_for_purchase));
-
-						FragmentActivity activity = getActivity();
-						if (activity != null) {
-							ChoosePlanFragment.showInstance(activity, OsmAndFeature.HOURLY_MAP_UPDATES);
-						}
-					}
+		toolbarSwitchContainer.setOnClickListener(view -> {
+			boolean visible = !isChecked;
+			if (visible) {
+				if (InAppPurchaseUtils.isLiveUpdatesAvailable(app)) {
+					switchOnLiveUpdates();
+					updateToolbarSwitch(true);
 				} else {
-					settings.IS_LIVE_UPDATES_ON.set(false);
-					enableLiveUpdates(false);
 					updateToolbarSwitch(false);
+					app.showToastMessage(getString(R.string.osm_live_ask_for_purchase));
+
+					FragmentActivity activity = getActivity();
+					if (activity != null) {
+						ChoosePlanFragment.showInstance(activity, OsmAndFeature.HOURLY_MAP_UPDATES);
+					}
 				}
-				updateList();
+			} else {
+				settings.IS_LIVE_UPDATES_ON.set(false);
+				enableLiveUpdates(false);
+				updateToolbarSwitch(false);
 			}
+			updateList();
 		});
 
 		TextView title = toolbarSwitchContainer.findViewById(R.id.switchButtonText);
@@ -345,21 +305,21 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 	private void switchOnLiveUpdates() {
 		settings.IS_LIVE_UPDATES_ON.set(true);
 		enableLiveUpdates(true);
-		showUpdateDialog(getMyActivity(), getFragmentManager(), this);
+		showUpdateDialog(getActivity(), getFragmentManager(), this);
 		startUpdateDateAsyncTask();
 	}
 
 	private void enableLiveUpdates(boolean enable) {
-		if (!Algorithms.isEmpty(adapter.mapsList)) {
+		if (!Algorithms.isEmpty(adapter.localItems)) {
 			AlarmManager alarmMgr = (AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
-			List<LocalIndexInfo> mapsToUpdate = getMapsToUpdate(adapter.mapsList, settings);
-			for (LocalIndexInfo li : mapsToUpdate) {
-				String fileName = li.getFileName();
+			List<LocalItem> mapsToUpdate = getMapsToUpdate(adapter.localItems, settings);
+			for (LocalItem item : mapsToUpdate) {
+				String fileName = getFileNameWithoutRoadSuffix(item);
 				PendingIntent alarmIntent = getPendingIntent(app, fileName);
 				if (enable) {
-					final CommonPreference<Integer> updateFrequencyPreference =
+					CommonPreference<Integer> updateFrequencyPreference =
 							preferenceUpdateFrequency(fileName, settings);
-					final CommonPreference<Integer> timeOfDayPreference =
+					CommonPreference<Integer> timeOfDayPreference =
 							preferenceTimeOfDayToUpdate(fileName, settings);
 					UpdateFrequency updateFrequency = UpdateFrequency.values()[updateFrequencyPreference.get()];
 					TimeOfDay timeOfDayToUpdate = TimeOfDay.values()[timeOfDayPreference.get()];
@@ -377,7 +337,7 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 		}
 	}
 
-	public static int updateCountEnabled(TextView countView, List<LocalIndexInfo> mapsList, OsmandSettings settings) {
+	public static int updateCountEnabled(TextView countView, List<LocalItem> mapsList, OsmandSettings settings) {
 		int countEnabled = getMapsToUpdate(mapsList, settings).size();
 		if (countView != null) {
 			String countText = countEnabled + "/" + mapsList.size();
@@ -386,10 +346,10 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 		return countEnabled;
 	}
 
-	public static List<LocalIndexInfo> getMapsToUpdate(List<LocalIndexInfo> mapsList, OsmandSettings settings) {
-		List<LocalIndexInfo> listToUpdate = new ArrayList<>();
-		for (LocalIndexInfo mapToUpdate : mapsList) {
-			CommonPreference<Boolean> preference = preferenceForLocalIndex(mapToUpdate.getFileName(), settings);
+	public static List<LocalItem> getMapsToUpdate(List<LocalItem> mapsList, OsmandSettings settings) {
+		List<LocalItem> listToUpdate = new ArrayList<>();
+		for (LocalItem mapToUpdate : mapsList) {
+			CommonPreference<Boolean> preference = preferenceForLocalIndex(getFileNameWithoutRoadSuffix(mapToUpdate), settings);
 			if (preference.get()) {
 				listToUpdate.add(mapToUpdate);
 			}
@@ -398,16 +358,19 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 	}
 
 	protected class LiveMapsAdapter extends OsmandBaseExpandableListAdapter implements LocalIndexInfoAdapter {
-		private final ArrayList<LocalIndexInfo> mapsList = new ArrayList<>();
+		private final List<LocalItem> localItems = new ArrayList<>();
 
 		@Override
-		public void addData(LocalIndexInfo info) {
-			mapsList.add(info);
+		public void addData(@NonNull List<LocalItem> indexes) {
+			if (LocalItemUtils.addUnique(localItems, indexes)) {
+				notifyDataSetChanged();
+			}
 		}
 
 		@Override
 		public void clearData() {
-			mapsList.clear();
+			localItems.clear();
+			notifyDataSetChanged();
 		}
 
 		@Override
@@ -416,24 +379,21 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 		}
 
 		public void sort() {
-			Collections.sort(mapsList, new Comparator<LocalIndexInfo>() {
-				@Override
-				public int compare(LocalIndexInfo o1, LocalIndexInfo o2) {
-					CommonPreference<Boolean> preference1 = preferenceForLocalIndex(o1.getFileName(), getSettings());
-					CommonPreference<Boolean> preference2 = preferenceForLocalIndex(o2.getFileName(), getSettings());
-					int prefSort = preference2.get().compareTo(preference1.get());
-					if (prefSort != 0) {
-						return prefSort;
-					}
-					return o1.compareTo(o2);
+			Collections.sort(localItems, (o1, o2) -> {
+				CommonPreference<Boolean> preference1 = preferenceForLocalIndex(getFileNameWithoutRoadSuffix(o1), settings);
+				CommonPreference<Boolean> preference2 = preferenceForLocalIndex(getFileNameWithoutRoadSuffix(o2), settings);
+				int prefSort = preference2.get().compareTo(preference1.get());
+				if (prefSort != 0) {
+					return prefSort;
 				}
+				return o1.compareTo(o2);
 			});
 			notifyDataSetInvalidated();
 		}
 
 		@Override
-		public LocalIndexInfo getChild(int groupPosition, int childPosition) {
-			return mapsList.get(childPosition);
+		public LocalItem getChild(int groupPosition, int childPosition) {
+			return localItems.get(childPosition);
 		}
 
 		@Override
@@ -442,15 +402,15 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 		}
 
 		@Override
-		public View getChildView(final int groupPosition, final int childPosition,
-								 boolean isLastChild, View convertView, ViewGroup parent) {
-			LayoutInflater inflater = UiUtilities.getInflater(app, nightMode);
+		public View getChildView(int groupPosition, int childPosition,
+		                         boolean isLastChild, View convertView, ViewGroup parent) {
+			LayoutInflater inflater = UiUtilities.getInflater(getContext(), nightMode);
 			convertView = inflater.inflate(R.layout.list_item_triple_row_icon_and_menu, parent, false);
-			ImageView secondaryIcon = (ImageView) convertView.findViewById(R.id.secondary_icon);
+			ImageView secondaryIcon = convertView.findViewById(R.id.secondary_icon);
 			UiUtilities.rotateImageByLayoutDirection(secondaryIcon);
 			LiveMapsViewHolder viewHolder = new LiveMapsViewHolder(convertView);
 			convertView.setTag(viewHolder);
-			viewHolder.bindLocalIndexInfo(getChild(groupPosition, childPosition).getFileName());
+			viewHolder.bindLocalItem(getFileNameWithoutRoadSuffix(getChild(groupPosition, childPosition)));
 			return convertView;
 		}
 
@@ -469,10 +429,10 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 				topShadowView.setVisibility(View.VISIBLE);
 			}
 
-			TextViewEx titleView = ((TextViewEx) view.findViewById(R.id.title));
+			TextViewEx titleView = view.findViewById(R.id.title);
 			titleView.setText(getGroup(groupPosition));
 
-			TextViewEx countView = ((TextViewEx) view.findViewById(R.id.description));
+			TextViewEx countView = view.findViewById(R.id.description);
 			AndroidUtils.setTextSecondaryColor(app, countView, nightMode);
 
 			return view;
@@ -480,7 +440,7 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 
 		@Override
 		public int getChildrenCount(int groupPosition) {
-			return mapsList.size();
+			return localItems.size();
 		}
 
 		@Override
@@ -517,14 +477,14 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 		private final CompoundButton compoundButton;
 
 		private LiveMapsViewHolder(View view) {
-			statusIcon = (AppCompatImageView) view.findViewById(R.id.icon);
-			title = (TextView) view.findViewById(R.id.title);
-			subTitle = (TextView) view.findViewById(R.id.sub_title);
-			description = (TextView) view.findViewById(R.id.description);
-			compoundButton = (CompoundButton) view.findViewById(R.id.compound_button);
+			statusIcon = view.findViewById(R.id.icon);
+			title = view.findViewById(R.id.title);
+			subTitle = view.findViewById(R.id.sub_title);
+			description = view.findViewById(R.id.description);
+			compoundButton = view.findViewById(R.id.compound_button);
 		}
 
-		public void bindLocalIndexInfo(@NonNull final String item) {
+		public void bindLocalItem(@NonNull String item) {
 			boolean liveUpdateOn = settings.IS_LIVE_UPDATES_ON.get();
 			CommonPreference<Boolean> localUpdateOn = preferenceForLocalIndex(item, settings);
 //			IncrementalChangesManager changesManager = app.getResourceManager().getChangesManager();
@@ -540,18 +500,12 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 			AndroidUiHelper.updateVisibility(subTitle, localUpdateOn.get());
 			if (localUpdateOn.get()) {
 				int frequencyId = preferenceUpdateFrequency(item, settings).get();
-				final UpdateFrequency frequency = UpdateFrequency.values()[frequencyId];
-				String subTitleText = getString(frequency.getLocalizedId());
-				/*int timeOfDateToUpdateId = preferenceTimeOfDayToUpdate(item, settings).get();
-				final TimeOfDay timeOfDay = TimeOfDay.values()[timeOfDateToUpdateId];
-				if (frequency != UpdateFrequency.HOURLY) {
-					subTitleText += " • " + getString(timeOfDay.getLocalizedId());
-				}*/
+				UpdateFrequency frequency = UpdateFrequency.values()[frequencyId];
+				String subTitleText = getString(frequency.titleId);
 				subTitle.setText(subTitleText);
 				subTitle.setTextColor(ContextCompat.getColor(app, liveUpdateOn
 						? ColorUtilities.getActiveColorId(nightMode) : ColorUtilities.getSecondaryTextColorId(nightMode)));
-				Typeface typeface = FontCache.getFont(app, getString(R.string.font_roboto_medium));
-				subTitle.setTypeface(typeface);
+				subTitle.setTypeface(FontCache.getMediumFont());
 			}
 
 			Drawable statusDrawable = AppCompatResources.getDrawable(app, R.drawable.ic_map);
@@ -563,21 +517,11 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 			}
 			statusIcon.setImageDrawable(statusDrawable);
 
-			description.setText(getLastCheckString(item, app));
+			description.setText(getFormattedLastSuccessfulCheck(item));
 
-			if (InAppPurchaseHelper.isSubscribedToLiveUpdates(app)) {
+			if (InAppPurchaseUtils.isLiveUpdatesAvailable(app)) {
 				compoundButton.setEnabled(liveUpdateOn);
-				compoundButton.setOnCheckedChangeListener(new SwitchCompat.OnCheckedChangeListener() {
-					@Override
-					public void onCheckedChanged(CompoundButton buttonView, boolean isChecked) {
-						onUpdateLocalIndex(item, isChecked, new Runnable() {
-							@Override
-							public void run() {
-								runSort();
-							}
-						});
-					}
-				});
+				compoundButton.setOnCheckedChangeListener((buttonView, isChecked) -> onUpdateLocalIndex(item, isChecked, LiveUpdatesFragment.this::runSort));
 			} else {
 				compoundButton.setEnabled(false);
 			}
@@ -591,7 +535,7 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 
 		GetLastUpdateDateTask(LiveUpdatesFragment fragment) {
 			this.fragment = new WeakReference<>(fragment);
-			app = fragment.getMyApplication();
+			app = fragment.app;
 		}
 
 		@Override
@@ -631,25 +575,11 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 		}
 	}
 
-	protected static String getLastCheckString(String fileName, OsmandApplication app) {
-		return getLastCheckString(fileName, app, false);
-	}
-
-	protected static String getLastCheckString(String fileName, OsmandApplication app, boolean lastTimeChecked) {
-		OsmandSettings settings = app.getSettings();
-
-		final long lastUpdate = preferenceLatestUpdateAvailable(fileName, settings).get();
+	@NonNull
+	private String getFormattedLastSuccessfulCheck(@NonNull String fileName) {
+		long lastUpdate = preferenceLastSuccessfulUpdateCheck(fileName, settings).get();
 		String lastUpdateString = formatShortDateTime(app, lastUpdate);
-		String description = app.getString(R.string.updated, lastUpdateString);
-
-		if (lastTimeChecked) {
-			final long lastCheck = preferenceLastCheck(fileName, settings).get();
-			String lastCheckString = formatShortDateTime(app, lastCheck);
-			if (!lastUpdateString.equals(app.getString(R.string.shared_string_never))) {
-				description = description.concat("\n" + app.getString(R.string.last_time_checked, lastCheckString));
-			}
-		}
-		return description;
+		return app.getString(R.string.updated, lastUpdateString);
 	}
 
 	@Override
@@ -658,18 +588,18 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 	}
 
 	@Override
-	public List<LocalIndexInfo> getMapsToUpdate() {
-		return getMapsToUpdate(adapter.mapsList, settings);
+	public List<LocalItem> getMapsToUpdate() {
+		return getMapsToUpdate(adapter.localItems, settings);
 	}
 
 	@Override
-	public boolean onUpdateLocalIndex(String fileName, boolean newValue, final Runnable callback) {
+	public boolean onUpdateLocalIndex(String fileName, boolean newValue, Runnable callback) {
 		int frequencyId = preferenceUpdateFrequency(fileName, settings).get();
 		int timeOfDateToUpdateId = preferenceTimeOfDayToUpdate(fileName, settings).get();
-		final AlarmManager alarmManager = (AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
-		final PendingIntent alarmIntent = getPendingIntent(app, fileName);
+		AlarmManager alarmManager = (AlarmManager) app.getSystemService(Context.ALARM_SERVICE);
+		PendingIntent alarmIntent = getPendingIntent(app, fileName);
 
-		final CommonPreference<Boolean> liveUpdatePreference = preferenceForLocalIndex(fileName, settings);
+		CommonPreference<Boolean> liveUpdatePreference = preferenceForLocalIndex(fileName, settings);
 		liveUpdatePreference.set(newValue);
 		if (settings.IS_LIVE_UPDATES_ON.get() && liveUpdatePreference.get()) {
 			runLiveUpdate(getActivity(), fileName, true, callback);
@@ -684,7 +614,7 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 	}
 
 	@Override
-	public void forceUpdateLocal(String fileName, boolean userRequested, final Runnable callback) {
+	public void forceUpdateLocal(String fileName, boolean userRequested, Runnable callback) {
 		if (settings.IS_LIVE_UPDATES_ON.get()) {
 			runLiveUpdate(getActivity(), fileName, userRequested, callback);
 		}
@@ -702,6 +632,15 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 		if (adapter != null) {
 			adapter.notifyDataSetChanged();
 		}
+	}
+
+	@NonNull
+	public static String getFileNameWithoutRoadSuffix(@NonNull LocalItem item) {
+		String fileName = item.getFileName();
+		if (fileName.endsWith(BINARY_ROAD_MAP_INDEX_EXT)) {
+			return fileName.substring(0, fileName.lastIndexOf(BINARY_ROAD_MAP_INDEX_EXT)) + BINARY_MAP_INDEX_EXT;
+		}
+		return fileName;
 	}
 
 	public static String getSupportRegionName(OsmandApplication app, InAppPurchaseHelper purchaseHelper) {
@@ -731,11 +670,5 @@ public class LiveUpdatesFragment extends BaseOsmAndDialogFragment implements OnL
 			countryName = app.getString(R.string.osmand_team);
 		}
 		return countryName;
-	}
-
-	public static String getSupportRegionHeader(OsmandApplication app, String supportRegion) {
-		return supportRegion.equals(app.getString(R.string.osmand_team)) ?
-				app.getString(R.string.default_buttons_support) :
-				app.getString(R.string.osm_live_support_region);
 	}
 }

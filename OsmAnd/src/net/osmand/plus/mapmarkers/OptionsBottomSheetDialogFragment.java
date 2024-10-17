@@ -1,7 +1,6 @@
 package net.osmand.plus.mapmarkers;
 
 import android.app.Activity;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
@@ -13,18 +12,16 @@ import android.widget.ImageView;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import net.osmand.AndroidUtils;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.plus.R;
 import net.osmand.plus.base.BottomSheetDialogFragment;
 import net.osmand.plus.helpers.AndroidUiHelper;
-import net.osmand.plus.mapmarkers.MapMarkersDialogFragment;
-import net.osmand.plus.mapmarkers.MapMarkersMode;
 
 public class OptionsBottomSheetDialogFragment extends BottomSheetDialogFragment {
 
-	public final static String TAG = "OptionsBottomSheetDialogFragment";
-	public final static String GROUPS_MARKERS_MENU = "groups_markers_menu";
-	public final static String HISTORY_MARKERS_MENU = "history_markers_menu";
+	public static final String TAG = "OptionsBottomSheetDialogFragment";
+	public static final String GROUPS_MARKERS_MENU = "groups_markers_menu";
+	public static final String HISTORY_MARKERS_MENU = "history_markers_menu";
 
 	private MarkerOptionsFragmentListener listener;
 	private boolean disableSortBy;
@@ -48,38 +45,24 @@ public class OptionsBottomSheetDialogFragment extends BottomSheetDialogFragment 
 	@Nullable
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-		final int themeRes = getMyApplication().getSettings().isLightContent() ? R.style.OsmandLightTheme : R.style.OsmandDarkTheme;
+		int themeRes = getMyApplication().getSettings().isLightContent() ? R.style.OsmandLightTheme : R.style.OsmandDarkTheme;
 
 		View view = View.inflate(new ContextThemeWrapper(getContext(), themeRes), R.layout.fragment_marker_options_bottom_sheet_dialog, null);
-		view.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				dismiss();
-			}
-		});
+		view.setOnClickListener(v -> dismiss());
 
-		final View mainView = view.findViewById(R.id.main_view);
+		View mainView = view.findViewById(R.id.main_view);
 		if (!AndroidUiHelper.isOrientationPortrait(getActivity())) {
 			mainView.getLayoutParams().width = getResources().getDimensionPixelSize(R.dimen.landscape_bottom_sheet_dialog_fragment_width);
 		}
 
 		((ImageView) mainView.findViewById(R.id.sort_by_icon)).setImageDrawable(getContentIcon(R.drawable.ic_sort_waypoint_dark));
-		MapMarkersMode mode = getMyApplication().getSettings().MAP_MARKERS_MODE.get();
 		int displayedCount = getMyApplication().getSettings().DISPLAYED_MARKERS_WIDGETS_COUNT.get();
-		ImageView showDirectionIcon = (ImageView) mainView.findViewById(R.id.show_direction_icon);
-		int imageResId = 0;
-		switch (mode) {
-			case TOOLBAR:
-				imageResId = displayedCount == 1 ? R.drawable.ic_action_device_topbar : R.drawable.ic_action_device_topbar_two;
-				break;
-			case WIDGETS:
-				imageResId = displayedCount == 1 ? R.drawable.ic_action_device_widget : R.drawable.ic_action_device_widget_two;
-				break;
-		}
-		showDirectionIcon.setBackgroundDrawable(getContentIcon(R.drawable.ic_action_device_top));
-		if (imageResId != 0) {
-			showDirectionIcon.setImageDrawable(getIcon(imageResId, R.color.active_color_primary_light));
-		}
+		ImageView showDirectionIcon = mainView.findViewById(R.id.show_direction_icon);
+		int imageResId = displayedCount == 1
+				? R.drawable.ic_action_device_topbar
+				: R.drawable.ic_action_device_topbar_two;
+		showDirectionIcon.setBackground(getContentIcon(R.drawable.ic_action_device_top));
+		showDirectionIcon.setImageDrawable(getIcon(imageResId, R.color.active_color_primary_light));
 		((ImageView) mainView.findViewById(R.id.coordinate_input_icon)).setImageDrawable(getContentIcon(R.drawable.ic_action_coordinates_longitude));
 		((ImageView) mainView.findViewById(R.id.build_route_icon)).setImageDrawable(getContentIcon(R.drawable.ic_action_gdirections_dark));
 		((ImageView) mainView.findViewById(R.id.save_as_new_track_icon)).setImageDrawable(getContentIcon(R.drawable.ic_action_polygom_dark));
@@ -89,69 +72,51 @@ public class OptionsBottomSheetDialogFragment extends BottomSheetDialogFragment 
 		if (disableSortBy) {
 			disableView(sortByRow);
 		} else {
-			sortByRow.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View view) {
-					if (listener != null) {
-						listener.sortByOnClick();
-					}
-					dismiss();
+			sortByRow.setOnClickListener(v -> {
+				if (listener != null) {
+					listener.sortByOnClick();
 				}
+				dismiss();
 			});
 		}
-		mainView.findViewById(R.id.show_direction_row).setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				if (listener != null) {
-					listener.showDirectionOnClick();
-				}
-				dismiss();
+		mainView.findViewById(R.id.show_direction_row).setOnClickListener(v -> {
+			if (listener != null) {
+				listener.showDirectionOnClick();
 			}
+			dismiss();
 		});
-		mainView.findViewById(R.id.coordinate_input_row).setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				if (listener != null) {
-					listener.coordinateInputOnClick();
-				}
-				dismiss();
+		mainView.findViewById(R.id.coordinate_input_row).setOnClickListener(v -> {
+			if (listener != null) {
+				listener.coordinateInputOnClick();
 			}
+			dismiss();
 		});
-		mainView.findViewById(R.id.build_route_row).setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View view) {
-				if (listener != null) {
-					listener.buildRouteOnClick();
-				}
-				dismiss();
+		mainView.findViewById(R.id.build_route_row).setOnClickListener(v -> {
+			if (listener != null) {
+				listener.buildRouteOnClick();
 			}
+			dismiss();
 		});
 		View saveAsTrackRow = mainView.findViewById(R.id.save_as_new_track_row);
 		if (disableSaveAsTrack) {
 			disableView(saveAsTrackRow);
 		} else {
-			saveAsTrackRow.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View view) {
-					if (listener != null) {
-						listener.saveAsNewTrackOnClick();
-					}
-					dismiss();
+			saveAsTrackRow.setOnClickListener(v -> {
+				if (listener != null) {
+					listener.saveAsNewTrackOnClick();
 				}
+				dismiss();
 			});
 		}
 		View moveAllToHistoryRow = mainView.findViewById(R.id.move_all_to_history_row);
 		if (disableMoveAllToHistory) {
 			disableView(moveAllToHistoryRow);
 		} else {
-			moveAllToHistoryRow.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View view) {
-					if (listener != null) {
-						listener.moveAllToHistoryOnClick();
-					}
-					dismiss();
+			moveAllToHistoryRow.setOnClickListener(v -> {
+				if (listener != null) {
+					listener.moveAllToHistoryOnClick();
 				}
+				dismiss();
 			});
 		}
 
@@ -177,11 +142,7 @@ public class OptionsBottomSheetDialogFragment extends BottomSheetDialogFragment 
 				}
 
 				ViewTreeObserver obs = mainView.getViewTreeObserver();
-				if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-					obs.removeOnGlobalLayoutListener(this);
-				} else {
-					obs.removeGlobalOnLayoutListener(this);
-				}
+				obs.removeOnGlobalLayoutListener(this);
 			}
 		});
 

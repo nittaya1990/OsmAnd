@@ -13,10 +13,10 @@ import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
 import net.osmand.CallbackWithObject;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.bottomsheetmenu.BaseBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.TitleItem;
@@ -34,7 +34,7 @@ public class SelectMultipleProfilesBottomSheet extends BasePreferenceBottomSheet
 	public static final String SELECTED_KEYS = "selected_keys";
 	public static final String DISABLED_KEYS = "disabled_keys";
 
-	private List<ProfileDataObject> profiles = new ArrayList<>();
+	private final List<ProfileDataObject> profiles = new ArrayList<>();
 	private List<String> selectedProfiles;
 	private List<String> disabledProfiles;
 
@@ -75,7 +75,7 @@ public class SelectMultipleProfilesBottomSheet extends BasePreferenceBottomSheet
 		}
 	}
 
-	private void addProfileItem(final ProfileDataObject profile) {
+	private void addProfileItem(ProfileDataObject profile) {
 		OsmandApplication app = requiredMyApplication();
 		View itemView = UiUtilities.getInflater(app, nightMode)
 				.inflate(R.layout.bottom_sheet_item_with_descr_and_checkbox_56dp, null);
@@ -89,7 +89,7 @@ public class SelectMultipleProfilesBottomSheet extends BasePreferenceBottomSheet
 		TextView tvTitle = itemView.findViewById(R.id.title);
 		TextView tvDescription = itemView.findViewById(R.id.description);
 		ImageView ivIcon = itemView.findViewById(R.id.icon);
-		final CompoundButton compoundButton = itemView.findViewById(R.id.compound_button);
+		CompoundButton compoundButton = itemView.findViewById(R.id.compound_button);
 
 		tvTitle.setText(profile.getName());
 		tvDescription.setText(profile.getDescription());
@@ -174,7 +174,7 @@ public class SelectMultipleProfilesBottomSheet extends BasePreferenceBottomSheet
 		fragment.setArguments(args);
 		fragment.setTargetFragment(targetFragment, 0);
 		fragment.setUsedOnMap(usedOnMap);
-		fragment.show(mapActivity.getSupportFragmentManager(), SelectMultipleProfilesBottomSheet.TAG);
+		fragment.show(mapActivity.getSupportFragmentManager(), TAG);
 	}
 
 }

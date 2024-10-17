@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-	xmlns:osmand="http://schemas.android.com/apk/res-auto"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
@@ -37,15 +37,15 @@
 						android:layout_width="match_parent"
 						android:layout_height="match_parent"
 						android:layout_gravity="center_vertical"
+						android:layout_marginStart="@dimen/context_menu_buttons_padding_bottom"
 						android:layout_marginLeft="@dimen/context_menu_buttons_padding_bottom"
+						android:layout_marginEnd="@dimen/context_menu_buttons_padding_bottom"
 						android:layout_marginRight="@dimen/context_menu_buttons_padding_bottom"
 						android:orientation="horizontal"
 						android:paddingStart="@dimen/route_info_app_modes_padding"
 						android:paddingLeft="@dimen/route_info_app_modes_padding"
 						android:paddingEnd="@dimen/route_info_app_modes_padding"
-						android:paddingRight="@dimen/route_info_app_modes_padding"
-						android:layout_marginStart="@dimen/context_menu_buttons_padding_bottom"
-						android:layout_marginEnd="@dimen/context_menu_buttons_padding_bottom" />
+						android:paddingRight="@dimen/route_info_app_modes_padding" />
 
 					<LinearLayout
 						android:id="@+id/app_modes_fold_container"
@@ -58,12 +58,13 @@
 						<androidx.appcompat.widget.AppCompatImageView
 							android:id="@+id/fold_button"
 							android:layout_width="wrap_content"
+							android:contentDescription="@string/fold_unfold"
 							android:layout_height="match_parent"
 							android:background="?attr/selectableItemBackgroundBorderless"
 							android:paddingLeft="@dimen/route_info_icon_padding_right"
 							android:paddingRight="@dimen/route_info_icon_padding_right"
-							osmand:srcCompat="@drawable/ic_action_arrow_down"
-							android:tint="@color/description_font_and_bottom_sheet_icons"
+							app:srcCompat="@drawable/ic_action_arrow_down"
+							android:tint="@color/icon_color_default_light"
 							android:paddingStart="@dimen/route_info_icon_padding_right"
 							android:paddingEnd="@dimen/route_info_icon_padding_right" />
 
@@ -78,12 +79,13 @@
 
 						<androidx.appcompat.widget.AppCompatImageView
 							android:id="@+id/app_modes_options"
+							android:contentDescription="@string/app_modes_options"
 							android:layout_width="wrap_content"
 							android:layout_height="match_parent"
 							android:background="?attr/selectableItemBackgroundBorderless"
 							android:paddingLeft="@dimen/route_info_icon_padding_right"
 							android:paddingRight="@dimen/route_info_icon_padding_right"
-							osmand:srcCompat="@drawable/ic_overflow_menu_dark"
+							app:srcCompat="@drawable/ic_overflow_menu_dark"
 							android:paddingStart="@dimen/route_info_icon_padding_right"
 							android:paddingEnd="@dimen/route_info_icon_padding_right" />
 
@@ -116,7 +118,7 @@
 						android:layout_marginEnd="@dimen/favorites_icon_right_margin"
 						android:layout_marginRight="@dimen/favorites_icon_right_margin"
 						android:layout_marginBottom="@dimen/list_header_text_left_margin"
-						osmand:srcCompat="@drawable/ic_action_location_color" />
+						app:srcCompat="@drawable/ic_action_location_color" />
 
 					<LinearLayout
 						android:layout_width="0dp"
@@ -134,7 +136,7 @@
 							android:layout_marginEnd="@dimen/list_content_padding"
 							android:layout_marginBottom="3dp"
 							android:text="@string/route_from"
-							android:textColor="@color/description_font_and_bottom_sheet_icons"
+							android:textColor="@color/text_color_secondary_light"
 							android:textSize="@dimen/default_sub_text_size" />
 
 						<TextView
@@ -155,13 +157,10 @@
 						android:id="@+id/from_button"
 						android:layout_width="wrap_content"
 						android:layout_height="wrap_content"
-						android:layout_marginLeft="@dimen/context_menu_padding_margin_medium"
-						android:layout_marginTop="@dimen/route_info_icon_vertical_padding"
-						android:layout_marginRight="@dimen/context_menu_padding_margin_medium"
-						android:layout_marginBottom="@dimen/route_info_icon_vertical_padding"
-						tools:background="@drawable/btn_rounded_dark"
-						android:layout_marginStart="@dimen/context_menu_padding_margin_medium"
-						android:layout_marginEnd="@dimen/context_menu_padding_margin_medium">
+						android:layout_marginHorizontal="@dimen/context_menu_padding_margin_medium"
+						android:layout_marginVertical="@dimen/route_info_icon_vertical_padding"
+						android:contentDescription="@string/shared_string_swap"
+						tools:background="@drawable/btn_rounded_dark">
 
 						<LinearLayout
 							android:id="@+id/from_button_container"
@@ -185,7 +184,7 @@
 								android:text="@string/shared_string_swap"
 								android:textColor="?attr/active_color_basic"
 								android:textSize="@dimen/text_button_text_size"
-								osmand:typeface="@string/font_roboto_medium"
+								app:typefaceWeight="medium"
 								android:visibility="gone"
 								tools:ignore="UnusedAttribute" />
 
@@ -193,13 +192,8 @@
 								android:id="@+id/from_button_image_view"
 								android:layout_width="@dimen/standard_icon_size"
 								android:layout_height="@dimen/standard_icon_size"
-								android:layout_marginLeft="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginTop="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginRight="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginBottom="@dimen/route_info_icon_vertical_padding"
-								tools:src="@drawable/ic_action_remove_dark"
-								android:layout_marginEnd="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginStart="@dimen/route_info_icon_vertical_padding" />
+								android:layout_margin="@dimen/route_info_icon_vertical_padding"
+								tools:src="@drawable/ic_action_change_navigation_points" />
 
 						</LinearLayout>
 
@@ -236,7 +230,7 @@
 						android:layout_marginEnd="@dimen/favorites_icon_right_margin"
 						android:layout_marginRight="@dimen/favorites_icon_right_margin"
 						android:layout_marginBottom="@dimen/list_header_text_left_margin"
-						osmand:srcCompat="@drawable/ic_action_location_color" />
+						app:srcCompat="@drawable/ic_action_location_color" />
 
 					<LinearLayout
 						android:layout_width="0dp"
@@ -255,7 +249,7 @@
 							android:gravity="start"
 							android:singleLine="true"
 							android:text="@string/intermediate_destinations"
-							android:textColor="@color/description_font_and_bottom_sheet_icons"
+							android:textColor="@color/text_color_secondary_light"
 							android:textSize="@dimen/default_sub_text_size" />
 
 						<TextView
@@ -276,13 +270,9 @@
 						android:id="@+id/via_button"
 						android:layout_width="wrap_content"
 						android:layout_height="@dimen/route_info_buttons_height"
-						android:layout_marginLeft="@dimen/context_menu_padding_margin_medium"
-						android:layout_marginTop="@dimen/route_info_icon_vertical_padding"
-						android:layout_marginRight="@dimen/context_menu_padding_margin_medium"
-						android:layout_marginBottom="@dimen/route_info_icon_vertical_padding"
-						tools:background="@drawable/btn_rounded_dark"
-						android:layout_marginEnd="@dimen/context_menu_padding_margin_medium"
-						android:layout_marginStart="@dimen/context_menu_padding_margin_medium">
+						android:layout_marginHorizontal="@dimen/context_menu_padding_margin_medium"
+						android:layout_marginVertical="@dimen/route_info_icon_vertical_padding"
+						tools:background="@drawable/btn_rounded_dark">
 
 						<LinearLayout
 							android:id="@+id/via_button_container"
@@ -297,7 +287,6 @@
 								android:layout_height="wrap_content"
 								android:layout_gravity="center"
 								android:layout_marginStart="@dimen/content_padding_small"
-								android:layout_marginLeft="@dimen/content_padding_small"
 								android:layout_weight="1"
 								android:ellipsize="end"
 								android:gravity="center"
@@ -306,20 +295,15 @@
 								android:text="@string/shared_string_edit"
 								android:textColor="?attr/active_color_basic"
 								android:textSize="@dimen/text_button_text_size"
-								osmand:typeface="@string/font_roboto_medium"
+								app:typefaceWeight="medium"
 								tools:ignore="UnusedAttribute" />
 
 							<androidx.appcompat.widget.AppCompatImageView
 								android:id="@+id/via_button_image_view"
 								android:layout_width="@dimen/standard_icon_size"
 								android:layout_height="@dimen/standard_icon_size"
-								android:layout_marginLeft="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginTop="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginRight="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginBottom="@dimen/route_info_icon_vertical_padding"
-								tools:src="@drawable/ic_action_edit_dark"
-								android:layout_marginEnd="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginStart="@dimen/route_info_icon_vertical_padding" />
+								android:layout_margin="@dimen/route_info_icon_vertical_padding"
+								tools:src="@drawable/ic_action_edit_dark" />
 
 						</LinearLayout>
 
@@ -356,7 +340,7 @@
 						android:layout_marginEnd="@dimen/favorites_icon_right_margin"
 						android:layout_marginRight="@dimen/favorites_icon_right_margin"
 						android:layout_marginBottom="@dimen/list_header_text_left_margin"
-						osmand:srcCompat="@drawable/ic_action_location_color" />
+						app:srcCompat="@drawable/ic_action_location_color" />
 
 					<LinearLayout
 						android:layout_width="0dp"
@@ -372,7 +356,7 @@
 							android:layout_marginTop="5dp"
 							android:layout_marginBottom="3dp"
 							android:text="@string/route_to"
-							android:textColor="@color/description_font_and_bottom_sheet_icons"
+							android:textColor="@color/text_color_secondary_light"
 							android:textSize="@dimen/default_sub_text_size" />
 
 						<TextView
@@ -393,13 +377,10 @@
 						android:id="@+id/to_button"
 						android:layout_width="wrap_content"
 						android:layout_height="@dimen/route_info_buttons_height"
-						android:layout_marginLeft="@dimen/context_menu_padding_margin_medium"
-						android:layout_marginTop="@dimen/route_info_icon_vertical_padding"
-						android:layout_marginRight="@dimen/context_menu_padding_margin_medium"
-						android:layout_marginBottom="@dimen/route_info_icon_vertical_padding"
-						tools:background="@drawable/btn_rounded_dark"
-						android:layout_marginEnd="@dimen/context_menu_padding_margin_medium"
-						android:layout_marginStart="@dimen/context_menu_padding_margin_medium">
+						android:layout_marginHorizontal="@dimen/context_menu_padding_margin_medium"
+						android:layout_marginVertical="@dimen/route_info_icon_vertical_padding"
+						android:contentDescription="@string/shared_string_add"
+						tools:background="@drawable/btn_rounded_dark">
 
 						<LinearLayout
 							android:id="@+id/to_button_container"
@@ -423,20 +404,15 @@
 								android:text="@string/shared_string_add"
 								android:textColor="?attr/active_color_basic"
 								android:textSize="@dimen/text_button_text_size"
-								osmand:typeface="@string/font_roboto_medium"
+								app:typefaceWeight="medium"
 								tools:ignore="UnusedAttribute" />
 
 							<androidx.appcompat.widget.AppCompatImageView
 								android:id="@+id/to_button_image_view"
 								android:layout_width="@dimen/standard_icon_size"
 								android:layout_height="@dimen/standard_icon_size"
-								android:layout_marginLeft="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginTop="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginRight="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginBottom="@dimen/route_info_icon_vertical_padding"
-								tools:src="@drawable/ic_action_plus"
-								android:layout_marginEnd="@dimen/route_info_icon_vertical_padding"
-								android:layout_marginStart="@dimen/route_info_icon_vertical_padding" />
+								android:layout_margin="@dimen/route_info_icon_vertical_padding"
+								tools:src="@drawable/ic_action_plus" />
 
 						</LinearLayout>
 
@@ -495,10 +471,10 @@
 						android:gravity="center"
 						android:letterSpacing="@dimen/text_button_letter_spacing"
 						android:maxLines="1"
-						android:text="@string/shared_string_options"
+						android:text="@string/shared_string_settings"
 						android:textColor="?attr/active_color_basic"
 						android:textSize="@dimen/text_button_text_size"
-						osmand:typeface="@string/font_roboto_medium"
+						app:typefaceWeight="medium"
 						tools:ignore="UnusedAttribute" />
 
 					<androidx.appcompat.widget.AppCompatImageView
@@ -521,9 +497,9 @@
 					android:layout_gravity="bottom"
 					android:max="100"
 					android:visibility="gone"
-					osmand:mpb_progressStyle="horizontal"
-					osmand:mpb_useIntrinsicPadding="false"
-					osmand:mpb_setBothDrawables="true"
+					app:mpb_progressStyle="horizontal"
+					app:mpb_useIntrinsicPadding="false"
+					app:mpb_setBothDrawables="true"
 					style="@style/Widget.MaterialProgressBar.ProgressBar.Horizontal" />
 
 			</FrameLayout>
@@ -577,7 +553,7 @@
 			android:layout_height="wrap_content"
 			android:layout_gravity="top"
 			android:scaleType="fitXY"
-			osmand:srcCompat="@drawable/bg_contextmenu_shadow" />
+			app:srcCompat="@drawable/bg_contextmenu_shadow" />
 
 	</LinearLayout>
 

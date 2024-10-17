@@ -2,7 +2,7 @@ package net.osmand.plus.backup.commands;
 
 import androidx.annotation.NonNull;
 
-import net.osmand.AndroidNetworkUtils;
+import net.osmand.plus.utils.AndroidNetworkUtils;
 import net.osmand.OperationLog;
 import net.osmand.plus.backup.BackupCommand;
 import net.osmand.plus.backup.BackupError;
@@ -25,6 +25,8 @@ import static net.osmand.plus.backup.BackupHelper.STATUS_PARSE_JSON_ERROR;
 import static net.osmand.plus.backup.BackupHelper.STATUS_SERVER_ERROR;
 import static net.osmand.plus.backup.BackupHelper.STATUS_SUCCESS;
 
+import android.os.Build;
+
 public class RegisterDeviceCommand extends BackupCommand {
 
 	private final String token;
@@ -40,8 +42,13 @@ public class RegisterDeviceCommand extends BackupCommand {
 
 	@Override
 	protected Object doInBackground(Object... objects) {
-		Map<String, String> params = new HashMap<>();
 		BackupHelper helper = getHelper();
+		// Update order id on login
+		if (Algorithms.isEmpty(token)) {
+			helper.updateOrderId(null);
+		}
+
+		Map<String, String> params = new HashMap<>();
 		params.put("email", helper.getEmail());
 		String orderId = helper.getOrderId();
 		if (orderId != null) {
@@ -52,6 +59,9 @@ public class RegisterDeviceCommand extends BackupCommand {
 			params.put("deviceid", androidId);
 		}
 		params.put("token", token);
+		params.put("brand", Build.BRAND);
+		params.put("model", Build.MODEL);
+		params.put("lang", getApp().getLocaleHelper().getLanguage());
 		OperationLog operationLog = createOperationLog("registerDevice");
 		AndroidNetworkUtils.sendRequest(getApp(), DEVICE_REGISTER_URL, params, "Register device", false, true, (resultJson, error, resultCode) -> {
 			int status;

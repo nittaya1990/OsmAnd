@@ -3,12 +3,16 @@ package net.osmand.plus.routing;
 import android.graphics.Rect;
 import android.os.Bundle;
 
-import net.osmand.util.Algorithms;
-
 import androidx.annotation.ColorInt;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+
+import net.osmand.shared.gpx.ColoringPurpose;
+import net.osmand.plus.card.color.ColoringStyle;
+import net.osmand.plus.card.color.palette.gradient.PaletteGradientColor;
+import net.osmand.util.Algorithms;
+import net.osmand.shared.routing.ColoringType;
 
 public class PreviewRouteLineInfo {
 
@@ -16,6 +20,7 @@ public class PreviewRouteLineInfo {
 	private static final String CUSTOM_COLOR_NIGHT = "custom_color_night";
 	private static final String ROUTE_COLORING_TYPE = "route_coloring_type";
 	private static final String LINE_WIDTH = "line_width";
+	private static final String SHOW_TURN_ARROWS = "show_turn_arrows";
 	private static final String NAVIGATION_ICON_ID = "navigation_icon_id";
 	private static final String NAVIGATION_ICON_COLOR = "navigation_icon_color";
 	private static final String LINE_BOUNDS = "line_bounds";
@@ -29,10 +34,13 @@ public class PreviewRouteLineInfo {
 	@ColorInt
 	private int customColorNight;
 	private ColoringType coloringType = ColoringType.DEFAULT;
+	private String gradientPalette = PaletteGradientColor.DEFAULT_NAME;
 	private String routeInfoAttribute;
 	private String width;
+	private boolean showTurnArrows;
 
 	// temporally parameters to show in preview
+	private boolean showDirectionArrows = true;
 	@ColorInt
 	private int iconColor;
 	@DrawableRes
@@ -46,30 +54,20 @@ public class PreviewRouteLineInfo {
 	                            @ColorInt int customColorNight,
 	                            @NonNull ColoringType coloringType,
 	                            @Nullable String routeInfoAttribute,
-	                            @Nullable String width) {
+	                            @Nullable String width,
+	                            @NonNull String gradientPalette,
+	                            boolean showTurnArrows) {
 		this.customColorDay = customColorDay;
 		this.customColorNight = customColorNight;
 		this.coloringType = coloringType;
 		this.routeInfoAttribute = routeInfoAttribute;
 		this.width = width;
+		this.showTurnArrows = showTurnArrows;
+		this.gradientPalette = gradientPalette;
 	}
 
 	public PreviewRouteLineInfo(@NonNull Bundle bundle) {
 		readBundle(bundle);
-	}
-
-	public PreviewRouteLineInfo(@NonNull PreviewRouteLineInfo existed) {
-		this.customColorDay = existed.customColorDay;
-		this.customColorNight = existed.customColorNight;
-		this.coloringType = existed.coloringType;
-		this.routeInfoAttribute = existed.routeInfoAttribute;
-		this.width = existed.width;
-		this.iconId = existed.iconId;
-		this.iconColor = existed.iconColor;
-		this.lineBounds = existed.lineBounds;
-		this.centerX = existed.centerX;
-		this.centerY = existed.centerY;
-		this.screenHeight = existed.screenHeight;
 	}
 
 	public void setCustomColor(@ColorInt int color, boolean nightMode) {
@@ -78,6 +76,20 @@ public class PreviewRouteLineInfo {
 		} else {
 			customColorDay = color;
 		}
+	}
+
+	public void setGradientPalette(@NonNull String gradientPalette) {
+		this.gradientPalette = gradientPalette;
+	}
+
+	@NonNull
+	public String getGradientPalette() {
+		return gradientPalette;
+	}
+
+	public void setRouteColoringStyle(@NonNull ColoringStyle coloringStyle) {
+		setRouteColoringType(coloringStyle.getType());
+		setRouteInfoAttribute(coloringStyle.getRouteInfoAttribute());
 	}
 
 	public void setRouteColoringType(@NonNull ColoringType coloringType) {
@@ -90,6 +102,14 @@ public class PreviewRouteLineInfo {
 
 	public void setWidth(@Nullable String width) {
 		this.width = width;
+	}
+
+	public void setShowTurnArrows(boolean showTurnArrows) {
+		this.showTurnArrows = showTurnArrows;
+	}
+
+	public void setShowDirectionArrows(boolean show) {
+		this.showDirectionArrows = show;
 	}
 
 	public void setIconId(int iconId) {
@@ -121,6 +141,11 @@ public class PreviewRouteLineInfo {
 	}
 
 	@NonNull
+	public ColoringStyle getRouteColoringStyle() {
+		return new ColoringStyle(getRouteColoringType(), getRouteInfoAttribute());
+	}
+
+	@NonNull
 	public ColoringType getRouteColoringType() {
 		return coloringType;
 	}
@@ -133,6 +158,14 @@ public class PreviewRouteLineInfo {
 	@Nullable
 	public String getWidth() {
 		return width;
+	}
+
+	public boolean shouldShowTurnArrows() {
+		return showTurnArrows;
+	}
+
+	public boolean shouldShowDirectionArrows() {
+		return showDirectionArrows;
 	}
 
 	public int getIconId() {
@@ -167,9 +200,10 @@ public class PreviewRouteLineInfo {
 		if (bundle.containsKey(CUSTOM_COLOR_NIGHT)) {
 			customColorNight = bundle.getInt(CUSTOM_COLOR_NIGHT);
 		}
-		coloringType = ColoringType.getRouteColoringTypeByName(bundle.getString(ROUTE_COLORING_TYPE));
-		routeInfoAttribute = ColoringType.getRouteInfoAttribute(bundle.getString(ROUTE_COLORING_TYPE));
+		coloringType = ColoringType.Companion.requireValueOf(ColoringPurpose.ROUTE_LINE, bundle.getString(ROUTE_COLORING_TYPE));
+		routeInfoAttribute = ColoringType.Companion.getRouteInfoAttribute(bundle.getString(ROUTE_COLORING_TYPE));
 		width = bundle.getString(LINE_WIDTH);
+		showTurnArrows = bundle.getBoolean(SHOW_TURN_ARROWS);
 		iconId = bundle.getInt(NAVIGATION_ICON_ID);
 		iconColor = bundle.getInt(NAVIGATION_ICON_COLOR);
 		lineBounds = bundle.getParcelable(LINE_BOUNDS);
@@ -185,6 +219,7 @@ public class PreviewRouteLineInfo {
 		if (width != null) {
 			bundle.putString(LINE_WIDTH, width);
 		}
+		bundle.putBoolean(SHOW_TURN_ARROWS, showTurnArrows);
 		bundle.putInt(NAVIGATION_ICON_ID, iconId);
 		bundle.putInt(NAVIGATION_ICON_COLOR, iconColor);
 		bundle.putParcelable(LINE_BOUNDS, lineBounds);

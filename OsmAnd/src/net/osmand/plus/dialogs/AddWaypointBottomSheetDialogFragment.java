@@ -13,10 +13,10 @@ import androidx.annotation.Nullable;
 
 import net.osmand.data.LatLon;
 import net.osmand.data.PointDescription;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper;
-import net.osmand.plus.TargetPointsHelper.TargetPoint;
+import net.osmand.plus.helpers.TargetPointsHelper;
+import net.osmand.plus.helpers.TargetPointsHelper.TargetPoint;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.MenuBottomSheetDialogFragment;
 import net.osmand.plus.base.bottomsheetmenu.BaseBottomSheetItem;
@@ -34,9 +34,9 @@ public class AddWaypointBottomSheetDialogFragment extends MenuBottomSheetDialogF
 	@Override
 	public void createMenuItems(Bundle savedInstanceState) {
 		Bundle args = getArguments();
-		final LatLon latLon = new LatLon(args.getDouble(LAT_KEY), args.getDouble(LON_KEY));
-		final PointDescription name = PointDescription.deserializeFromString(args.getString(POINT_DESCRIPTION_KEY), latLon);
-		final TargetPointsHelper targetPointsHelper = getMyApplication().getTargetPointsHelper();
+		LatLon latLon = new LatLon(args.getDouble(LAT_KEY), args.getDouble(LON_KEY));
+		PointDescription name = PointDescription.deserializeFromString(args.getString(POINT_DESCRIPTION_KEY), latLon);
+		TargetPointsHelper targetPointsHelper = getMyApplication().getTargetPointsHelper();
 
 		items.add(new TitleItem(getString(R.string.new_destination_point_dialog)));
 
@@ -46,12 +46,9 @@ public class AddWaypointBottomSheetDialogFragment extends MenuBottomSheetDialogF
 				.setIcon(getIcon(R.drawable.list_destination, 0))
 				.setTitle(getString(R.string.replace_destination_point))
 				.setLayoutId(R.layout.bottom_sheet_item_with_descr_56dp)
-				.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						targetPointsHelper.navigateToPoint(latLon, true, -1, name);
-						dismiss();
-					}
+				.setOnClickListener(v -> {
+					targetPointsHelper.navigateToPoint(latLon, true, -1, name);
+					dismiss();
 				})
 				.create();
 		items.add(replaceDestItem);
@@ -62,12 +59,9 @@ public class AddWaypointBottomSheetDialogFragment extends MenuBottomSheetDialogF
 				.setIcon(getIcon(R.drawable.list_startpoint, 0))
 				.setTitle(getString(R.string.make_as_start_point))
 				.setLayoutId(R.layout.bottom_sheet_item_with_descr_56dp)
-				.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						targetPointsHelper.setStartPoint(latLon, true, name);
-						dismiss();
-					}
+				.setOnClickListener(v -> {
+					targetPointsHelper.setStartPoint(latLon, true, name);
+					dismiss();
 				})
 				.create();
 		items.add(replaceStartItem);
@@ -80,13 +74,10 @@ public class AddWaypointBottomSheetDialogFragment extends MenuBottomSheetDialogF
 				.setIcon(getSubsequentDestIcon())
 				.setTitle(getString(R.string.keep_and_add_destination_point))
 				.setLayoutId(R.layout.bottom_sheet_item_with_descr_56dp)
-				.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						targetPointsHelper.navigateToPoint(latLon, true,
-								targetPointsHelper.getIntermediatePoints().size() + 1, name);
-						dismiss();
-					}
+				.setOnClickListener(v -> {
+					targetPointsHelper.navigateToPoint(latLon, true,
+							targetPointsHelper.getIntermediatePoints().size() + 1, name);
+					dismiss();
 				})
 				.create();
 		items.add(subsequentDestItem);
@@ -97,12 +88,9 @@ public class AddWaypointBottomSheetDialogFragment extends MenuBottomSheetDialogF
 				.setIcon(getFirstIntermDestIcon())
 				.setTitle(getString(R.string.add_as_first_destination_point))
 				.setLayoutId(R.layout.bottom_sheet_item_with_descr_56dp)
-				.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						targetPointsHelper.navigateToPoint(latLon, true, 0, name);
-						dismiss();
-					}
+				.setOnClickListener(v -> {
+					targetPointsHelper.navigateToPoint(latLon, true, 0, name);
+					dismiss();
 				})
 				.create();
 		items.add(firstIntermItem);
@@ -133,12 +121,12 @@ public class AddWaypointBottomSheetDialogFragment extends MenuBottomSheetDialogF
 
 	@Override
 	protected int getDividerColorId() {
-		return nightMode ? R.color.route_info_bottom_view_bg_dark : -1;
+		return nightMode ? R.color.card_and_list_background_dark : -1;
 	}
 
 	@Override
 	protected Drawable getActiveIcon(@DrawableRes int id) {
-		return getIcon(id, nightMode ? R.color.ctx_menu_direction_color_dark : R.color.map_widget_blue);
+		return getIcon(id, nightMode ? R.color.icon_color_active_dark : R.color.map_widget_blue);
 	}
 
 	private Drawable getBackgroundIcon(@DrawableRes int resId) {

@@ -109,7 +109,7 @@
     <string name="gps_points_in_buffer">envoyé (%1$d dans le tampon)</string>
     <string name="monitoring_is_enabled">Enregistrement activé</string>
     <string name="shared_string_enabled">Activé</string>
-    <string name="shared_string_status">Statut</string>
+    <string name="shared_string_status">État</string>
     <string name="shared_string_disable">Désactiver</string>
     <string name="shared_string_save">Enregistrer</string>
     <string name="shared_string_name">Nom</string>
@@ -139,11 +139,11 @@
     <string name="si_m_s">Mètres par seconde</string>
     <string name="si_min_km">Minutes par kilomètre</string>
     <string name="si_min_m">Minutes par mile</string>
-    <string name="si_mi_feet">Miles/pieds</string>
+    <string name="si_mi_feet">Miles / pieds</string>
     <string name="si_mi_yard">Miles / yards</string>
-    <string name="si_km_m">Kilomètres/mètres</string>
+    <string name="si_km_m">Kilomètres / mètres</string>
     <string name="si_nm">Miles nautiques</string>
-    <string name="si_mi_meters">Miles / Mètres</string>
+    <string name="si_mi_meters">Miles / mètres</string>
     <string name="nm_h">nœuds</string>
     <string name="shared_string_later">Plus tard</string>
     <string name="shared_string_password">Mot de passe</string>
@@ -271,4 +271,12 @@
     <string name="logcat_buffer_descr">Vérifier et partager les logs détaillés de l\'application</string>
     <string name="shared_string_export">Exporter</string>
     <string name="send_report">Envoyer le rapport</string>
+    <string name="send_live_location_error">Erreur de localisation temps réel : %1$s</string>
+    <string name="ltr_or_rtl_combine_via_dash">%1$s - %2$s</string>
+    <string name="ltr_or_rtl_combine_via_colon">%1$s : %2$s</string>
+    <string name="shared_string_error">Erreur</string>
+    <string name="location_source_summary">Par défaut, OsmAnd installé depuis Google Play utilise les Google Play Services pour déterminer la localisation.
+\n
+\nSi vous obtenez des informations de localisation inexactes ou si vous utilisez un appareil sans Google Play Services, essayez de changer par l\'API Android</string>
+    <string name="location_source">Source de localisation</string>
 </resources>

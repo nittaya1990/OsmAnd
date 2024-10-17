@@ -1,17 +1,23 @@
 package net.osmand.plus.routing;
 
 
+import static net.osmand.plus.routing.data.AnnounceTimeDistances.STATE_LONG_PREPARE_TURN;
+import static net.osmand.plus.routing.data.AnnounceTimeDistances.STATE_PREPARE_TURN;
+import static net.osmand.plus.routing.data.AnnounceTimeDistances.STATE_TURN_IN;
+import static net.osmand.plus.routing.data.AnnounceTimeDistances.STATE_TURN_NOW;
+
 import android.content.res.AssetFileDescriptor;
-import android.media.AudioManager;
+import android.media.AudioAttributes;
 import android.media.SoundPool;
+
+import androidx.annotation.NonNull;
 
 import net.osmand.Location;
 import net.osmand.StateChangedListener;
 import net.osmand.binary.RouteDataObject;
 import net.osmand.data.PointDescription;
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.helpers.WaypointHelper.LocationPointWrapper;
-import net.osmand.plus.routing.AlarmInfo.AlarmInfoType;
+import net.osmand.plus.helpers.LocationPointWrapper;
 import net.osmand.plus.routing.RouteCalculationResult.NextDirectionInfo;
 import net.osmand.plus.routing.data.AnnounceTimeDistances;
 import net.osmand.plus.routing.data.StreetName;
@@ -31,17 +37,12 @@ import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import static net.osmand.plus.routing.data.AnnounceTimeDistances.STATE_LONG_PREPARE_TURN;
-import static net.osmand.plus.routing.data.AnnounceTimeDistances.STATE_PREPARE_TURN;
-import static net.osmand.plus.routing.data.AnnounceTimeDistances.STATE_TURN_IN;
-import static net.osmand.plus.routing.data.AnnounceTimeDistances.STATE_TURN_NOW;
-
 
 public class VoiceRouter {
+
 	private static final int STATUS_UTWP_TOLD = -1;
 	private static final int STATUS_UNKNOWN = 0;
 	private static final int STATUS_LONG_PREPARE = 1;
@@ -66,23 +67,23 @@ public class VoiceRouter {
 	private AnnounceTimeDistances atd;
 
 	private int currentStatus = STATUS_UNKNOWN;
-	private boolean playedAndArriveAtTarget = false;
-	private float playGoAheadDist = 0;
-	private long lastAnnouncedSpeedLimit = 0;
-	private long waitAnnouncedSpeedLimit = 0;
-	private long lastAnnouncedOffRoute = 0;
-	private long waitAnnouncedOffRoute = 0;
-	private boolean suppressDest = false;
-	private boolean announceBackOnRoute = false;
+	private boolean playedAndArriveAtTarget;
+	private float playGoAheadDist;
+	private long lastAnnouncedSpeedLimit;
+	private long waitAnnouncedSpeedLimit;
+	private long lastAnnouncedOffRoute;
+	private long waitAnnouncedOffRoute;
+	private boolean suppressDest;
+	private boolean announceBackOnRoute;
 	// private long lastTimeRouteRecalcAnnounced = 0;
 	// Remember when last announcement was made
-	private long lastAnnouncement = 0;
+	private long lastAnnouncement;
 
 
 	private SoundPool soundPool;
 	private int soundClick = -1;
 
-	private VoiceCommandPending pendingCommand = null;
+	private VoiceCommandPending pendingCommand;
 	private RouteDirectionInfo nextRouteDirection;
 
 
@@ -123,7 +124,11 @@ public class VoiceRouter {
 
 	private void loadCameraSound() {
 		if (soundPool == null) {
-			soundPool = new SoundPool(5, AudioManager.STREAM_MUSIC, 0);
+			AudioAttributes attr = new AudioAttributes.Builder()
+					.setUsage(AudioAttributes.USAGE_NOTIFICATION)
+					.setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+					.build();
+			soundPool = new SoundPool.Builder().setAudioAttributes(attr).setMaxStreams(5).build();
 		}
 		if (soundClick == -1) {
 			try {
@@ -179,7 +184,7 @@ public class VoiceRouter {
 
 	public void updateAppMode() {
 		appMode = router.getAppMode() == null ? settings.getApplicationMode() : router.getAppMode();
-		atd = new AnnounceTimeDistances(appMode, settings);
+		atd = new AnnounceTimeDistances(appMode, app);
 	}
 
 	public int calculateImminent(float dist, Location loc) {
@@ -190,6 +195,9 @@ public class VoiceRouter {
 		//STATUS_UNKNOWN=0 -> STATUS_LONG_PREPARE=1 -> STATUS_PREPARE=2 -> STATUS_TURN_IN=3 -> STATUS_TURN=4 -> STATUS_TOLD=5
 		if (previousStatus != STATUS_TOLD) {
 			this.currentStatus = previousStatus + 1;
+			if (previousStatus == STATUS_TURN) {
+				waitAnnouncedOffRoute = 0;
+			}
 		} else {
 			this.currentStatus = previousStatus;
 		}
@@ -203,12 +211,16 @@ public class VoiceRouter {
 		return atd;
 	}
 
+	public RouteDirectionInfo getNextRouteDirection() {
+		return nextRouteDirection;
+	}
+
 	public float getArrivalDistance() {
 		return atd.getArrivalDistance();
 	}
 
 	public void announceOffRoute(double dist) {
-		if (dist > atd.getOffRouteDistance()) {
+		if (settings.SPEAK_ROUTE_DEVIATION.get() && dist > atd.getOffRouteDistance()) {
 			long ms = System.currentTimeMillis();
 			if (waitAnnouncedOffRoute == 0 || ms - lastAnnouncedOffRoute > waitAnnouncedOffRoute) {
 				CommandBuilder p = getNewCommandPlayerToPlay();
@@ -223,19 +235,25 @@ public class VoiceRouter {
 					waitAnnouncedOffRoute *= 2.5;
 				}
 				lastAnnouncedOffRoute = ms;
+			// Avoid offRoute/onRoute loop, #16571:
+			} else if (announceBackOnRoute && (dist < 0.3 * atd.getOffRouteDistance())) {
+				announceBackOnRoute();
 			}
 		}
 	}
 
-	public void announceBackOnRoute() {
-		if (announceBackOnRoute) {
+	private void announceBackOnRoute() {
+		//if (announceBackOnRoute) {
+		if (settings.SPEAK_ROUTE_DEVIATION.get()) {
 			CommandBuilder p = getNewCommandPlayerToPlay();
 			if (p != null) {
 				p.backOnRoute();
 			}
 			play(p);
-			announceBackOnRoute = false;
 		}
+		announceBackOnRoute = false;
+		waitAnnouncedOffRoute = 0;
+		//}
 	}
 
 	public void approachWaypoint(Location location, List<LocationPointWrapper> points) {
@@ -305,7 +323,7 @@ public class VoiceRouter {
 			// Need to calculate distance to nearest point
 			if (text.length() == 0) {
 				if (location != null && dist != null) {
-					dist[0] = point.getDeviationDistance() + 
+					dist[0] = point.getDeviationDistance() +
 							MapUtils.getDistance(location.getLatitude(), location.getLongitude(),
 									point.getPoint().getLatitude(), point.getPoint().getLongitude());
 				}
@@ -349,12 +367,12 @@ public class VoiceRouter {
 			//  Wait 10 seconds before announcement
 			if (ms - lastAnnouncedSpeedLimit > 120 * 1000) {
 				waitAnnouncedSpeedLimit = ms;
-			}	
+			}
 		} else {
 			// If we wait before more than 20 sec (reset counter)
 			if (ms - waitAnnouncedSpeedLimit > 20 * 1000) {
 				waitAnnouncedSpeedLimit = 0;
-			} else if (router.getSettings().SPEAK_SPEED_LIMIT.get() && ms - waitAnnouncedSpeedLimit > 10 * 1000 ) {
+			} else if (router.getSettings().SPEAK_SPEED_LIMIT.get() && ms - waitAnnouncedSpeedLimit > 10 * 1000) {
 				CommandBuilder p = getNewCommandPlayerToPlay();
 				if (p != null) {
 					lastAnnouncedSpeedLimit = ms;
@@ -374,10 +392,10 @@ public class VoiceRouter {
 	}
 
 	private boolean needsInforming() {
-		final Integer repeat = settings.KEEP_INFORMING.get();
+		Integer repeat = settings.KEEP_INFORMING.get();
 		if (repeat == null || repeat == 0) return false;
 
-		final long notBefore = lastAnnouncement + repeat * 60 * 1000L;
+		long notBefore = lastAnnouncement + repeat * 60 * 1000L;
 
 		return System.currentTimeMillis() > notBefore;
 	}
@@ -413,7 +431,7 @@ public class VoiceRouter {
 			if (dist <= 0) {
 				return;
 			} else if (needsInforming()) {
-				playGoAhead(dist, getSpeakableStreetName(currentSegment, next, false));
+				playGoAhead(dist, next, getSpeakableStreetName(currentSegment, next, false));
 				return;
 			} else if (currentStatus == STATUS_TOLD) {
 				// nothing said possibly that's wrong case we should say before that
@@ -434,25 +452,25 @@ public class VoiceRouter {
 		// Note: getNextRouteDirectionInfoAfter(nextInfo, x, y).distanceTo is distance from nextInfo, not from current position!
 		// STATUS_TURN = "Turn (now)"
 		if ((repeat || statusNotPassed(STATUS_TURN)) && atd.isTurnStateActive(speed, dist, STATE_TURN_NOW)) {
-			if (nextNextInfo != null && !atd.isTurnStateNotPassed(0, nextNextInfo.distanceTo, STATE_TURN_IN )) {
+			if (nextNextInfo != null && !atd.isTurnStateNotPassed(0, nextNextInfo.distanceTo, STATE_TURN_IN)) {
 				playMakeTurn(currentSegment, next, nextNextInfo);
 			} else {
 				playMakeTurn(currentSegment, next, null);
 			}
 			if (!next.getTurnType().goAhead() && isTargetPoint(nextNextInfo) && nextNextInfo != null) {
 				// !goAhead() avoids isolated "and arrive.." prompt, as goAhead() is not pronounced
-				if (!atd.isTurnStateNotPassed(0, nextNextInfo.distanceTo, STATE_TURN_IN )) {
+				if (!atd.isTurnStateNotPassed(0, nextNextInfo.distanceTo, STATE_TURN_IN)) {
 					// Issue #2865: Ensure a distance associated with the destination arrival is always announced, either here, or in subsequent "Turn in" prompt
 					// Distance fon non-straights already announced in "Turn (now)"'s nextnext  code above
 					if ((nextNextInfo != null) && (nextNextInfo.directionInfo != null) && nextNextInfo.directionInfo.getTurnType().goAhead()) {
 						playThen();
-						playGoAhead(nextNextInfo.distanceTo, new StreetName());
+						playGoAhead(nextNextInfo.distanceTo, next, new StreetName());
 					}
 					playAndArriveAtDestination(nextNextInfo);
-				} else if (!atd.isTurnStateNotPassed(0, nextNextInfo.distanceTo / 1.2f, STATE_TURN_IN )) {
+				} else if (!atd.isTurnStateNotPassed(0, nextNextInfo.distanceTo / 1.2f, STATE_TURN_IN)) {
 					// 1.2 is safety margin should the subsequent "Turn in" prompt not fit in amy more
 					playThen();
-					playGoAhead(nextNextInfo.distanceTo, new StreetName());
+					playGoAhead(nextNextInfo.distanceTo, next, new StreetName());
 					playAndArriveAtDestination(nextNextInfo);
 				}
 			}
@@ -497,7 +515,7 @@ public class VoiceRouter {
 			nextStatusAfter(STATUS_UNKNOWN);
 		} else if (repeat || (statusNotPassed(STATUS_PREPARE) && dist < playGoAheadDist)) {
 			playGoAheadDist = 0;
-			playGoAhead(dist, getSpeakableStreetName(currentSegment, next, false));
+			playGoAhead(dist, next, getSpeakableStreetName(currentSegment, next, false));
 		}
 	}
 
@@ -530,10 +548,16 @@ public class VoiceRouter {
 		play(p);
 	}
 
-	private void playGoAhead(int dist, StreetName streetName) {
+	private void playGoAhead(int dist, RouteDirectionInfo next, StreetName streetName) {
 		CommandBuilder p = getNewCommandPlayerToPlay();
+		String tParam = getTurnType(next.getTurnType());
+		ExitInfo exitInfo = next.getExitInfo();
 		if (p != null) {
 			p.goAhead(dist, streetName);
+			if (tParam != null && exitInfo != null && !Algorithms.isEmpty(exitInfo.getRef()) && settings.SPEAK_EXIT_NUMBER_NAMES.get()) {
+				String stringRef = getSpeakableExitRef(exitInfo.getRef());
+				p.then().takeExit(tParam, stringRef, getIntRef(exitInfo.getRef()), getSpeakableExitName(next, exitInfo, true));
+			}
 		}
 		play(p);
 	}
@@ -544,12 +568,11 @@ public class VoiceRouter {
 			return new StreetName(result);
 		}
 		if (player != null && player.supportsStructuredStreetNames()) {
-
 			// Issue 2377: Play Dest here only if not already previously announced, to avoid repetition
 			if (includeDest == true) {
 				result.put(TO_REF, getNonNullString(getSpeakablePointName(i.getRef())));
 				result.put(TO_STREET_NAME, getNonNullString(getSpeakablePointName(i.getStreetName())));
-				String dest = cutLongDestination(getSpeakablePointName(i.getDestinationName()));
+				String dest = getSpeakablePointName(cutLongDestination(i.getDestinationName()));
 				result.put(TO_DEST, getNonNullString(dest));
 			} else {
 				result.put(TO_REF, getNonNullString(getSpeakablePointName(i.getRef())));
@@ -564,7 +587,7 @@ public class VoiceRouter {
 							settings.MAP_TRANSLITERATE_NAMES.get(), currentSegment.isForwardDirection()))));
 					result.put(FROM_STREET_NAME, getNonNullString(getSpeakablePointName(obj.getName(settings.MAP_PREFERRED_LOCALE.get(),
 							settings.MAP_TRANSLITERATE_NAMES.get()))));
-					String dest = cutLongDestination(getSpeakablePointName(obj.getDestinationName(settings.MAP_PREFERRED_LOCALE.get(),
+					String dest = getSpeakablePointName(cutLongDestination(obj.getDestinationName(settings.MAP_PREFERRED_LOCALE.get(),
 							settings.MAP_TRANSLITERATE_NAMES.get(), currentSegment.isForwardDirection())));
 					result.put(FROM_DEST, getNonNullString(dest));
 				} else {
@@ -576,11 +599,24 @@ public class VoiceRouter {
 					result.put(FROM_DEST, "");
 				}
 			}
-
 		} else {
 			result.put(TO_REF, getNonNullString(getSpeakablePointName(i.getRef())));
 			result.put(TO_STREET_NAME, getNonNullString(getSpeakablePointName(i.getStreetName())));
 			result.put(TO_DEST, "");
+		}
+		// Delimit refs if followed by street names to create a brief pause. Need to apply in sync for toRef and fromRef.
+		String refDelimiter = ", "; 
+		//Issue #16256: Some TTS engines, at least in English, pronounce coincidental number concatenations like "nn, nnn" as "thousands":
+		if ((player != null) && (player.getLanguage().startsWith("en"))) {
+			refDelimiter = "; ";
+		}
+		String toRef = result.get(TO_REF);
+		String fromRef = result.get(FROM_REF);
+		if (!Algorithms.isEmpty(toRef) && !Algorithms.isEmpty(result.get(TO_STREET_NAME))) {
+			result.put(TO_REF, toRef + refDelimiter);
+			if (!Algorithms.isEmpty(fromRef)) {
+				result.put(FROM_REF, fromRef + refDelimiter);
+			}
 		}
 		return new StreetName(result);
 	}
@@ -591,14 +627,14 @@ public class VoiceRouter {
 			return new StreetName(result);
 		}
 		result.put(TO_REF, getNonNullString(getSpeakablePointName(exitInfo.getRef())));
-		String dest = cutLongDestination(getSpeakablePointName(routeInfo.getDestinationName()));
+		String dest = getSpeakablePointName(cutLongDestination(routeInfo.getDestinationName()));
 		result.put(TO_DEST, getNonNullString(dest));
 		result.put(TO_STREET_NAME, "");
 		return new StreetName(result);
 	}
 
 	private String getNonNullString(String speakablePointName) {
-		return  speakablePointName == null ? "" : speakablePointName;
+		return speakablePointName == null ? "" : speakablePointName;
 	}
 
 	private String getSpeakablePointName(String pn) {
@@ -706,11 +742,11 @@ public class VoiceRouter {
 					p.goAhead(dist, getSpeakableStreetName(currentSegment, next, true));
 				}
 				if (t.getValue() == TurnType.TL || t.getValue() == TurnType.TSHL || t.getValue() == TurnType.TSLL
-						|| t.getValue() == TurnType.TU || t.getValue() == TurnType.KL ) {
-					p.then().bearLeft( getSpeakableStreetName(currentSegment, next, false));
+						|| t.getValue() == TurnType.TU || t.getValue() == TurnType.KL) {
+					p.then().bearLeft(getSpeakableStreetName(currentSegment, next, false));
 				} else if (t.getValue() == TurnType.TR || t.getValue() == TurnType.TSHR || t.getValue() == TurnType.TSLR
 						|| t.getValue() == TurnType.TRU || t.getValue() == TurnType.KR) {
-					p.then().bearRight( getSpeakableStreetName(currentSegment, next, false));
+					p.then().bearRight(getSpeakableStreetName(currentSegment, next, false));
 				}
 			}
 			if (isPlay) {
@@ -723,7 +759,7 @@ public class VoiceRouter {
 		RouteDirectionInfo next = nextInfo.directionInfo;
 		if (isTargetPoint(nextInfo) && (!playedAndArriveAtTarget || repeat)) {
 			if (next.getTurnType().goAhead()) {
-				playGoAhead(nextInfo.distanceTo, getSpeakableStreetName(currentSegment, next, false));
+				playGoAhead(nextInfo.distanceTo, next, getSpeakableStreetName(currentSegment, next, false));
 				playAndArriveAtDestination(nextInfo);
 				playedAndArriveAtTarget = true;
 			} else if (nextInfo != null &&
@@ -805,7 +841,7 @@ public class VoiceRouter {
 		}
 	}
 	
-	private String getTurnType(TurnType t) {
+	private String getTurnType(@NonNull TurnType t) {
 		if (TurnType.TL == t.getValue()) {
 			return CommandPlayer.A_LEFT;
 		} else if (TurnType.TSHL == t.getValue()) {
@@ -825,37 +861,42 @@ public class VoiceRouter {
 		}
 		return null;
 	}
-	
+
 	public void gpsLocationLost() {
-		CommandBuilder p = getNewCommandPlayerToPlay();
-		if (p != null) {
-			p.gpsLocationLost();
+		if (settings.SPEAK_GPS_SIGNAL_STATUS.get()) {
+			CommandBuilder p = getNewCommandPlayerToPlay();
+			if (p != null) {
+				p.gpsLocationLost();
+			}
+			play(p);
 		}
-		play(p);
 	}
-	
+
 	public void gpsLocationRecover() {
-		CommandBuilder p = getNewCommandPlayerToPlay();
-		if (p != null) {
-			p.gpsLocationRecover();
+		if (settings.SPEAK_GPS_SIGNAL_STATUS.get()) {
+			CommandBuilder p = getNewCommandPlayerToPlay();
+			if (p != null) {
+				p.gpsLocationRecover();
+			}
+			play(p);
 		}
-		play(p);
 	}
 
 	public void newRouteIsCalculated(boolean newRoute) {
 		CommandBuilder p = getNewCommandPlayerToPlay();
 		if (p != null) {
-			if (!newRoute) {
-				p.routeRecalculated(router.getLeftDistance(), router.getLeftTime());
-			} else {
+			if (newRoute) {
 				p.newRouteCalculated(router.getLeftDistance(), router.getLeftTime());
+			} else if (settings.SPEAK_ROUTE_RECALCULATION.get()) {
+				p.routeRecalculated(router.getLeftDistance(), router.getLeftTime());
 			}
-		} else if (player == null) {
+		} else if (player == null && (newRoute || settings.SPEAK_ROUTE_RECALCULATION.get())) {
 			pendingCommand = new VoiceCommandPending(!newRoute ? VoiceCommandPending.ROUTE_RECALCULATED : VoiceCommandPending.ROUTE_CALCULATED, this);
 		}
 		play(p);
 		if (newRoute) {
 			playGoAheadDist = -1;
+			waitAnnouncedOffRoute = 0;
 		}
 		currentStatus = STATUS_UNKNOWN;
 		suppressDest = false;
@@ -903,12 +944,14 @@ public class VoiceRouter {
 	 * Command to wait until voice player is initialized
 	 */
 	private class VoiceCommandPending {
+
 		public static final int ROUTE_CALCULATED = 1;
 		public static final int ROUTE_RECALCULATED = 2;
-		protected final int type;
+
+		private final int type;
 		private final VoiceRouter voiceRouter;
-		
-		public VoiceCommandPending(int type, VoiceRouter voiceRouter) {
+
+		public VoiceCommandPending(int type, @NonNull VoiceRouter voiceRouter) {
 			this.type = type;
 			this.voiceRouter = voiceRouter;
 		}
@@ -945,12 +988,12 @@ public class VoiceRouter {
 		}
 	}
 
-	public void addVoiceMessageListener(VoiceMessageListener voiceMessageListener) {
-		voiceMessageListeners = updateVoiceMessageListeners(new ArrayList<>(voiceMessageListeners), voiceMessageListener, true);
+	public void addVoiceMessageListener(@NonNull VoiceMessageListener voiceMessageListener) {
+		voiceMessageListeners = Algorithms.updateWeakReferencesList(voiceMessageListeners, voiceMessageListener, true);
 	}
-	
-	public void removeVoiceMessageListener(VoiceMessageListener voiceMessageListener) {
-		voiceMessageListeners = updateVoiceMessageListeners(new ArrayList<>(voiceMessageListeners), voiceMessageListener, false);
+
+	public void removeVoiceMessageListener(@NonNull VoiceMessageListener voiceMessageListener) {
+		voiceMessageListeners = Algorithms.updateWeakReferencesList(voiceMessageListeners, voiceMessageListener, false);
 	}
 
 	private void notifyOnVoiceMessage(List<String> listCommands, List<String> played) {
@@ -963,29 +1006,13 @@ public class VoiceRouter {
 		}
 	}
 
-	private List<WeakReference<VoiceMessageListener>> updateVoiceMessageListeners(List<WeakReference<VoiceMessageListener>> voiceMessageListeners,
-																				  VoiceMessageListener listener, boolean isNewListener) {
-		Iterator<WeakReference<VoiceMessageListener>> it = voiceMessageListeners.iterator();
-		while (it.hasNext()) {
-			WeakReference<VoiceMessageListener> ref = it.next();
-			VoiceMessageListener l = ref.get();
-			if (l == null || l == listener) {
-				it.remove();
-			}
-		}
-		if (isNewListener) {
-			voiceMessageListeners.add(new WeakReference<>(listener));
-		}
-		return voiceMessageListeners;
-	}
-
 	private String cutLongDestination(String destination) {
 		if (destination == null) {
 			return null;
 		}
-		String[] words = destination.split(",");
+		String[] words = destination.split(";");
 		if (words.length > 3) {
-			return words[0] + "," + words[1] + "," + words[2];
+			return words[0] + ";" + words[1] + ";" + words[2];
 		}
 		return destination;
 	}

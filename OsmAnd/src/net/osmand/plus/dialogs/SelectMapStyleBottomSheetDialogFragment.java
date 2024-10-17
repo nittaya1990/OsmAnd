@@ -1,8 +1,7 @@
 package net.osmand.plus.dialogs;
 
-import static net.osmand.plus.UiUtilities.CompoundButtonType.PROFILE_DEPENDENT;
-import static net.osmand.plus.dialogs.ConfigureMapMenu.PISTE_ROUTES_ATTR;
-
+import static net.osmand.osm.OsmRouteType.SKI;
+import static net.osmand.plus.utils.UiUtilities.CompoundButtonType.PROFILE_DEPENDENT;
 import android.app.Activity;
 import android.content.Context;
 import android.os.Bundle;
@@ -21,23 +20,24 @@ import androidx.annotation.Nullable;
 import androidx.core.widget.NestedScrollView;
 import androidx.fragment.app.FragmentManager;
 
-import net.osmand.AndroidUtils;
 import net.osmand.Collator;
 import net.osmand.OsmAndCollator;
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.MenuBottomSheetDialogFragment;
 import net.osmand.plus.base.bottomsheetmenu.BaseBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.BottomSheetItemTitleWithDescrAndButton;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.SubtitleDividerItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.TitleItem;
+import net.osmand.plus.dashboard.DashboardOnMap;
+import net.osmand.plus.plugins.PluginsHelper;
 import net.osmand.plus.render.RendererRegistry;
-import net.osmand.plus.settings.backend.CommonPreference;
 import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.settings.backend.preferences.CommonPreference;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.views.OsmandMapTileView;
 import net.osmand.render.RenderingRulesStorage;
 import net.osmand.util.Algorithms;
@@ -67,7 +67,7 @@ public class SelectMapStyleBottomSheetDialogFragment extends MenuBottomSheetDial
 
 	@Override
 	public void createMenuItems(Bundle savedInstanceState) {
-		final Context context = getContext();
+		Context context = getContext();
 		if (context == null) {
 			return;
 		}
@@ -146,13 +146,14 @@ public class SelectMapStyleBottomSheetDialogFragment extends MenuBottomSheetDial
 			OsmandMapTileView view = mapActivity.getMapView();
 			OsmandSettings settings = view.getSettings();
 			settings.RENDERER.set(selectedStyle);
-			final CommonPreference<Boolean> pisteRoutesPref = settings.getCustomRenderBooleanProperty(PISTE_ROUTES_ATTR);
+			CommonPreference<Boolean> pisteRoutesPref = settings.getCustomRenderBooleanProperty(SKI.getRenderingPropertyAttr());
 			if (pisteRoutesPref.get()) {
 				pisteRoutesPref.set(settings.RENDERER.get().equals(RendererRegistry.WINTER_SKI_RENDER));
 			}
 			app.getRendererRegistry().setCurrentSelectedRender(loaded);
 			mapActivity.refreshMapComplete();
-			mapActivity.getDashboard().refreshContent(true);
+			DashboardOnMap dashboard = mapActivity.getDashboard();
+			dashboard.refreshContent(false);
 		} else {
 			Toast.makeText(mapActivity, R.string.renderer_load_exception, Toast.LENGTH_SHORT).show();
 		}
@@ -175,7 +176,7 @@ public class SelectMapStyleBottomSheetDialogFragment extends MenuBottomSheetDial
 
 	@NonNull
 	private TreeMap<String, String> generateStylesMap(Context context) {
-		final Collator collator = OsmAndCollator.primaryCollator();
+		Collator collator = OsmAndCollator.primaryCollator();
 		TreeMap<String, String> res = new TreeMap<>(new Comparator<String>() {
 			@Override
 			public int compare(String string1, String string2) {
@@ -188,8 +189,8 @@ public class SelectMapStyleBottomSheetDialogFragment extends MenuBottomSheetDial
 				return collator.compare(string1, string2);
 			}
 		});
-		Map<String, String> renderers = getMyApplication().getRendererRegistry().getRenderers();
-		List<String> disabledRendererNames = OsmandPlugin.getDisabledRendererNames();
+		Map<String, String> renderers = getMyApplication().getRendererRegistry().getRenderers(false);
+		List<String> disabledRendererNames = PluginsHelper.getDisabledRendererNames();
 
 		if (!Algorithms.isEmpty(disabledRendererNames)) {
 			Iterator<Map.Entry<String, String>> iterator = renderers.entrySet().iterator();

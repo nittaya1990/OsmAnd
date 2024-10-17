@@ -1,7 +1,11 @@
 package net.osmand.plus.measurementtool.command;
 
-import net.osmand.GPXUtilities.WptPt;
+import androidx.annotation.NonNull;
+
 import net.osmand.plus.measurementtool.MeasurementToolLayer;
+import net.osmand.shared.gpx.primitives.WptPt;
+
+import java.util.List;
 
 public class RemovePointCommand extends MeasurementModeCommand {
 
@@ -9,15 +13,16 @@ public class RemovePointCommand extends MeasurementModeCommand {
 	private WptPt point;
 	private String prevPointProfile;
 
-	public RemovePointCommand(MeasurementToolLayer measurementLayer, int position) {
+	public RemovePointCommand(@NonNull MeasurementToolLayer measurementLayer, int position) {
 		super(measurementLayer);
 		this.position = position;
 	}
 
 	@Override
 	public boolean execute() {
-		if (position > 0) {
-			prevPointProfile = getEditingCtx().getPoints().get(position - 1).getProfileType();
+		List<WptPt> points = getEditingCtx().getPoints();
+		if (position > 0 && position <= points.size()) {
+			prevPointProfile = points.get(position - 1).getProfileType();
 		}
 		point = getEditingCtx().removePoint(position, true);
 		refreshMap();
@@ -26,8 +31,9 @@ public class RemovePointCommand extends MeasurementModeCommand {
 
 	@Override
 	public void undo() {
-		if (position > 0) {
-			WptPt prevPt = getEditingCtx().getPoints().get(position - 1);
+		List<WptPt> points = getEditingCtx().getPoints();
+		if (position > 0 && position <= points.size()) {
+			WptPt prevPt = points.get(position - 1);
 			if (prevPointProfile != null) {
 				prevPt.setProfileType(prevPointProfile);
 			} else {
@@ -45,6 +51,7 @@ public class RemovePointCommand extends MeasurementModeCommand {
 		refreshMap();
 	}
 
+	@NonNull
 	@Override
 	public MeasurementCommandType getType() {
 		return MeasurementCommandType.REMOVE_POINT;

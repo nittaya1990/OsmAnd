@@ -21,19 +21,23 @@ import androidx.fragment.app.FragmentActivity;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.RecyclerView.ViewHolder;
 
 import com.google.android.material.appbar.AppBarLayout;
 
-import net.osmand.AndroidUtils;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.plus.profiles.data.ProfileDataObject;
 import net.osmand.plus.profiles.data.ProfileDataUtils;
 import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.BaseOsmAndFragment;
+import net.osmand.plus.widgets.dialogbutton.DialogButtonType;
 import net.osmand.plus.views.controls.ReorderItemTouchHelperCallback;
+import net.osmand.plus.widgets.dialogbutton.DialogButton;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -43,47 +47,41 @@ import java.util.List;
 
 public class EditProfilesFragment extends BaseOsmAndFragment {
 
-	private static String DELETED_APP_MODES_KEY = "deleted_app_modes_key";
-	private static String APP_MODES_ORDER_KEY = "app_modes_order_key";
+	private static final String DELETED_APP_MODES_KEY = "deleted_app_modes_key";
+	private static final String APP_MODES_ORDER_KEY = "app_modes_order_key";
 
-	private List<Object> items = new ArrayList<>();
+	private final List<Object> items = new ArrayList<>();
 	private HashMap<String, Integer> appModesOrders = new HashMap<>();
 	private ArrayList<String> deletedModesKeys = new ArrayList<>();
 
 	private EditProfilesAdapter adapter;
 
-	private boolean nightMode;
 	private boolean wasDrawerDisabled;
 
 	@Nullable
 	@Override
-	public View onCreateView(@NonNull final LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-		OsmandApplication app = requireMyApplication();
+	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+		updateNightMode();
 		if (savedInstanceState != null && savedInstanceState.containsKey(APP_MODES_ORDER_KEY) && savedInstanceState.containsKey(DELETED_APP_MODES_KEY)) {
-			appModesOrders = (HashMap<String, Integer>) savedInstanceState.getSerializable(APP_MODES_ORDER_KEY);
+			appModesOrders = (HashMap<String, Integer>) AndroidUtils.getSerializable(savedInstanceState, APP_MODES_ORDER_KEY, HashMap.class);
 			deletedModesKeys = savedInstanceState.getStringArrayList(DELETED_APP_MODES_KEY);
 		} else {
 			for (ApplicationMode mode : ApplicationMode.allPossibleValues()) {
 				appModesOrders.put(mode.getStringKey(), mode.getOrder());
 			}
 		}
-		nightMode = !app.getSettings().isLightContent();
-
-		View mainView = UiUtilities.getInflater(getContext(), nightMode).inflate(R.layout.edit_arrangement_list_fragment, container, false);
+		View mainView = themedInflater.inflate(R.layout.edit_arrangement_list_fragment, container, false);
 
 		AppBarLayout appbar = mainView.findViewById(R.id.appbar);
-		View toolbar = UiUtilities.getInflater(getContext(), nightMode).inflate(R.layout.global_preference_toolbar, container, false);
+		View toolbar = themedInflater.inflate(R.layout.global_preference_toolbar, container, false);
 		appbar.addView(toolbar);
 
 		ImageButton closeButton = mainView.findViewById(R.id.close_button);
 		closeButton.setImageResource(R.drawable.ic_action_remove_dark);
-		closeButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				FragmentActivity fragmentActivity = getActivity();
-				if (fragmentActivity != null) {
-					fragmentActivity.onBackPressed();
-				}
+		closeButton.setOnClickListener(v -> {
+			FragmentActivity fragmentActivity = getActivity();
+			if (fragmentActivity != null) {
+				fragmentActivity.onBackPressed();
 			}
 		});
 
@@ -96,7 +94,7 @@ public class EditProfilesFragment extends BaseOsmAndFragment {
 		adapter = new EditProfilesAdapter(app);
 		updateItems();
 
-		final ItemTouchHelper touchHelper = new ItemTouchHelper(new ReorderItemTouchHelperCallback(adapter));
+		ItemTouchHelper touchHelper = new ItemTouchHelper(new ReorderItemTouchHelperCallback(adapter));
 
 		touchHelper.attachToRecyclerView(recyclerView);
 		adapter.setAdapterListener(new ProfilesAdapterListener() {
@@ -136,56 +134,52 @@ public class EditProfilesFragment extends BaseOsmAndFragment {
 
 		recyclerView.setAdapter(adapter);
 
-		View cancelButton = mainView.findViewById(R.id.dismiss_button);
-		UiUtilities.setupDialogButton(nightMode, cancelButton, UiUtilities.DialogButtonType.SECONDARY, R.string.shared_string_cancel);
-		cancelButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				FragmentActivity fragmentActivity = getActivity();
-				if (fragmentActivity != null) {
-					fragmentActivity.onBackPressed();
-				}
+		DialogButton cancelButton = mainView.findViewById(R.id.dismiss_button);
+		cancelButton.setButtonType(DialogButtonType.SECONDARY);
+		cancelButton.setTitleId(R.string.shared_string_cancel);
+		cancelButton.setOnClickListener(v -> {
+			FragmentActivity fragmentActivity = getActivity();
+			if (fragmentActivity != null) {
+				fragmentActivity.onBackPressed();
 			}
 		});
 
 		mainView.findViewById(R.id.buttons_divider).setVisibility(View.VISIBLE);
 
-		View applyButton = mainView.findViewById(R.id.right_bottom_button);
-		UiUtilities.setupDialogButton(nightMode, applyButton, UiUtilities.DialogButtonType.PRIMARY, R.string.shared_string_apply);
+		DialogButton applyButton = mainView.findViewById(R.id.right_bottom_button);
+		applyButton.setButtonType(DialogButtonType.PRIMARY);
+		applyButton.setTitleId(R.string.shared_string_apply);
 		applyButton.setVisibility(View.VISIBLE);
-		applyButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				MapActivity mapActivity = (MapActivity) getActivity();
-				if (mapActivity != null) {
-					OsmandApplication app = mapActivity.getMyApplication();
+		applyButton.setOnClickListener(v -> {
+			MapActivity mapActivity = (MapActivity) getActivity();
+			if (mapActivity != null) {
+				OsmandApplication app = mapActivity.getMyApplication();
 
-					if (!deletedModesKeys.isEmpty()) {
-						List<ApplicationMode> deletedModes = new ArrayList<>();
-						for (String modeKey : deletedModesKeys) {
-							ApplicationMode mode = ApplicationMode.valueOfStringKey(modeKey, null);
-							if (mode != null) {
-								deletedModes.add(mode);
-							}
+				if (!deletedModesKeys.isEmpty()) {
+					List<ApplicationMode> deletedModes = new ArrayList<>();
+					for (String modeKey : deletedModesKeys) {
+						ApplicationMode mode = ApplicationMode.valueOfStringKey(modeKey, null);
+						if (mode != null) {
+							deletedModes.add(mode);
 						}
-						ApplicationMode.deleteCustomModes(deletedModes, app);
 					}
-					for (ApplicationMode mode : ApplicationMode.allPossibleValues()) {
-						String modeKey = mode.getStringKey();
-						Integer order = appModesOrders.get(modeKey);
-						if (order == null) {
-							order = mode.getOrder();
-						}
-						mode.setOrder(order);
-					}
-					ApplicationMode.reorderAppModes();
-					mapActivity.onBackPressed();
+					ApplicationMode.deleteCustomModes(deletedModes, app);
 				}
+				for (ApplicationMode mode : ApplicationMode.allPossibleValues()) {
+					String modeKey = mode.getStringKey();
+					Integer order = appModesOrders.get(modeKey);
+					if (order == null) {
+						order = mode.getOrder();
+					}
+					mode.setOrder(order);
+				}
+				ApplicationMode.reorderAppModes();
+				mapActivity.onBackPressed();
 			}
 		});
 
 		if (Build.VERSION.SDK_INT >= 21) {
-			AndroidUtils.addStatusBarPadding21v(app, mainView);
+			AndroidUtils.addStatusBarPadding21v(requireMyActivity(), mainView);
 		}
 
 		return mainView;
@@ -220,7 +214,7 @@ public class EditProfilesFragment extends BaseOsmAndFragment {
 
 	@Override
 	public int getStatusBarColorId() {
-		return nightMode ? R.color.status_bar_color_dark : R.color.status_bar_color_light;
+		return ColorUtilities.getStatusBarColorId(nightMode);
 	}
 
 	@Nullable
@@ -274,7 +268,7 @@ public class EditProfilesFragment extends BaseOsmAndFragment {
 
 		private int order;
 		private boolean deleted;
-		private boolean customProfile;
+		private final boolean customProfile;
 
 		EditProfileDataObject(String stringKey, String name, String descr, int iconRes, boolean isSelected,
 							  boolean customProfile, boolean deleted, @ColorInt int iconColorLight, @ColorInt int iconColorDark, int order) {
@@ -312,13 +306,13 @@ public class EditProfilesFragment extends BaseOsmAndFragment {
 		private static final int PROFILE_EDIT_TYPE = 1;
 		private static final int CATEGORY_TYPE = 3;
 
-		private OsmandApplication app;
-		private UiUtilities uiUtilities;
+		private final OsmandApplication app;
+		private final UiUtilities uiUtilities;
 
 		private List<Object> items = new ArrayList<>();
 		private ProfilesAdapterListener listener;
 
-		private boolean nightMode;
+		private final boolean nightMode;
 
 		EditProfilesAdapter(OsmandApplication app) {
 			setHasStableIds(true);
@@ -356,10 +350,10 @@ public class EditProfilesFragment extends BaseOsmAndFragment {
 
 		@SuppressLint("ClickableViewAccessibility")
 		@Override
-		public void onBindViewHolder(@NonNull final RecyclerView.ViewHolder holder, int pos) {
+		public void onBindViewHolder(@NonNull RecyclerView.ViewHolder holder, int pos) {
 			if (holder instanceof ProfileViewHolder) {
 				ProfileViewHolder profileViewHolder = (ProfileViewHolder) holder;
-				final EditProfileDataObject mode = (EditProfileDataObject) items.get(pos);
+				EditProfileDataObject mode = (EditProfileDataObject) items.get(pos);
 
 				profileViewHolder.title.setText(mode.getName());
 				profileViewHolder.description.setText(mode.getDescription());
@@ -468,7 +462,7 @@ public class EditProfilesFragment extends BaseOsmAndFragment {
 		}
 
 		@Override
-		public void onItemDismiss(RecyclerView.ViewHolder holder) {
+		public void onItemDismiss(@NonNull ViewHolder holder) {
 			listener.onDragOrSwipeEnded(holder);
 		}
 
@@ -508,7 +502,7 @@ public class EditProfilesFragment extends BaseOsmAndFragment {
 
 		private class InfoViewHolder extends RecyclerView.ViewHolder implements ReorderItemTouchHelperCallback.UnmovableItem {
 
-			private TextView description;
+			private final TextView description;
 
 			InfoViewHolder(View itemView) {
 				super(itemView);
@@ -523,7 +517,7 @@ public class EditProfilesFragment extends BaseOsmAndFragment {
 
 		private class CategoryViewHolder extends RecyclerView.ViewHolder implements ReorderItemTouchHelperCallback.UnmovableItem {
 
-			private TextView title;
+			private final TextView title;
 
 			CategoryViewHolder(View itemView) {
 				super(itemView);

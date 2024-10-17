@@ -11,24 +11,24 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class SelectCopyProfilesMenuAdapter extends AbstractProfileMenuAdapter<SelectCopyProfilesMenuAdapter.SelectProfileViewHolder> {
 
-	private OsmandApplication app;
+	private final OsmandApplication app;
 
 	private ApplicationMode selectedAppMode;
-	private List<ApplicationMode> items = new ArrayList<>();
+	private final List<ApplicationMode> items = new ArrayList<>();
 
-	private boolean nightMode;
+	private final boolean nightMode;
 
 	public SelectCopyProfilesMenuAdapter(List<ApplicationMode> items, @NonNull OsmandApplication app,
 	                                     boolean nightMode, @Nullable ApplicationMode selectedAppMode) {
@@ -47,7 +47,7 @@ public class SelectCopyProfilesMenuAdapter extends AbstractProfileMenuAdapter<Se
 	}
 
 	@Override
-	public void onBindViewHolder(@NonNull final SelectProfileViewHolder holder, int position) {
+	public void onBindViewHolder(@NonNull SelectProfileViewHolder holder, int position) {
 		ApplicationMode appMode = items.get(position);
 		boolean selected = appMode == selectedAppMode;
 

@@ -3,53 +3,39 @@ package net.osmand.plus.mapcontextmenu.builders.cards;
 import android.content.res.ColorStateList;
 import android.graphics.Bitmap;
 import android.graphics.drawable.Drawable;
-import android.net.TrafficStats;
-import android.os.AsyncTask;
 import android.view.View;
 import android.view.View.OnClickListener;
 import android.widget.ImageView;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 
-import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.widget.AppCompatButton;
 
-import net.osmand.AndroidNetworkUtils;
-import net.osmand.AndroidUtils;
-import net.osmand.Location;
 import net.osmand.PlatformUtil;
 import net.osmand.data.LatLon;
-import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
 import net.osmand.plus.R;
-import net.osmand.plus.Version;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.mapcontextmenu.MenuBuilder;
+import net.osmand.plus.mapcontextmenu.gallery.tasks.DownloadImageTask;
+import net.osmand.plus.mapcontextmenu.gallery.tasks.DownloadImageTask.DownloadImageListener;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
-import org.json.JSONArray;
-import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
-import java.util.ArrayList;
 import java.util.Date;
-import java.util.LinkedHashMap;
-import java.util.List;
 import java.util.Locale;
-import java.util.Map;
-
-import static net.osmand.plus.mapillary.MapillaryPlugin.TYPE_MAPILLARY_CONTRIBUTE;
-import static net.osmand.plus.mapillary.MapillaryPlugin.TYPE_MAPILLARY_PHOTO;
 
 public abstract class ImageCard extends AbstractCard {
-
-
 	private static final Log LOG = PlatformUtil.getLog(ImageCard.class);
+	private static final int THUMBNAIL_WIDTH = 12;
+	private static final int GALLERY_FULL_SIZE_WIDTH = 1280;
+
 	protected String type;
 	// Image location
 	protected LatLon location;
@@ -79,7 +65,7 @@ public abstract class ImageCard extends AbstractCard {
 	protected int buttonColor;
 	protected int buttonTextColor;
 
-	private int defaultCardLayoutId = R.layout.context_menu_card_image;
+	private final int defaultCardLayoutId = R.layout.context_menu_card_image;
 
 	protected Drawable icon;
 	protected Drawable buttonIcon;
@@ -174,21 +160,6 @@ public abstract class ImageCard extends AbstractCard {
 		}
 	}
 
-	private static ImageCard createCard(MapActivity mapActivity, JSONObject imageObject) {
-		ImageCard imageCard = null;
-		try {
-			if (imageObject.has("type")) {
-				String type = imageObject.getString("type");
-				if (!TYPE_MAPILLARY_CONTRIBUTE.equals(type) && !TYPE_MAPILLARY_PHOTO.equals(type)) {
-					imageCard = new UrlImageCard(mapActivity, imageObject);
-				}
-			}
-		} catch (JSONException e) {
-			e.printStackTrace();
-		}
-		return imageCard;
-	}
-
 	public double getCa() {
 		return ca;
 	}
@@ -227,6 +198,22 @@ public abstract class ImageCard extends AbstractCard {
 
 	public String getImageHiresUrl() {
 		return imageHiresUrl;
+	}
+
+	@Nullable
+	public String getThumbnailUrl() {
+		if (Algorithms.isEmpty(getImageHiresUrl())) {
+			return null;
+		}
+		return getImageHiresUrl() + "?width=" + THUMBNAIL_WIDTH;
+	}
+
+	@Nullable
+	public String getGalleryFullSizeUrl() {
+		if (Algorithms.isEmpty(getImageHiresUrl())) {
+			return null;
+		}
+		return getImageHiresUrl() + "?width=" + GALLERY_FULL_SIZE_WIDTH;
 	}
 
 	public boolean isExternalLink() {
@@ -309,12 +296,12 @@ public abstract class ImageCard extends AbstractCard {
 
 	public void update() {
 		if (view != null) {
-			ImageView image = (ImageView) view.findViewById(R.id.image);
-			ImageView iconImageView = (ImageView) view.findViewById(R.id.icon);
-			TextView urlTextView = (TextView) view.findViewById(R.id.url);
-			TextView watermarkTextView = (TextView) view.findViewById(R.id.watermark);
-			ProgressBar progress = (ProgressBar) view.findViewById(R.id.progress);
-			AppCompatButton button = (AppCompatButton) view.findViewById(R.id.button);
+			ImageView image = view.findViewById(R.id.image);
+			ImageView iconImageView = view.findViewById(R.id.icon);
+			TextView urlTextView = view.findViewById(R.id.url);
+			TextView watermarkTextView = view.findViewById(R.id.watermark);
+			ProgressBar progress = view.findViewById(R.id.progress);
+			AppCompatButton button = view.findViewById(R.id.button);
 
 			boolean night = getMyApplication().getDaynightHelper().isNightModeForMapControls();
 			AndroidUtils.setBackground(getMapActivity(), view.findViewById(R.id.card_background), night,
@@ -339,7 +326,7 @@ public abstract class ImageCard extends AbstractCard {
 				progress.setVisibility(View.VISIBLE);
 				image.setImageBitmap(null);
 			} else if (!downloaded) {
-				MenuBuilder.execute(new DownloadImageTask());
+				MenuBuilder.execute(new DownloadImageTask(getMyApplication(), imageUrl, getDownloadImageListener()));
 			} else {
 				progress.setVisibility(View.GONE);
 				image.setImageBitmap(bitmap);
@@ -351,12 +338,7 @@ public abstract class ImageCard extends AbstractCard {
 				}
 			}
 			if (onClickListener != null) {
-				view.findViewById(R.id.image_card).setOnClickListener(new OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						onClickListener.onClick(v);
-					}
-				});
+				view.findViewById(R.id.image_card).setOnClickListener(v -> onClickListener.onClick(v));
 			} else {
 				view.findViewById(R.id.image_card).setOnClickListener(null);
 			}
@@ -380,12 +362,7 @@ public abstract class ImageCard extends AbstractCard {
 			}
 			if (onButtonClickListener != null) {
 				button.setVisibility(View.VISIBLE);
-				button.setOnClickListener(new OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						onButtonClickListener.onClick(v);
-					}
-				});
+				button.setOnClickListener(v -> onButtonClickListener.onClick(v));
 			} else {
 				button.setVisibility(View.GONE);
 				button.setOnClickListener(null);
@@ -393,120 +370,24 @@ public abstract class ImageCard extends AbstractCard {
 		}
 	}
 
-	public static class GetImageCardsTask extends AsyncTask<Void, Void, List<ImageCard>> {
-
-		private MapActivity mapActivity;
-		private OsmandApplication app;
-		private LatLon latLon;
-		private Map<String, String> params;
-		private GetImageCardsListener listener;
-		private List<ImageCard> result;
-		private static final int GET_IMAGE_CARD_THREAD_ID = 10104;
-
-		public interface GetImageCardsListener {
-			void onPostProcess(List<ImageCard> cardList);
-
-			void onPlaceIdAcquired(String[] placeId);
-
-			void onFinish(List<ImageCard> cardList);
-		}
-
-		public GetImageCardsTask(@NonNull MapActivity mapActivity, LatLon latLon,
-								 @Nullable Map<String, String> params, GetImageCardsListener listener) {
-			this.mapActivity = mapActivity;
-			this.app = mapActivity.getMyApplication();
-			this.latLon = latLon;
-			this.params = params;
-			this.listener = listener;
-		}
-
-		@Override
-		protected List<ImageCard> doInBackground(Void... voids) {
-			TrafficStats.setThreadStatsTag(GET_IMAGE_CARD_THREAD_ID);
-			List<ImageCard> result = new ArrayList<>();
-			try {
-				final Map<String, String> pms = new LinkedHashMap<>();
-				pms.put("lat", "" + (float) latLon.getLatitude());
-				pms.put("lon", "" + (float) latLon.getLongitude());
-				Location myLocation = app.getLocationProvider().getLastKnownLocation();
-				if (myLocation != null) {
-					pms.put("mloc", "" + (float) myLocation.getLatitude() + "," + (float) myLocation.getLongitude());
-				}
-				pms.put("app", Version.isPaidVersion(app) ? "paid" : "free");
-				String preferredLang = app.getSettings().MAP_PREFERRED_LOCALE.get();
-				if (Algorithms.isEmpty(preferredLang)) {
-					preferredLang = app.getLanguage();
-				}
-				if (!Algorithms.isEmpty(preferredLang)) {
-					pms.put("lang", preferredLang);
-				}
-				OsmandPlugin.populateContextMenuImageCards(result, pms, params, listener);
-
-				String response = AndroidNetworkUtils.sendRequest(app, "https://osmand.net/api/cm_place", pms,
-						"Requesting location images...", false, false);
-
-				if (!Algorithms.isEmpty(response)) {
-					JSONObject obj = new JSONObject(response);
-					JSONArray images = obj.getJSONArray("features");
-					if (images.length() > 0) {
-						for (int i = 0; i < images.length(); i++) {
-							try {
-								JSONObject imageObject = (JSONObject) images.get(i);
-								if (imageObject != JSONObject.NULL) {
-									ImageCard imageCard = OsmandPlugin.createImageCardForJson(imageObject);
-									if (imageCard == null) {
-										imageCard = ImageCard.createCard(mapActivity, imageObject);
-									}
-									if (imageCard != null) {
-										result.add(imageCard);
-									}
-								}
-							} catch (JSONException e) {
-								e.printStackTrace();
-							}
-						}
-					}
-				}
-			} catch (Exception e) {
-				LOG.error(e);
+	private DownloadImageListener getDownloadImageListener() {
+		return new DownloadImageListener() {
+			@Override
+			public void onStartDownloading() {
+				downloading = true;
+				update();
 			}
-			if (listener != null) {
-				listener.onPostProcess(result);
+
+			@Override
+			public void onFinishDownloading(Bitmap bitmap) {
+				downloading = false;
+				downloaded = true;
+				ImageCard.this.bitmap = bitmap;
+				if (bitmap != null && Algorithms.isEmpty(getImageHiresUrl())) {
+					ImageCard.this.imageHiresUrl = getUrl();
+				}
+				update();
 			}
-			return result;
-		}
-
-		@Override
-		protected void onPostExecute(List<ImageCard> cardList) {
-			result = cardList;
-			if (listener != null) {
-				listener.onFinish(result);
-			}
-		}
-	}
-
-	private class DownloadImageTask extends AsyncTask<Void, Void, Bitmap> {
-
-		@Override
-		protected void onPreExecute() {
-			downloading = true;
-			update();
-		}
-
-		@Override
-		protected Bitmap doInBackground(Void... params) {
-			return AndroidNetworkUtils.downloadImage(getMyApplication(), imageUrl);
-		}
-
-		@Override
-		protected void onPostExecute(Bitmap bitmap) {
-			downloading = false;
-			downloaded = true;
-			ImageCard.this.bitmap = bitmap;
-			if (bitmap != null && Algorithms.isEmpty(getImageHiresUrl())) {
-				ImageCard.this.imageHiresUrl = getUrl();
-			}
-			update();
-		}
+		};
 	}
 }

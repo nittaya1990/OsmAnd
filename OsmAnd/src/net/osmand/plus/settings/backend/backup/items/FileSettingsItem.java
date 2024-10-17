@@ -6,20 +6,21 @@ import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import net.osmand.FileUtils;
 import net.osmand.IndexConstants;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.audionotes.AudioVideoNotesPlugin.Recording;
 import net.osmand.plus.download.SrtmDownloadItem;
 import net.osmand.plus.helpers.FileNameTranslationHelper;
+import net.osmand.plus.plugins.audionotes.AudioVideoNotesPlugin.Recording;
 import net.osmand.plus.settings.backend.backup.FileSettingsItemReader;
 import net.osmand.plus.settings.backend.backup.SettingsHelper;
 import net.osmand.plus.settings.backend.backup.SettingsItemReader;
 import net.osmand.plus.settings.backend.backup.SettingsItemType;
 import net.osmand.plus.settings.backend.backup.SettingsItemWriter;
 import net.osmand.plus.settings.backend.backup.StreamSettingsItemWriter;
+import net.osmand.plus.utils.FileUtils;
 import net.osmand.util.Algorithms;
+import net.osmand.util.CollectionUtils;
 
 import org.json.JSONException;
 import org.json.JSONObject;
@@ -41,6 +42,7 @@ public class FileSettingsItem extends StreamSettingsItem {
 		RENDERING_STYLE("rendering_style", IndexConstants.RENDERERS_DIR, R.drawable.ic_action_map_style),
 		WIKI_MAP("wiki_map", IndexConstants.WIKI_INDEX_DIR, R.drawable.ic_plugin_wikipedia),
 		SRTM_MAP("srtm_map", IndexConstants.SRTM_INDEX_DIR, R.drawable.ic_plugin_srtm),
+		TERRAIN_DATA("terrain", IndexConstants.GEOTIFF_DIR, R.drawable.ic_action_terrain),
 		OBF_MAP("obf_map", IndexConstants.MAPS_PATH, R.drawable.ic_map),
 		TILES_MAP("tiles_map", IndexConstants.TILES_INDEX_DIR, R.drawable.ic_map),
 		ROAD_MAP("road_map", IndexConstants.ROADS_INDEX_DIR, R.drawable.ic_map),
@@ -48,7 +50,10 @@ public class FileSettingsItem extends StreamSettingsItem {
 		TTS_VOICE("tts_voice", IndexConstants.VOICE_INDEX_DIR, R.drawable.ic_action_volume_up),
 		VOICE("voice", IndexConstants.VOICE_INDEX_DIR, R.drawable.ic_action_volume_up),
 		TRAVEL("travel", IndexConstants.WIKIVOYAGE_INDEX_DIR, R.drawable.ic_plugin_wikipedia),
-		MULTIMEDIA_NOTES("multimedia_notes", IndexConstants.AV_INDEX_DIR, R.drawable.ic_action_photo_dark);
+		MULTIMEDIA_NOTES("multimedia_notes", IndexConstants.AV_INDEX_DIR, R.drawable.ic_action_photo_dark),
+		NAUTICAL_DEPTH("nautical_depth", IndexConstants.NAUTICAL_INDEX_DIR, R.drawable.ic_action_nautical_depth),
+		FAVORITES_BACKUP("favorites_backup", IndexConstants.BACKUP_INDEX_DIR, R.drawable.ic_action_folder_favorites),
+		COLOR_PALETTE("colors_palette", IndexConstants.COLOR_PALETTE_DIR, R.drawable.ic_action_file_color_palette);
 
 		private final String subtypeName;
 		private final String subtypeFolder;
@@ -61,9 +66,11 @@ public class FileSettingsItem extends StreamSettingsItem {
 		}
 
 		public boolean isMap() {
-			return this == OBF_MAP || this == WIKI_MAP || this == SRTM_MAP || this == TILES_MAP || this == ROAD_MAP;
+			return this == OBF_MAP || this == WIKI_MAP || this == TRAVEL || this == SRTM_MAP
+					|| this == TERRAIN_DATA || this == TILES_MAP || this == ROAD_MAP || this == NAUTICAL_DEPTH;
 		}
 
+		@NonNull
 		public String getSubtypeName() {
 			return subtypeName;
 		}
@@ -77,8 +84,9 @@ public class FileSettingsItem extends StreamSettingsItem {
 			return iconId;
 		}
 
+		@Nullable
 		public static FileSubtype getSubtypeByName(@NonNull String name) {
-			for (FileSubtype subtype : FileSubtype.values()) {
+			for (FileSubtype subtype : values()) {
 				if (name.equals(subtype.subtypeName)) {
 					return subtype;
 				}
@@ -86,23 +94,30 @@ public class FileSettingsItem extends StreamSettingsItem {
 			return null;
 		}
 
+		@NonNull
 		public static FileSubtype getSubtypeByPath(@NonNull OsmandApplication app, @NonNull String fileName) {
 			fileName = fileName.replace(app.getAppPath(null).getPath(), "");
 			return getSubtypeByFileName(fileName);
 		}
 
+		@NonNull
 		public static FileSubtype getSubtypeByFileName(@NonNull String fileName) {
 			String name = fileName;
 			if (fileName.startsWith(File.separator)) {
 				name = fileName.substring(1);
 			}
-			for (FileSubtype subtype : FileSubtype.values()) {
+			for (FileSubtype subtype : values()) {
 				switch (subtype) {
 					case UNKNOWN:
 					case OTHER:
 						break;
 					case SRTM_MAP:
 						if (SrtmDownloadItem.isSrtmFile(name)) {
+							return subtype;
+						}
+						break;
+					case TERRAIN_DATA:
+						if (name.endsWith(IndexConstants.TIF_EXT)) {
 							return subtype;
 						}
 						break;
@@ -126,6 +141,16 @@ public class FileSettingsItem extends StreamSettingsItem {
 									return subtype;
 								}
 							}
+						}
+						break;
+					case NAUTICAL_DEPTH:
+						if (name.endsWith(IndexConstants.BINARY_DEPTH_MAP_INDEX_EXT)) {
+							return subtype;
+						}
+						break;
+					case COLOR_PALETTE:
+						if (name.endsWith(IndexConstants.TXT_EXT)) {
+							return subtype;
 						}
 						break;
 					default:
@@ -172,11 +197,11 @@ public class FileSettingsItem extends StreamSettingsItem {
 		} else if (subtype == FileSubtype.UNKNOWN || subtype == null) {
 			throw new IllegalArgumentException("Unknown file subtype: " + getFileName());
 		} else {
-			String subtypeFolder = subtype.subtypeFolder;
+			String subtypeFolder = subtype.getSubtypeFolder();
 			int nameIndex = fileName.indexOf(name);
-			int folderIndex = fileName.indexOf(subtype.subtypeFolder);
+			int folderIndex = fileName.indexOf(subtype.getSubtypeFolder());
 			if (nameIndex != -1 && folderIndex != -1) {
-				String subfolderPath = fileName.substring(folderIndex + subtype.subtypeFolder.length(), nameIndex);
+				String subfolderPath = fileName.substring(folderIndex + subtype.getSubtypeFolder().length(), nameIndex);
 				subtypeFolder = subtypeFolder + subfolderPath;
 			}
 			this.file = new File(app.getAppPath(subtypeFolder), name);
@@ -241,7 +266,7 @@ public class FileSettingsItem extends StreamSettingsItem {
 
 	@Override
 	public boolean needMd5Digest() {
-		return subtype == FileSubtype.TTS_VOICE || subtype == FileSubtype.VOICE;
+		return CollectionUtils.equalsToAny(subtype, FileSubtype.TTS_VOICE, FileSubtype.VOICE, FileSubtype.GPX);
 	}
 
 	public File getPluginPath() {
@@ -293,7 +318,7 @@ public class FileSettingsItem extends StreamSettingsItem {
 		} else if (file != null) {
 			if (file.isDirectory()) {
 				List<File> filesToUpload = new ArrayList<>();
-				FileUtils.collectDirFiles(file, filesToUpload);
+				FileUtils.collectFiles(file, filesToUpload, false);
 
 				for (File file : filesToUpload) {
 					size += file.length();
@@ -342,8 +367,10 @@ public class FileSettingsItem extends StreamSettingsItem {
 			prefix = oldPath.substring(0, oldPath.lastIndexOf(IndexConstants.BINARY_SRTM_FEET_MAP_INDEX_EXT));
 		} else if (oldPath.endsWith(IndexConstants.BINARY_ROAD_MAP_INDEX_EXT)) {
 			prefix = oldPath.substring(0, oldPath.lastIndexOf(IndexConstants.BINARY_ROAD_MAP_INDEX_EXT));
-		} else {
+		} else if (oldPath.contains(".")) {
 			prefix = oldPath.substring(0, oldPath.lastIndexOf("."));
+		} else {
+			prefix = oldPath;
 		}
 		String suffix = oldPath.replace(prefix, "");
 		int number = 0;
@@ -355,6 +382,12 @@ public class FileSettingsItem extends StreamSettingsItem {
 				return newFile;
 			}
 		}
+	}
+
+	@Override
+	public void delete() {
+		super.delete();
+		// TODO: delete settings item
 	}
 
 	@Nullable

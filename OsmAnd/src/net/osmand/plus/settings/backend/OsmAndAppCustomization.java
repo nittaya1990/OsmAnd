@@ -1,5 +1,8 @@
 package net.osmand.plus.settings.backend;
 
+import static net.osmand.IndexConstants.INDEX_DOWNLOAD_DOMAIN;
+import static net.osmand.aidlapi.OsmAndCustomizationConstants.DRAWER_ITEM_ID_SCHEME;
+
 import android.app.Activity;
 import android.content.Context;
 import android.content.Intent;
@@ -10,30 +13,30 @@ import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.text.TextUtils;
-import android.widget.ArrayAdapter;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import net.osmand.AndroidUtils;
 import net.osmand.IProgress;
 import net.osmand.IndexConstants;
-import net.osmand.JsonUtils;
 import net.osmand.PlatformUtil;
 import net.osmand.aidl.ConnectedApp;
 import net.osmand.data.LocationPoint;
-import net.osmand.plus.ContextMenuAdapter;
-import net.osmand.plus.ContextMenuItem;
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
 import net.osmand.plus.Version;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.download.DownloadActivity;
 import net.osmand.plus.helpers.WaypointHelper;
 import net.osmand.plus.importfiles.ImportHelper;
-import net.osmand.plus.myplaces.FavoritesActivity;
+import net.osmand.plus.myplaces.MyPlacesActivity;
+import net.osmand.plus.plugins.OsmandPlugin;
+import net.osmand.plus.plugins.PluginsHelper;
 import net.osmand.plus.routing.RouteCalculationResult;
-import net.osmand.plus.views.OsmandMapTileView;
+import net.osmand.plus.utils.AndroidNetworkUtils;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.JsonUtils;
+import net.osmand.plus.widgets.ctxmenu.ContextMenuAdapter;
+import net.osmand.plus.widgets.ctxmenu.data.ContextMenuItem;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
@@ -58,41 +61,43 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import static net.osmand.aidlapi.OsmAndCustomizationConstants.DRAWER_ITEM_ID_SCHEME;
-
 public class OsmAndAppCustomization {
 
 	private static final int MAX_NAV_DRAWER_ITEMS_PER_APP = 3;
 
 	private static final Log LOG = PlatformUtil.getLog(OsmAndAppCustomization.class);
 
-	protected OsmandApplication app;
-	protected OsmandSettings osmandSettings;
+	private OsmandApplication app;
+	private OsmandSettings osmandSettings;
 
-	private Map<String, Bitmap> navDrawerLogos = new HashMap<>();
+	private final Map<String, Bitmap> navDrawerLogos = new HashMap<>();
 
 	private String navDrawerFooterIntent;
 	private String navDrawerFooterAppName;
 	private String navDrawerFooterPackageName;
 
-	private Set<String> featuresEnabledIds = new HashSet<>();
-	private Set<String> featuresDisabledIds = new HashSet<>();
-	private Set<String> featuresEnabledPatterns = new HashSet<>();
-	private Set<String> featuresDisabledPatterns = new HashSet<>();
-	private Set<ApplicationMode> marginAppModeUsage = new HashSet<>();
-	private Map<String, Set<ApplicationMode>> widgetsVisibilityMap = new LinkedHashMap<>();
-	private Map<String, Set<ApplicationMode>> widgetsAvailabilityMap = new LinkedHashMap<>();
-	private CustomOsmandSettings customOsmandSettings;
+	private final Set<String> featuresEnabledIds = new HashSet<>();
+	private final Set<String> featuresDisabledIds = new HashSet<>();
+	private final Set<String> featuresEnabledPatterns = new HashSet<>();
+	private final Set<String> featuresDisabledPatterns = new HashSet<>();
+	private final Set<ApplicationMode> marginAppModeUsage = new HashSet<>();
+	private final Map<String, Set<ApplicationMode>> widgetsVisibilityMap = new LinkedHashMap<>();
+	private final Map<String, Set<ApplicationMode>> widgetsAvailabilityMap = new LinkedHashMap<>();
+
+	private CustomOsmandSettings customSettings;
 
 	private int marginLeft;
 	private int marginTop;
 	private int marginRight;
 	private int marginBottom;
 
+	private int minZoom;
+	private int maxZoom;
+
 	private boolean featuresCustomized;
 	private boolean widgetsCustomized;
 
-	private List<OsmAndAppCustomizationListener> listeners = new ArrayList<>();
+	private final List<OsmAndAppCustomizationListener> listeners = new ArrayList<>();
 
 	public interface OsmAndAppCustomizationListener {
 
@@ -100,8 +105,8 @@ public class OsmAndAppCustomization {
 	}
 
 	public static class CustomOsmandSettings {
-		private String sharedPreferencesName;
-		private OsmandSettings settings;
+		private final String sharedPreferencesName;
+		private final OsmandSettings settings;
 
 		CustomOsmandSettings(OsmandApplication app, String sharedPreferencesName, Bundle bundle) {
 			this.sharedPreferencesName = sharedPreferencesName;
@@ -125,12 +130,12 @@ public class OsmAndAppCustomization {
 	}
 
 	public OsmandSettings getOsmandSettings() {
-		return customOsmandSettings != null ? customOsmandSettings.getSettings() : osmandSettings;
+		return customSettings != null ? customSettings.getSettings() : osmandSettings;
 	}
 
 	public void customizeOsmandSettings(@NonNull String sharedPreferencesName, @Nullable Bundle bundle) {
-		customOsmandSettings = new CustomOsmandSettings(app, sharedPreferencesName, bundle);
-		OsmandSettings newSettings = customOsmandSettings.getSettings();
+		customSettings = new CustomOsmandSettings(app, sharedPreferencesName, bundle);
+		OsmandSettings newSettings = customSettings.getSettings();
 		if (Build.VERSION.SDK_INT < 19) {
 			if (osmandSettings.isExternalStorageDirectorySpecifiedPre19()) {
 				File externalStorageDirectory = osmandSettings.getExternalStorageDirectoryPre19();
@@ -142,23 +147,25 @@ public class OsmAndAppCustomization {
 			String directory = osmandSettings.getExternalStorageDirectoryV19();
 			newSettings.setExternalStorageDirectoryV19(type, directory);
 		}
-		app.setOsmandSettings(newSettings);
+		app.setSettings(newSettings);
 		notifySettingsCustomized();
 	}
 
 	public void restoreOsmandSettings() {
-		app.setOsmandSettings(osmandSettings);
+		app.setSettings(osmandSettings);
 		notifySettingsCustomized();
 	}
 
 	public boolean restoreOsmand() {
 		featuresCustomized = false;
 		widgetsCustomized = false;
-		customOsmandSettings = null;
+		customSettings = null;
 		marginLeft = 0;
 		marginTop = 0;
 		marginRight = 0;
 		marginBottom = 0;
+		maxZoom = 0;
+		minZoom = 0;
 		restoreOsmandSettings();
 
 		featuresEnabledIds.clear();
@@ -178,8 +185,8 @@ public class OsmAndAppCustomization {
 		return MapActivity.class;
 	}
 
-	public Class<FavoritesActivity> getFavoritesActivity() {
-		return FavoritesActivity.class;
+	public Class<MyPlacesActivity> getMyPlacesActivity() {
+		return MyPlacesActivity.class;
 	}
 
 	public Class<? extends Activity> getDownloadIndexActivity() {
@@ -190,12 +197,14 @@ public class OsmAndAppCustomization {
 		return DownloadActivity.class;
 	}
 
-	public List<String> onIndexingFiles(IProgress progress, Map<String, String> indexFileNames) {
+	public List<String> onIndexingFiles(@Nullable IProgress progress, @NonNull Map<String, String> indexFileNames) {
 		return Collections.emptyList();
 	}
 
+	@NonNull
 	public String getIndexesUrl() {
-		return "https://" + IndexConstants.INDEX_DOWNLOAD_DOMAIN + "/get_indexes?gzip&" + Version.getVersionAsURLParam(app);
+		return AndroidNetworkUtils.getHttpProtocol() + INDEX_DOWNLOAD_DOMAIN
+				+ "/get_indexes?gzip&" + Version.getVersionAsURLParam(app);
 	}
 
 	public boolean showDownloadExtraActions() {
@@ -345,6 +354,7 @@ public class OsmAndAppCustomization {
 		setFeaturesCustomized();
 	}
 
+	@NonNull
 	public Set<ApplicationMode> regWidgetVisibility(@NonNull String widgetId, @Nullable List<String> appModeKeys) {
 		HashSet<ApplicationMode> set = getAppModesSet(appModeKeys);
 		widgetsVisibilityMap.put(widgetId, set);
@@ -352,6 +362,7 @@ public class OsmAndAppCustomization {
 		return set;
 	}
 
+	@NonNull
 	public Set<ApplicationMode> regWidgetAvailability(@NonNull String widgetId, @Nullable List<String> appModeKeys) {
 		HashSet<ApplicationMode> set = getAppModesSet(appModeKeys);
 		widgetsAvailabilityMap.put(widgetId, set);
@@ -359,7 +370,7 @@ public class OsmAndAppCustomization {
 		return set;
 	}
 
-	public void setMapMargins(int left, int top, int right, int bottom, List<String> appModeKeys) {
+	public void setMapMargins(int left, int top, int right, int bottom, @Nullable List<String> appModeKeys) {
 		marginLeft = left;
 		marginTop = top;
 		marginRight = right;
@@ -367,7 +378,7 @@ public class OsmAndAppCustomization {
 		marginAppModeUsage.addAll(getAppModesSet(appModeKeys));
 	}
 
-	public void updateMapMargins(MapActivity mapActivity) {
+	public void updateMapMargins(@NonNull MapActivity mapActivity) {
 		if (isMapMarginAvailable()) {
 			mapActivity.setMargins(marginLeft, marginTop, marginRight, marginBottom);
 		} else {
@@ -379,7 +390,7 @@ public class OsmAndAppCustomization {
 		return marginAppModeUsage.contains(app.getSettings().getApplicationMode());
 	}
 
-	public boolean isWidgetVisible(@NonNull String key, ApplicationMode appMode) {
+	public boolean isWidgetVisible(@NonNull String key, @NonNull ApplicationMode appMode) {
 		Set<ApplicationMode> set = widgetsVisibilityMap.get(key);
 		if (set == null) {
 			return false;
@@ -387,12 +398,12 @@ public class OsmAndAppCustomization {
 		return set.contains(appMode);
 	}
 
-	public boolean isWidgetAvailable(@NonNull String key, ApplicationMode appMode) {
-		Set<ApplicationMode> set = widgetsAvailabilityMap.get(key);
-		if (set == null) {
+	public boolean isWidgetAvailable(@NonNull String widgetId, @NonNull ApplicationMode appMode) {
+		Set<ApplicationMode> availableForModes = widgetsAvailabilityMap.get(widgetId);
+		if (availableForModes == null) {
 			return true;
 		}
-		return set.contains(appMode);
+		return availableForModes.contains(appMode);
 	}
 
 	public boolean setNavDrawerLogoWithParams(String imageUri, @Nullable String packageName, @Nullable String intent) {
@@ -401,18 +412,18 @@ public class OsmAndAppCustomization {
 
 	public boolean changePluginStatus(String pluginId, int newState) {
 		if (newState == 0) {
-			for (OsmandPlugin plugin : OsmandPlugin.getEnabledPlugins()) {
+			for (OsmandPlugin plugin : PluginsHelper.getEnabledPlugins()) {
 				if (plugin.getId().equals(pluginId)) {
-					OsmandPlugin.enablePlugin(null, app, plugin, false);
+					PluginsHelper.enablePlugin(null, app, plugin, false);
 				}
 			}
 			return true;
 		}
 
 		if (newState == 1) {
-			for (OsmandPlugin plugin : OsmandPlugin.getAvailablePlugins()) {
+			for (OsmandPlugin plugin : PluginsHelper.getAvailablePlugins()) {
 				if (plugin.getId().equals(pluginId)) {
-					OsmandPlugin.enablePlugin(null, app, plugin, true);
+					PluginsHelper.enablePlugin(null, app, plugin, true);
 				}
 			}
 			return true;
@@ -475,7 +486,7 @@ public class OsmAndAppCustomization {
 		}
 	}
 
-	public void registerNavDrawerItems(final Activity activity, ContextMenuAdapter adapter) {
+	public void registerNavDrawerItems(Activity activity, ContextMenuAdapter adapter) {
 		PackageManager pm = activity.getPackageManager();
 		for (Map.Entry<String, List<NavDrawerItem>> entry : getNavDrawerItems().entrySet()) {
 			String appPackage = entry.getKey();
@@ -488,20 +499,15 @@ public class OsmAndAppCustomization {
 					if (item.flags != -1) {
 						intent.addFlags(item.flags);
 					}
-					final Intent finalIntent = intent;
+					Intent finalIntent = intent;
 					int iconId = AndroidUtils.getDrawableId(app, item.iconName);
-					adapter.addItem(new ContextMenuItem.ItemBuilder()
-							.setId(item.getId())
+					adapter.addItem(new ContextMenuItem(item.getId())
 							.setTitle(item.name)
 							.setIcon(iconId != 0 ? iconId : ContextMenuItem.INVALID_ID)
-							.setListener(new ContextMenuAdapter.ItemClickListener() {
-								@Override
-								public boolean onContextMenuClick(ArrayAdapter<ContextMenuItem> adapter, int itemId, int position, boolean isChecked, int[] viewCoordinates) {
-									activity.startActivity(finalIntent);
-									return true;
-								}
-							})
-							.createItem());
+							.setListener((uiAdapter, view, _item, isChecked) -> {
+								AndroidUtils.startActivityIfSafe(activity, finalIntent);
+								return true;
+							}));
 				}
 			}
 		}
@@ -558,6 +564,19 @@ public class OsmAndAppCustomization {
 		return set;
 	}
 
+	public int getMaxZoom() {
+		return maxZoom;
+	}
+
+	public int getMinZoom() {
+		return minZoom;
+	}
+
+	public void setZoomLimits(int minZoom, int maxZoom) {
+		this.minZoom = minZoom;
+		this.maxZoom = maxZoom;
+	}
+
 	public boolean isFeatureEnabled(@NonNull String id) {
 		if (!featuresCustomized) {
 			return true;
@@ -587,11 +606,11 @@ public class OsmAndAppCustomization {
 	}
 
 	public boolean areSettingsCustomized() {
-		return customOsmandSettings != null;
+		return customSettings != null;
 	}
 
 	public boolean areSettingsCustomizedForPreference(String sharedPreferencesName) {
-		if (customOsmandSettings != null && customOsmandSettings.sharedPreferencesName.equals(sharedPreferencesName)) {
+		if (customSettings != null && customSettings.sharedPreferencesName.equals(sharedPreferencesName)) {
 			return true;
 		}
 		return OsmandSettings.areSettingsCustomizedForPreference(sharedPreferencesName, app);
@@ -615,13 +634,9 @@ public class OsmAndAppCustomization {
 	}
 
 	private void notifySettingsCustomized() {
-		app.runInUIThread(new Runnable() {
-
-			@Override
-			public void run() {
-				for (OsmAndAppCustomizationListener l : listeners) {
-					l.onOsmAndSettingsCustomized();
-				}
+		app.runInUIThread(() -> {
+			for (OsmAndAppCustomizationListener l : listeners) {
+				l.onOsmAndSettingsCustomized();
 			}
 		});
 	}
@@ -641,10 +656,10 @@ public class OsmAndAppCustomization {
 		static final String ICON_NAME_KEY = "icon_name";
 		static final String FLAGS_KEY = "flags";
 
-		private String name;
-		private String uri;
-		private String iconName;
-		private int flags;
+		private final String name;
+		private final String uri;
+		private final String iconName;
+		private final int flags;
 
 		public NavDrawerItem(String name, String uri, String iconName, int flags) {
 			this.name = name;

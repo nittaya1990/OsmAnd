@@ -1,9 +1,14 @@
 package net.osmand.osm;
 
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Map;
 
 public class PoiType extends AbstractPoiType {
+
+	public static final int DEFAULT_ORDER = 90;
+	public static final int DEFAULT_MIN_COUNT = 3;
+	public static final int DEFAULT_MAX_PER_MAP = 100;
 	
 	private PoiCategory category;
 	private PoiFilter filter;
@@ -24,7 +29,10 @@ public class PoiType extends AbstractPoiType {
 	private boolean text;
 	private boolean nameOnly;
 	private boolean relation;
-	private int order = 90;
+	private int order = DEFAULT_ORDER;
+	private boolean topIndex = false;
+	private int maxPerMap;
+	private int minCount;
 
 
 	public PoiType(MapPoiTypes poiTypes, PoiCategory category, PoiFilter filter, String keyName) {
@@ -164,7 +172,22 @@ public class PoiType extends AbstractPoiType {
 
 	public Map<PoiCategory, LinkedHashSet<String>> putTypes(Map<PoiCategory, LinkedHashSet<String>> acceptedTypes) {
 		if (isAdditional()) {
-			return parentType.putTypes(acceptedTypes);
+			parentType.putTypes(acceptedTypes);
+			if (filterOnly) {
+				LinkedHashSet<String> set = acceptedTypes.get(category);
+				for (PoiType pt : category.getPoiTypes()) {
+					List<PoiType> poiAdditionals = pt.getPoiAdditionals();
+					if (poiAdditionals == null) {
+						continue;
+					}
+					for (PoiType poiType : poiAdditionals) {
+						if (poiType.getKeyName().equals(keyName)) {
+							set.add(pt.getKeyName());
+						}
+					}
+				}
+			}
+			return acceptedTypes;
 		}
 		PoiType rt = getReferenceType();
 		PoiType poiType = rt != null ? rt : this;
@@ -245,5 +268,29 @@ public class PoiType extends AbstractPoiType {
 				", relation=" + relation +
 				", order=" + order +
 				'}';
+	}
+
+	public boolean isTopIndex() {
+		return topIndex;
+	}
+
+	public void setTopIndex(boolean topIndex) {
+		this.topIndex = topIndex;
+	}
+
+	public int getMaxPerMap() {
+		return maxPerMap;
+	}
+
+	public void setMaxPerMap(int maxPerMap) {
+		this.maxPerMap = maxPerMap;
+	}
+
+	public int getMinCount() {
+		return minCount;
+	}
+
+	public void setMinCount(int minCount) {
+		this.minCount = minCount;
 	}
 }

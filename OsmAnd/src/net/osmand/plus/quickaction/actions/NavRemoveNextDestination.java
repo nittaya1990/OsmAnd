@@ -1,5 +1,7 @@
 package net.osmand.plus.quickaction.actions;
 
+import static net.osmand.plus.quickaction.QuickActionIds.NAV_REMOVE_NEXT_DESTINATION_ACTION_ID;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -9,20 +11,21 @@ import androidx.annotation.NonNull;
 
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper;
+import net.osmand.plus.helpers.TargetPointsHelper;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.mapcontextmenu.other.DestinationReachedMenu;
+import net.osmand.plus.mapcontextmenu.other.DestinationReachedFragment;
 import net.osmand.plus.quickaction.QuickAction;
 import net.osmand.plus.quickaction.QuickActionType;
 
 public class NavRemoveNextDestination extends QuickAction {
 
-	public static final QuickActionType TYPE = new QuickActionType(34,
+	public static final QuickActionType TYPE = new QuickActionType(NAV_REMOVE_NEXT_DESTINATION_ACTION_ID,
 			"nav.destination.remove", NavRemoveNextDestination.class)
 			.nameRes(R.string.quick_action_remove_next_destination)
 			.iconRes(R.drawable.ic_action_navigation_skip_destination)
 			.nonEditable()
-			.category(QuickActionType.NAVIGATION);
+			.category(QuickActionType.NAVIGATION)
+			.nameActionRes(R.string.shared_string_remove);
 
 	public NavRemoveNextDestination() {
 		super(TYPE);
@@ -38,7 +41,7 @@ public class NavRemoveNextDestination extends QuickAction {
 		if (targetsHelper.getIntermediatePoints().size() > 0) {
 			targetsHelper.removeWayPoint(true, 0);
 		} else {
-			DestinationReachedMenu.show(mapActivity);
+			DestinationReachedFragment.show(mapActivity);
 		}
 	}
 

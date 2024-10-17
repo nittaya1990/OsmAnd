@@ -1,20 +1,50 @@
 package net.osmand.plus.views.layers.geometry;
 
-import android.content.Context;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Matrix;
-import android.graphics.Paint;
-import android.graphics.PorterDuff;
-import android.graphics.PorterDuffColorFilter;
+import static net.osmand.shared.routing.Gpx3DWallColorType.NONE;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.views.layers.geometry.GpxGeometryWay.GeometryArrowsStyle;
+import android.graphics.Canvas;
+import android.util.Pair;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+
+import net.osmand.core.jni.QListFColorARGB;
+import net.osmand.core.jni.VectorLinesCollection;
+import net.osmand.plus.track.Track3DStyle;
+import net.osmand.shared.routing.ColoringType;
+import net.osmand.shared.routing.Gpx3DWallColorType;
+
+import java.util.List;
 
 public class GpxGeometryWayDrawer extends MultiColoringGeometryWayDrawer<GpxGeometryWayContext> {
 
+	@Nullable
+	protected ColoringType outlineColoringType;
+
+	@Nullable
+	private Track3DStyle track3DStyle;
+
 	public GpxGeometryWayDrawer(GpxGeometryWayContext context) {
 		super(context);
+		outlineColoringType = context.getDefaultColoringType();
+	}
+
+	public void setOutlineColoringType(@Nullable ColoringType outlineColoringType) {
+		this.outlineColoringType = outlineColoringType;
+	}
+
+	public void setTrack3DStyle(@Nullable Track3DStyle track3DStyle) {
+		this.track3DStyle = track3DStyle;
+	}
+
+	@Override
+	public void drawPath(@NonNull VectorLinesCollection collection, int baseOrder, boolean shouldDrawArrows,
+	                     @NonNull List<DrawPathData31> pathsData) {
+		if (coloringType.isGradient() || track3DStyle != null && track3DStyle.getVisualizationType().is3dType()) {
+			drawGradient(collection, baseOrder, shouldDrawArrows, pathsData);
+		} else if (coloringType.isDefault() || coloringType.isCustomColor() || coloringType.isTrackSolid() || coloringType.isRouteInfoAttribute()) {
+			super.drawPath(collection, baseOrder, shouldDrawArrows, pathsData);
+		}
 	}
 
 	@Override
@@ -24,53 +54,15 @@ public class GpxGeometryWayDrawer extends MultiColoringGeometryWayDrawer<GpxGeom
 		}
 	}
 
+	@NonNull
 	@Override
-	protected PathPoint getArrowPathPoint(float iconx, float icony, GeometryWayStyle<?> style, double angle) {
-		return new ArrowPathPoint(iconx, icony, angle, style);
-	}
+	protected Pair<QListFColorARGB, QListFColorARGB> getColorizationMappings(@NonNull List<DrawPathData31> pathsData) {
+		Gpx3DWallColorType wallColorType = track3DStyle != null && track3DStyle.getVisualizationType().is3dType() ? track3DStyle.getWallColorType() : NONE;
+		ColoringType outlineColoringType = ColoringType.Companion.valueOf(wallColorType);
 
-	private static class ArrowPathPoint extends ColorDependentArrowPathPoint {
+		QListFColorARGB mapping = getColorizationMapping(pathsData, coloringType, false);
+		QListFColorARGB outlineMapping = outlineColoringType != null ? getColorizationMapping(pathsData, outlineColoringType, true) : null;
 
-		ArrowPathPoint(float x, float y, double angle, GeometryWayStyle<?> style) {
-			super(x, y, angle, style);
-		}
-
-		@Override
-		void draw(Canvas canvas, GeometryWayContext context) {
-			if (style instanceof GeometryArrowsStyle && shouldDrawArrow()) {
-				Context ctx = style.getCtx();
-				GeometryArrowsStyle arrowsWayStyle = (GeometryArrowsStyle) style;
-				Bitmap bitmap = style.getPointBitmap();
-				boolean useSpecialArrow = arrowsWayStyle.useSpecialArrow();
-
-				float newWidth = useSpecialArrow ? AndroidUtils.dpToPx(ctx, 12) : arrowsWayStyle.getTrackWidth() / 2f;
-				float paintH2 = bitmap.getHeight() / 2f;
-				float paintW2 = newWidth / 2f;
-
-				Matrix matrix = getMatrix();
-				matrix.reset();
-				float sy = useSpecialArrow ? newWidth / bitmap.getHeight() : 1;
-				matrix.postScale(newWidth / bitmap.getWidth(), sy);
-				matrix.postRotate((float) angle, paintW2, paintH2);
-				matrix.postTranslate(x - paintW2, y - paintH2);
-
-				if (useSpecialArrow) {
-					drawCircle(canvas, arrowsWayStyle);
-				}
-
-				Paint paint = context.getPaintIconCustom();
-				int arrowColor = arrowsWayStyle.getPointColor();
-				paint.setColorFilter(new PorterDuffColorFilter(arrowColor, PorterDuff.Mode.SRC_IN));
-				canvas.drawBitmap(bitmap, matrix, paint);
-			}
-		}
-
-		private void drawCircle(Canvas canvas, GeometryArrowsStyle style) {
-			Paint paint = style.getContext().getCirclePaint();
-			paint.setColor(GeometryArrowsStyle.OUTER_CIRCLE_COLOR);
-			canvas.drawCircle(x, y, style.getOuterCircleRadius(), paint);
-			paint.setColor(style.getTrackColor());
-			canvas.drawCircle(x, y, style.getInnerCircleRadius(), paint);
-		}
+		return new Pair<>(mapping, outlineMapping);
 	}
 }

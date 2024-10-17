@@ -5,7 +5,7 @@ import android.util.Pair;
 import net.osmand.data.RotatedTileBox;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
-import net.osmand.plus.OsmAndFormatter;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.render.RenderingRuleSearchRequest;
@@ -21,11 +21,12 @@ public class TransportStopRoute {
 	public String desc;
 	public TransportRoute route;
 	public TransportStop stop;
+	private int stopIndex = -1;
 	public int distance;
 	public boolean showWholeRoute;
 	private int cachedColor;
 	private boolean cachedNight;
-	private Map<Pair<String, Boolean>, Integer> cachedRouteColors = new HashMap<>();
+	private final Map<Pair<String, Boolean>, Integer> cachedRouteColors = new HashMap<>();
 
 	public static TransportStopRoute getTransportStopRoute(TransportRoute rs, TransportStop s) {
 		TransportStopType type = TransportStopType.findType(rs.getType());
@@ -35,6 +36,7 @@ public class TransportStopRoute {
 		r.route = rs;
 		r.stop = s;
 		r.refStop = s;
+		r.initStopIndex();
 		return r;
 	}
 
@@ -79,7 +81,7 @@ public class TransportStopRoute {
 
 	public int getColor(OsmandApplication ctx, boolean nightMode) {
 		if (cachedColor == 0 || cachedNight != nightMode) {
-			cachedColor = ctx.getResources().getColor(R.color.transport_route_line);
+			cachedColor = ctx.getColor(R.color.transport_route_line);
 			cachedNight = nightMode;
 			if (type != null) {
 				RenderingRulesStorage rrs = ctx.getRendererRegistry().getCurrentSelectedRenderer();
@@ -151,4 +153,35 @@ public class TransportStopRoute {
 		}
 	}
 
+	private void initStopIndex() {
+		if (route == null || stop == null) {
+			return;
+		}
+		List<TransportStop> stops = route.getForwardStops();
+		for (int i = 0; i < stops.size(); i++) {
+			TransportStop stop = stops.get(i);
+			if (this.stop.getId().equals(stop.getId())) {
+				stopIndex = i;
+				break;
+			}
+		}
+	}
+
+	public int getStopIndex() {
+		if (stopIndex == -1) {
+			initStopIndex();
+		}
+		return stopIndex;
+	}
+
+	public void setStopIndex(int stopIndex) {
+		if (route == null || stop == null) {
+			return;
+		}
+		if (stopIndex == -1) {
+			initStopIndex();
+		} else if (stopIndex < route.getForwardStops().size()) {
+			this.stopIndex = stopIndex;
+		}
+	}
 }

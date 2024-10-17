@@ -11,23 +11,27 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.RecyclerView;
 
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
 import net.osmand.IndexConstants;
-import net.osmand.plus.GPXDatabase.GpxDataItem;
-import net.osmand.plus.GpxDbHelper;
-import net.osmand.plus.GpxDbHelper.GpxDataItemCallback;
-import net.osmand.plus.GpxSelectionHelper;
+import net.osmand.plus.shared.SharedUtil;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.mapmarkers.adapters.GroupsAdapter;
 import net.osmand.plus.mapmarkers.adapters.TracksGroupsAdapter;
+import net.osmand.plus.track.GpxSelectionParams;
+import net.osmand.plus.track.helpers.GpxFileLoaderTask;
+import net.osmand.plus.track.helpers.GpxSelectionHelper;
+import net.osmand.shared.gpx.GpxDataItem;
+import net.osmand.shared.gpx.GpxDbHelper;
+import net.osmand.shared.gpx.GpxDbHelper.GpxDataItemCallback;
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.util.Algorithms;
 
 import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
+
+;
 
 public class AddTracksGroupBottomSheetDialogFragment extends AddGroupBottomSheetDialogFragment {
 
@@ -41,7 +45,7 @@ public class AddTracksGroupBottomSheetDialogFragment extends AddGroupBottomSheet
 	private RecyclerView recyclerView;
 	private TextView lookingForTracksText;
 
-	private GpxDataItemCallback gpxDataItemCallback = new GpxDataItemCallback() {
+	private final GpxDataItemCallback gpxDataItemCallback = new GpxDataItemCallback() {
 		@Override
 		public boolean isCancelled() {
 			ProcessGpxTask processor = asyncProcessor;
@@ -49,24 +53,28 @@ public class AddTracksGroupBottomSheetDialogFragment extends AddGroupBottomSheet
 		}
 
 		@Override
-		public void onGpxDataItemReady(GpxDataItem item) {
+		public void onGpxDataItemReady(@NonNull GpxDataItem item) {
 			populateList(item);
-			if (dbHelper.isRead()) {
+			if (dbHelper.isReading()) {
 				onListPopulated();
 			}
 		}
 	};
 
 	@Override
+	public void onCreate(Bundle savedInstanceState) {
+		super.onCreate(savedInstanceState);
+		app = requiredMyApplication();
+		dbHelper = app.getGpxDbHelper();
+	}
+
+	@Override
 	public void onViewCreated(@NonNull View view, @Nullable Bundle savedInstanceState) {
 		super.onViewCreated(view, savedInstanceState);
 
-		app = requiredMyApplication();
-		dbHelper = app.getGpxDbHelper();
-
-		progressBar = (ProgressBar) mainView.findViewById(R.id.progress_bar);
-		recyclerView = (RecyclerView) mainView.findViewById(R.id.groups_recycler_view);
-		lookingForTracksText = (TextView) mainView.findViewById(R.id.looking_for_tracks_text);
+		progressBar = mainView.findViewById(R.id.progress_bar);
+		recyclerView = mainView.findViewById(R.id.groups_recycler_view);
+		lookingForTracksText = mainView.findViewById(R.id.looking_for_tracks_text);
 
 		asyncProcessor = new ProcessGpxTask();
 		asyncProcessor.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
@@ -90,24 +98,27 @@ public class AddTracksGroupBottomSheetDialogFragment extends AddGroupBottomSheet
 	@Override
 	protected void onItemClick(int position) {
 		GpxDataItem dataItem = gpxList.get(position - 1);
-		GPXTrackAnalysis analysis = dataItem.getAnalysis();
-		if (analysis != null && analysis.wptCategoryNames != null && analysis.wptCategoryNames.size() > 1) {
+		GpxTrackAnalysis analysis = dataItem.getAnalysis();
+		if (analysis != null && !Algorithms.isEmpty(analysis.getWptCategoryNames())) {
 			Bundle args = new Bundle();
-			args.putString(SelectWptCategoriesBottomSheetDialogFragment.GPX_FILE_PATH_KEY, dataItem.getFile().getAbsolutePath());
+			args.putString(SelectWptCategoriesBottomSheetDialogFragment.GPX_FILE_PATH_KEY, dataItem.getFile().absolutePath());
 
 			SelectWptCategoriesBottomSheetDialogFragment fragment = new SelectWptCategoriesBottomSheetDialogFragment();
 			fragment.setArguments(args);
 			fragment.setUsedOnMap(false);
 			fragment.show(getParentFragment().getChildFragmentManager(), SelectWptCategoriesBottomSheetDialogFragment.TAG);
 		} else {
-			OsmandApplication app = getMyApplication();
-			if (app != null) {
-				GpxSelectionHelper selectionHelper = app.getSelectedGpxHelper();
-				File gpx = dataItem.getFile();
-				if (selectionHelper.getSelectedFileByPath(gpx.getAbsolutePath()) == null) {
-					GPXFile res = GPXUtilities.loadGPXFile(gpx);
-					selectionHelper.selectGpxFile(res, true, false, false, false, false);
-				}
+			GpxSelectionHelper selectionHelper = app.getSelectedGpxHelper();
+			File gpx = SharedUtil.jFile(dataItem.getFile());
+			if (selectionHelper.getSelectedFileByPath(gpx.getAbsolutePath()) == null) {
+				GpxFileLoaderTask.loadGpxFile(gpx, getActivity(), gpxFile -> {
+					GpxSelectionParams params = GpxSelectionParams.newInstance()
+							.showOnMap().selectedAutomatically().saveSelection();
+					selectionHelper.selectGpxFile(gpxFile, params);
+					app.getMapMarkersHelper().addOrEnableGpxGroup(gpx);
+					return true;
+				});
+			} else {
 				app.getMapMarkersHelper().addOrEnableGpxGroup(gpx);
 			}
 		}
@@ -115,9 +126,9 @@ public class AddTracksGroupBottomSheetDialogFragment extends AddGroupBottomSheet
 	}
 
 	private void populateList(GpxDataItem item) {
-		if (item != null && item.getFile() != null) {
-			GPXTrackAnalysis analysis = item.getAnalysis();
-			if (analysis != null && analysis.wptPoints > 0) {
+		if (item != null) {
+			GpxTrackAnalysis analysis = item.getAnalysis();
+			if (analysis != null && analysis.getWptPoints() > 0) {
 				int index = gpxList.indexOf(item);
 				if (index != -1) {
 					gpxList.set(index, item);
@@ -173,7 +184,7 @@ public class AddTracksGroupBottomSheetDialogFragment extends AddGroupBottomSheet
 							gpxFile.getName() : gpxSubfolder + "/" + gpxFile.getName();
 					processGPXFolder(gpxFile, sub);
 				} else if (gpxFile.isFile() && gpxFile.getName().toLowerCase().endsWith(IndexConstants.GPX_FILE_EXT)) {
-					GpxDataItem item = dbHelper.getItem(gpxFile, gpxDataItemCallback);
+					GpxDataItem item = dbHelper.getItem(SharedUtil.kFile(gpxFile), gpxDataItemCallback);
 					publishProgress(item);
 				}
 				if (isCancelled()) {
@@ -192,7 +203,7 @@ public class AddTracksGroupBottomSheetDialogFragment extends AddGroupBottomSheet
 
 		@Override
 		protected void onPostExecute(Void aVoid) {
-			if (dbHelper.isRead()) {
+			if (dbHelper.isReading()) {
 				onListPopulated();
 			}
 		}

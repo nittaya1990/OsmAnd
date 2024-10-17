@@ -2,7 +2,9 @@ package net.osmand.router;
 
 import net.osmand.util.Algorithms;
 
-import gnu.trove.set.hash.TIntHashSet;
+import java.util.HashSet;
+import java.util.LinkedHashSet;
+
 
 public class TurnType {
 	public static final int C = 1;//"C"; // continue (go straight) //$NON-NLS-1$
@@ -19,21 +21,22 @@ public class TurnType {
 	public static final int OFFR = 12; // Off route //$NON-NLS-1$
 	public static final int RNDB = 13; // Roundabout
 	public static final int RNLB = 14; // Roundabout left
+	private static final int[] TURNS_ORDER = {TU, TSHL, TL, TSLL, C, TSLR, TR, TSHR, TRU};
 
 	public static TurnType straight() {
 		return valueOf(C, false);
 	}
 	
 	public int getActiveCommonLaneTurn() {
-		if(lanes == null || lanes.length == 0) {
-			return C;
+		if (lanes == null || lanes.length == 0) {
+			return -1;
 		}
-		for(int i = 0; i < lanes.length; i++) {
-			if(lanes[i] % 2 == 1) {
+		for (int i = 0; i < lanes.length; i++) {
+			if (lanes[i] % 2 == 1) {
 				return TurnType.getPrimaryTurn(lanes[i]);
 			}
 		}
-		return C;
+		return -1;
 	}
 	
 	public String toXmlString() {
@@ -99,7 +102,8 @@ public class TurnType {
 		} else if (s != null && (s.startsWith("EXIT") ||
 				s.startsWith("RNDB") || s.startsWith("RNLB"))) {
 			try {
-				t = TurnType.getExitTurn(Integer.parseInt(s.substring(4)), 0, leftSide);
+				int type = s.contains("RNLB") ? RNLB : RNDB;
+				t = TurnType.getExitTurn(type, Integer.parseInt(s.substring(4)), 0, leftSide);
 			} catch (NumberFormatException e) {
 				e.printStackTrace();
 			}
@@ -134,6 +138,17 @@ public class TurnType {
 	private boolean possiblyLeftTurn;
 	private boolean possiblyRightTurn;
 
+	public TurnType(int value, int exitOut, float turnAngle, boolean skipToSpeak, int[] lanes,
+	                boolean possiblyLeftTurn, boolean possiblyRightTurn) {
+		this.value = value;
+		this.exitOut = exitOut;
+		this.turnAngle = turnAngle;
+		this.skipToSpeak = skipToSpeak;
+		this.lanes = lanes;
+		this.possiblyLeftTurn = possiblyLeftTurn;
+		this.possiblyRightTurn = possiblyRightTurn;
+	}
+
 	public static TurnType getExitTurn(int out, float angle, boolean leftSide) {
 		TurnType r = valueOf(RNDB, leftSide); //$NON-NLS-1$
 		r.exitOut = out;
@@ -141,7 +156,17 @@ public class TurnType {
 		return r;
 	}
 
-	
+	private static TurnType getExitTurn(int type, int out, float angle, boolean leftSide) {
+		if (type != RNDB && type != RNLB) {
+			return getExitTurn(out, angle, leftSide);
+		}
+		TurnType r = valueOf(type, leftSide); //$NON-NLS-1$
+		r.exitOut = out;
+		r.setTurnAngle(angle);
+		return r;
+	}
+
+
 	private TurnType(int vl) {
 		this.value = vl;
 	}
@@ -273,6 +298,58 @@ public class TurnType {
         return s.toString();
 	}
 
+	public int countTurnTypeDirections(int type, boolean onlyActive) {
+		if (lanes == null) {
+			return 0;
+		}
+		int cnt = 0;
+		for (int h = 0; h < lanes.length; h++) {
+			boolean active = lanes[h] % 2 == 1;
+			if (onlyActive && !active) {
+				continue;
+			}
+			int primary = TurnType.getPrimaryTurn(lanes[h]);
+			if (primary == 0) {
+				primary = TurnType.C;
+			}
+			if (primary == type) {
+				cnt++;
+			}
+			if (onlyActive) {
+				continue;
+			}
+			int secondary = TurnType.getSecondaryTurn(lanes[h]);
+			if (secondary == type) {
+				cnt++;
+			}
+			int tertiary = TurnType.getTertiaryTurn(lanes[h]);
+			if (tertiary == type) {
+				cnt++;
+			}
+		}
+		return cnt;
+	}
+
+	public int countDirections() {
+		HashSet<Integer> directions = new HashSet<>();
+		for (int h = 0; h < lanes.length; h++) {
+			int primary = TurnType.getPrimaryTurn(lanes[h]);
+			if (primary == 0) {
+				primary = TurnType.C;
+			}
+			directions.add(primary);
+			int secondary = TurnType.getSecondaryTurn(lanes[h]);
+			if (secondary > 0) {
+				directions.add(secondary);
+			}
+			int tertiary = TurnType.getTertiaryTurn(lanes[h]);
+			if (tertiary > 0) {
+				directions.add(tertiary);
+			}
+		}
+		return directions.size();
+	}
+
 	public static int[] lanesFromString(String lanesString) {
 		if (Algorithms.isEmpty(lanesString)) {
 			return null;
@@ -385,8 +462,8 @@ public class TurnType {
 			vl = "Off route";
 		}
 		if(vl != null) {
-			if(lanes != null) {
-				vl += "(" + lanesToString(lanes) +")";
+			if (lanes != null && lanes.length > 0) {
+				vl += " (" + lanesToString(lanes) +")";
 			}
 			return vl;
 		}
@@ -413,6 +490,23 @@ public class TurnType {
 		return type == TSLL || type == TSLR || type == C || type == KL || type == KR;
 	}
 	
+	public static boolean isKeepDirectionTurn(int type) {
+		return type == C || type == KL || type == KR;
+	}
+
+	public static boolean isSharpOrReverse(int type) {
+		return type == TurnType.TSHL || type == TurnType.TSHR || type == TurnType.TU || type == TurnType.TRU;
+	}
+
+	public static boolean isSharpLeftOrUTurn(int type) {
+		return type == TurnType.TSHL || type == TurnType.TU;
+	}
+
+	public static boolean isSharpRightOrUTurn(int type) {
+		// turn:lanes=reverse is transform to TU only
+		return type == TurnType.TSHR || type == TurnType.TRU || type == TurnType.TU;
+	}
+	
 	public static boolean hasAnySlightTurnLane(int type) {
 		return TurnType.isSlightTurn(TurnType.getPrimaryTurn(type))
 				|| TurnType.isSlightTurn(TurnType.getSecondaryTurn(type))
@@ -425,7 +519,7 @@ public class TurnType {
 				|| TurnType.getTertiaryTurn(type) == turn;
 	}
 
-	public static void collectTurnTypes(int lane, TIntHashSet set) {
+	public static void collectTurnTypes(int lane, LinkedHashSet<Integer> set) {
 		int pt = TurnType.getPrimaryTurn(lane);
 		if(pt != 0) {
 			set.add(pt);
@@ -499,6 +593,23 @@ public class TurnType {
 		return turn;
 	}
 
-	
+	public static int getPrev(int turn) {
+		for (int i = TURNS_ORDER.length - 1; i >= 0; i--) {
+			int t = TURNS_ORDER[i];
+			if (t == turn && i > 0) {
+				return TURNS_ORDER[i - 1];
+			}
+		}
+		return turn;
+	}
 
+	public static int getNext(int turn) {
+		for (int i = 0; i < TURNS_ORDER.length; i++) {
+			int t = TURNS_ORDER[i];
+			if (t == turn && i + 1 < TURNS_ORDER.length) {
+				return TURNS_ORDER[i + 1];
+			}
+		}
+		return turn;
+	}
 }

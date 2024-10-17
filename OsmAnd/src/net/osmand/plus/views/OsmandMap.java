@@ -1,36 +1,27 @@
 package net.osmand.plus.views;
 
-import static net.osmand.plus.auto.CarSurfaceView.MAP_DENSITY_DIVIDER_160;
-import static net.osmand.plus.auto.CarSurfaceView.TEXT_SCALE_DIVIDER_160;
-
-import android.content.Context;
 import android.graphics.Point;
 import android.view.Display;
-import android.view.WindowManager;
-import android.widget.Toast;
 
 import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
 
-import net.osmand.AndroidUtils;
 import net.osmand.Location;
 import net.osmand.data.RotatedTileBox;
 import net.osmand.map.MapTileDownloader.IMapDownloaderCallback;
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandApplication.NavigationSessionListener;
-import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper;
 import net.osmand.plus.auto.NavigationSession;
 import net.osmand.plus.auto.SurfaceRenderer;
 import net.osmand.plus.base.MapViewTrackingUtilities;
+import net.osmand.plus.helpers.TargetPointsHelper;
 import net.osmand.plus.resources.ResourceManager;
 import net.osmand.plus.routing.RoutingHelper;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.util.CollectionUtils;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.List;
 
-public class OsmandMap implements NavigationSessionListener {
+public class OsmandMap {
 
 	private final OsmandApplication app;
 
@@ -40,24 +31,21 @@ public class OsmandMap implements NavigationSessionListener {
 	private final MapActions mapActions;
 	private final IMapDownloaderCallback downloaderCallback;
 
-	private final List<OsmandMapListener> listeners = Collections.synchronizedList(new ArrayList<>());
+	private List<RenderingViewSetupListener> renderingViewSetupListeners = new ArrayList<>();
 
-	public interface OsmandMapListener {
-		void onChangeZoom(int stp);
+	public interface RenderingViewSetupListener {
 
-		void onSetMapElevation(float angle);
-
-		void onSetupOpenGLView(boolean init);
+		void onSetupRenderingView();
 	}
 
-	public void addListener(@NonNull OsmandMapListener listener) {
-		if (!listeners.contains(listener)) {
-			listeners.add(listener);
+	public void addRenderingViewSetupListener(@NonNull RenderingViewSetupListener listener) {
+		if (!renderingViewSetupListeners.contains(listener)) {
+			renderingViewSetupListeners = CollectionUtils.addToList(renderingViewSetupListeners, listener);
 		}
 	}
 
-	public void removeListener(@NonNull OsmandMapListener listener) {
-		listeners.remove(listener);
+	public void removeRenderingViewSetupListener(@NonNull RenderingViewSetupListener listener) {
+		renderingViewSetupListeners = CollectionUtils.removeFromList(renderingViewSetupListeners, listener);
 	}
 
 	public OsmandMap(@NonNull OsmandApplication app) {
@@ -65,22 +53,21 @@ public class OsmandMap implements NavigationSessionListener {
 		mapViewTrackingUtilities = app.getMapViewTrackingUtilities();
 		mapActions = new MapActions(app);
 
-		int w;
-		int h;
+		int width;
+		int height;
 		NavigationSession carNavigationSession = app.getCarNavigationSession();
 		if (carNavigationSession == null) {
-			WindowManager wm = (WindowManager) app.getSystemService(Context.WINDOW_SERVICE);
-			Display display = wm.getDefaultDisplay();
+			Display display = AndroidUtils.getDisplay(app);
 			Point screenDimensions = new Point(0, 0);
 			display.getSize(screenDimensions);
-			w = screenDimensions.x;
-			h = screenDimensions.y - AndroidUtils.getStatusBarHeight(app);
+			width = screenDimensions.x;
+			height = screenDimensions.y - AndroidUtils.getStatusBarHeight(app);
 		} else {
 			SurfaceRenderer surface = carNavigationSession.getNavigationCarSurface();
-			w = surface != null ? surface.getWidth() : 100;
-			h = surface != null ? surface.getHeight() : 100;
+			width = surface != null ? surface.getWidth() : 100;
+			height = surface != null ? surface.getHeight() : 100;
 		}
-		mapView = new OsmandMapTileView(app, w, h);
+		mapView = new OsmandMapTileView(app, width, height);
 		mapLayers = new MapLayers(app);
 
 		// to not let it gc
@@ -94,8 +81,6 @@ public class OsmandMap implements NavigationSessionListener {
 			}
 		};
 		app.getResourceManager().getMapTileDownloader().addDownloaderCallback(downloaderCallback);
-
-		app.setNavigationSessionListener(this);
 	}
 
 	@NonNull
@@ -122,43 +107,8 @@ public class OsmandMap implements NavigationSessionListener {
 		mapView.refreshMap();
 	}
 
-	public void refreshMap(final boolean updateVectorRendering) {
+	public void refreshMap(boolean updateVectorRendering) {
 		mapView.refreshMap(updateVectorRendering);
-	}
-
-	public void changeZoom(int stp, long time) {
-		mapViewTrackingUtilities.setZoomTime(time);
-		changeZoom(stp);
-	}
-
-	public void changeZoom(int stp) {
-		// delta = Math.round(delta * OsmandMapTileView.ZOOM_DELTA) * OsmandMapTileView.ZOOM_DELTA_1;
-		boolean changeLocation = false;
-		// if (settings.AUTO_ZOOM_MAP.get() == AutoZoomMap.NONE) {
-		// changeLocation = false;
-		// }
-
-		// double curZoom = mapView.getZoom() + mapView.getZoomFractionalPart() + stp * 0.3;
-		// int newZoom = (int) Math.round(curZoom);
-		// double zoomFrac = curZoom - newZoom;
-
-		final int newZoom = mapView.getZoom() + stp;
-		final double zoomFrac = mapView.getZoomFractionalPart();
-		if (newZoom > mapView.getMaxZoom()) {
-			Toast.makeText(app, R.string.edit_tilesource_maxzoom, Toast.LENGTH_SHORT).show();
-			return;
-		}
-		if (newZoom < mapView.getMinZoom()) {
-			Toast.makeText(app, R.string.edit_tilesource_minzoom, Toast.LENGTH_SHORT).show();
-			return;
-		}
-		mapView.getAnimatedDraggingThread().startZooming(newZoom, zoomFrac, changeLocation);
-		if (app.accessibilityEnabled()) {
-			Toast.makeText(app, app.getString(R.string.zoomIs) + " " + newZoom, Toast.LENGTH_SHORT).show();
-		}
-		for (OsmandMapListener listener : listeners) {
-			listener.onChangeZoom(stp);
-		}
 	}
 
 	public void setMapLocation(double lat, double lon) {
@@ -166,31 +116,22 @@ public class OsmandMap implements NavigationSessionListener {
 		mapViewTrackingUtilities.locationChanged(lat, lon, this);
 	}
 
-	public void setMapElevation(float angle) {
-		for (OsmandMapListener listener : listeners) {
-			listener.onSetMapElevation(angle);
-		}
-	}
-
-	public void setupOpenGLView(boolean init) {
+	public void setupRenderingView() {
 		OsmandMapTileView mapView = app.getOsmandMap().getMapView();
-		for (OsmandMapListener listener : listeners) {
-			listener.onSetupOpenGLView(init);
+		for (RenderingViewSetupListener listener : renderingViewSetupListeners) {
+			listener.onSetupRenderingView();
 		}
 		NavigationSession navigationSession = app.getCarNavigationSession();
 		if (navigationSession != null) {
-			navigationSession.setMapView(mapView);
-			app.getMapViewTrackingUtilities().setMapView(mapView);
-		} else if (mapView.getMapActivity() == null) {
-			app.getMapViewTrackingUtilities().setMapView(null);
-		}
-	}
-
-	@Override
-	public void onNavigationSessionChanged(@Nullable NavigationSession navigationSession) {
-		if (navigationSession != null) {
-			navigationSession.setMapView(mapView);
-			app.getMapViewTrackingUtilities().setMapView(mapView);
+			if (navigationSession.hasStarted()) {
+				navigationSession.setMapView(mapView);
+				app.getMapViewTrackingUtilities().setMapView(mapView);
+			} else {
+				navigationSession.setMapView(null);
+				if (mapView.getMapActivity() == null) {
+					app.getMapViewTrackingUtilities().setMapView(null);
+				}
+			}
 		} else if (mapView.getMapActivity() == null) {
 			app.getMapViewTrackingUtilities().setMapView(null);
 		}
@@ -198,22 +139,24 @@ public class OsmandMap implements NavigationSessionListener {
 
 	public float getTextScale() {
 		float scale = app.getSettings().TEXT_SCALE.get();
-		return scale * getCarScaleCoef(true);
+		return scale * getCarDensityScaleCoef();
+	}
+
+	public float getOriginalTextScale() {
+		return app.getSettings().TEXT_SCALE.get();
 	}
 
 	public float getMapDensity() {
 		float scale = app.getSettings().MAP_DENSITY.get();
-		return scale * getCarScaleCoef(false);
+		return scale * getCarDensityScaleCoef();
 	}
 
-	public float getCarScaleCoef(boolean textScale) {
+	public float getCarDensityScaleCoef() {
 		OsmandMapTileView mapView = app.getOsmandMap().getMapView();
 		if (mapView.isCarView()) {
 			float carViewDensity = mapView.getCarViewDensity();
 			float density = mapView.getDensity();
-			if (density >= 2 && carViewDensity == 1) {
-				return textScale ? TEXT_SCALE_DIVIDER_160 : MAP_DENSITY_DIVIDER_160;
-			}
+			return carViewDensity / density;
 		}
 		return 1f;
 	}

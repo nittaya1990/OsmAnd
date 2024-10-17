@@ -1,9 +1,9 @@
 package net.osmand.plus.routepreparationmenu.cards;
 
+
 import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.graphics.drawable.GradientDrawable;
-import android.os.Build;
 import android.text.SpannableString;
 import android.text.style.ForegroundColorSpan;
 import android.view.View;
@@ -17,21 +17,21 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
-import net.osmand.AndroidUtils;
 import net.osmand.data.LatLon;
 import net.osmand.data.TransportRoute;
-import net.osmand.plus.ColorUtilities;
-import net.osmand.plus.OsmAndFormatter;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.helpers.FontCache;
 import net.osmand.plus.routing.RouteCalculationResult;
 import net.osmand.plus.routing.TransportRoutingHelper;
 import net.osmand.plus.transport.TransportStopRoute;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.FontCache;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.plus.widgets.FlowLayout;
 import net.osmand.plus.widgets.style.CustomTypefaceSpan;
-import net.osmand.router.TransportRouteResult;
 import net.osmand.router.TransportRoutePlanner.TransportRouteResultSegment;
+import net.osmand.router.TransportRouteResult;
 import net.osmand.util.Algorithms;
 
 import java.util.Iterator;
@@ -43,12 +43,12 @@ public class PublicTransportCard extends MapBaseCard {
 	public static final int DETAILS_BUTTON_INDEX = 0;
 	public static final int SHOW_BUTTON_INDEX = 1;
 
-	private LatLon startLocation;
-	private LatLon endLocation;
-	private TransportRouteResult routeResult;
+	private final LatLon startLocation;
+	private final LatLon endLocation;
+	private final TransportRouteResult routeResult;
 	private PublicTransportCardListener transportCardListener;
 
-	private int routeId;
+	private final int routeId;
 	private String showButtonCustomTitle;
 	private boolean routeInfoVisible = true;
 	private boolean routeButtonsVisible = true;
@@ -123,21 +123,13 @@ public class PublicTransportCard extends MapBaseCard {
 			int paddingBottom = info.getPaddingBottom();
 			info.setBackgroundResource(AndroidUtils.resolveAttribute(view.getContext(), android.R.attr.selectableItemBackground));
 			info.setPadding(paddingLeft, paddingTop, paddingRight, paddingBottom);
-			info.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					CardListener listener = getListener();
-					if (listener != null) {
-						listener.onCardPressed(PublicTransportCard.this);
-					}
-				}
-			});
+			info.setOnClickListener(v -> notifyCardPressed());
 		} else {
 			view.findViewById(R.id.badges_padding).setVisibility(View.GONE);
 		}
 
-		TextView fromLine = (TextView) view.findViewById(R.id.from_line);
-		TextView wayLine = (TextView) view.findViewById(R.id.way_line);
+		TextView fromLine = view.findViewById(R.id.from_line);
+		TextView wayLine = view.findViewById(R.id.way_line);
 		TextView intervalLine = view.findViewById(R.id.interval_line);
 
 		fromLine.setText(getFirstLineDescrSpan());
@@ -153,7 +145,7 @@ public class PublicTransportCard extends MapBaseCard {
 		view.findViewById(R.id.card_divider).setVisibility(showTopShadow ? View.VISIBLE : View.GONE);
 		view.findViewById(R.id.top_divider).setVisibility(!showTopShadow && showDivider ? View.VISIBLE : View.GONE);
 		if (transparentBackground) {
-			view.findViewById(R.id.routes_info_container).setBackgroundDrawable(null);
+			view.findViewById(R.id.routes_info_container).setBackground(null);
 		}
 	}
 
@@ -168,28 +160,19 @@ public class PublicTransportCard extends MapBaseCard {
 
 	public void updateButtons() {
 		int color = getActiveColor();
-		FrameLayout detailsButton = (FrameLayout) view.findViewById(R.id.details_button);
-		TextView detailsButtonDescr = (TextView) view.findViewById(R.id.details_button_descr);
+		FrameLayout detailsButton = view.findViewById(R.id.details_button);
+		TextView detailsButtonDescr = view.findViewById(R.id.details_button_descr);
 
-		if (Build.VERSION.SDK_INT > Build.VERSION_CODES.LOLLIPOP) {
-			AndroidUtils.setBackground(app, detailsButton, nightMode, R.drawable.btn_border_light, R.drawable.btn_border_dark);
-			AndroidUtils.setBackground(app, detailsButtonDescr, nightMode, R.drawable.ripple_light, R.drawable.ripple_dark);
-		} else {
-			AndroidUtils.setBackground(app, detailsButton, nightMode, R.drawable.btn_border_trans_light, R.drawable.btn_border_trans_dark);
-		}
-		detailsButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				app.getTransportRoutingHelper().setCurrentRoute(routeId);
-				getMapActivity().refreshMap();
-				CardListener listener = getListener();
-				if (listener != null) {
-					listener.onCardButtonPressed(PublicTransportCard.this, DETAILS_BUTTON_INDEX);
-				}
-			}
+		AndroidUtils.setBackground(app, detailsButton, nightMode, R.drawable.btn_border_light, R.drawable.btn_border_dark);
+		AndroidUtils.setBackground(app, detailsButtonDescr, nightMode, R.drawable.ripple_light, R.drawable.ripple_dark);
+		detailsButton.setOnClickListener(v -> {
+			app.getTransportRoutingHelper().setCurrentRoute(routeId);
+			getMapActivity().refreshMap();
+			notifyButtonPressed(DETAILS_BUTTON_INDEX);
 		});
-		FrameLayout showButton = (FrameLayout) view.findViewById(R.id.show_button);
-		TextView showButtonDescr = (TextView) view.findViewById(R.id.show_button_descr);
+
+		FrameLayout showButton = view.findViewById(R.id.show_button);
+		TextView showButtonDescr = view.findViewById(R.id.show_button_descr);
 		if (isCurrentRoute()) {
 			color = ContextCompat.getColor(app, R.color.card_and_list_background_light);
 			AndroidUtils.setBackground(app, showButton, nightMode, R.drawable.btn_active_light, R.drawable.btn_active_dark);
@@ -198,37 +181,19 @@ public class PublicTransportCard extends MapBaseCard {
 			} else {
 				showButtonDescr.setText(R.string.shared_string_control_start);
 			}
-			showButton.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					CardListener listener = getListener();
-					if (listener != null) {
-						listener.onCardButtonPressed(PublicTransportCard.this, SHOW_BUTTON_INDEX);
-					}
-				}
-			});
+			showButton.setOnClickListener(v -> notifyButtonPressed(SHOW_BUTTON_INDEX));
 		} else {
-			if (Build.VERSION.SDK_INT > Build.VERSION_CODES.LOLLIPOP) {
-				AndroidUtils.setBackground(app, showButton, nightMode, R.drawable.btn_border_light, R.drawable.btn_border_dark);
-				AndroidUtils.setBackground(app, showButtonDescr, nightMode, R.drawable.ripple_light, R.drawable.ripple_dark);
-			} else {
-				AndroidUtils.setBackground(app, showButton, nightMode, R.drawable.btn_border_trans_light, R.drawable.btn_border_trans_dark);
-			}
+			AndroidUtils.setBackground(app, showButton, nightMode, R.drawable.btn_border_light, R.drawable.btn_border_dark);
+			AndroidUtils.setBackground(app, showButtonDescr, nightMode, R.drawable.ripple_light, R.drawable.ripple_dark);
 			if (!Algorithms.isEmpty(showButtonCustomTitle)) {
 				showButtonDescr.setText(showButtonCustomTitle);
 			} else {
 				showButtonDescr.setText(R.string.shared_string_show_on_map);
 			}
-			showButton.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					app.getTransportRoutingHelper().setCurrentRoute(routeId);
-					getMapActivity().refreshMap();
-					CardListener listener = getListener();
-					if (listener != null) {
-						listener.onCardButtonPressed(PublicTransportCard.this, SHOW_BUTTON_INDEX);
-					}
-				}
+			showButton.setOnClickListener(v -> {
+				app.getTransportRoutingHelper().setCurrentRoute(routeId);
+				getMapActivity().refreshMap();
+				notifyButtonPressed(SHOW_BUTTON_INDEX);
 			});
 		}
 		showButtonDescr.setTextColor(color);
@@ -255,8 +220,7 @@ public class PublicTransportCard extends MapBaseCard {
 		}
 
 		SpannableString firstLineDesc = new SpannableString(firstLine);
-		Typeface typeface = FontCache.getRobotoMedium(app);
-		firstLineDesc.setSpan(new CustomTypefaceSpan(typeface), firstLine.indexOf(name), firstLine.indexOf(name) + name.length(), 0);
+		firstLineDesc.setSpan(new CustomTypefaceSpan(FontCache.getMediumFont()), firstLine.indexOf(name), firstLine.indexOf(name) + name.length(), 0);
 		firstLineDesc.setSpan(new ForegroundColorSpan(getMainFontColor()), firstLine.indexOf(name), firstLine.indexOf(name) + name.length(), 0);
 
 		return firstLineDesc;
@@ -264,7 +228,7 @@ public class PublicTransportCard extends MapBaseCard {
 
 	private SpannableString getSecondLineDescrSpan(List<TransportRouteResultSegment> segments) {
 		TransportRoutingHelper transportRoutingHelper = app.getTransportRoutingHelper();
-		Typeface typeface = FontCache.getRobotoMedium(app);
+		Typeface typeface = FontCache.getMediumFont();
 		int walkTimeReal = transportRoutingHelper.getWalkingTime(segments);
 		int walkTimePT = (int) routeResult.getWalkTime();
 		int walkTime = walkTimeReal > 0 ? walkTimeReal : walkTimePT;
@@ -318,7 +282,7 @@ public class PublicTransportCard extends MapBaseCard {
 
 	private void createRouteBadges(List<TransportRouteResultSegment> segments, boolean badgesRowClickable) {
 		int itemsSpacing = AndroidUtils.dpToPx(app, 6);
-		FlowLayout routesBadges = (FlowLayout) view.findViewById(R.id.routes_badges);
+		FlowLayout routesBadges = view.findViewById(R.id.routes_badges);
 		routesBadges.removeAllViews();
 
 		TransportRoutingHelper transportRoutingHelper = app.getTransportRoutingHelper();
@@ -375,16 +339,16 @@ public class PublicTransportCard extends MapBaseCard {
 		}
 	}
 
-	private View createRouteBadge(@NonNull final TransportRouteResultSegment segment, boolean badgesRowClickable) {
-		LinearLayout bageView = (LinearLayout) mapActivity.getLayoutInflater().inflate(R.layout.transport_stop_route_item_with_icon, null, false);
+	private View createRouteBadge(@NonNull TransportRouteResultSegment segment, boolean badgesRowClickable) {
+		LinearLayout bageView = (LinearLayout) themedInflater.inflate(R.layout.transport_stop_route_item_with_icon, null, false);
 		TransportRoute transportRoute = segment.route;
 		TransportStopRoute transportStopRoute = TransportStopRoute.getTransportStopRoute(transportRoute, segment.getStart());
 
 		String routeRef = segment.route.getAdjustedRouteRef(true);
 		int bgColor = transportStopRoute.getColor(app, nightMode);
 
-		TextView transportStopRouteTextView = (TextView) bageView.findViewById(R.id.transport_stop_route_text);
-		ImageView transportStopRouteImageView = (ImageView) bageView.findViewById(R.id.transport_stop_route_icon);
+		TextView transportStopRouteTextView = bageView.findViewById(R.id.transport_stop_route_text);
+		ImageView transportStopRouteImageView = bageView.findViewById(R.id.transport_stop_route_icon);
 
 		int drawableResId = transportStopRoute.type == null ? R.drawable.ic_action_bus_dark : transportStopRoute.type.getResourceId();
 		transportStopRouteImageView.setImageDrawable(app.getUIUtilities().getPaintedIcon(drawableResId, ColorUtilities.getContrastColor(app, bgColor, true)));
@@ -401,12 +365,12 @@ public class PublicTransportCard extends MapBaseCard {
 				}
 			});
 		} else {
-			bageView.findViewById(R.id.button).setBackgroundDrawable(null);
+			bageView.findViewById(R.id.button).setBackground(null);
 		}
 		return bageView;
 	}
 
-	private View createWalkRouteBadge(@NonNull final RouteCalculationResult result, boolean badgesRowClickable) {
+	private View createWalkRouteBadge(@NonNull RouteCalculationResult result, boolean badgesRowClickable) {
 		View v = createWalkRouteBadge(result.getRoutingTime(), null, null, badgesRowClickable);
 		if (transportCardListener != null && !badgesRowClickable) {
 			v.setOnClickListener(new View.OnClickListener() {
@@ -419,12 +383,12 @@ public class PublicTransportCard extends MapBaseCard {
 		return v;
 	}
 
-	private View createWalkRouteBadge(double walkTime, @Nullable final LatLon start, @Nullable final LatLon end, boolean badgesRowClickable) {
+	private View createWalkRouteBadge(double walkTime, @Nullable LatLon start, @Nullable LatLon end, boolean badgesRowClickable) {
 		LinearLayout bageView = (LinearLayout) getMapActivity().getLayoutInflater().inflate(R.layout.transport_stop_route_item_with_icon, null, false);
 		int activeColor = getActiveColor();
 
-		TextView transportStopRouteTextView = (TextView) bageView.findViewById(R.id.transport_stop_route_text);
-		ImageView transportStopRouteImageView = (ImageView) bageView.findViewById(R.id.transport_stop_route_icon);
+		TextView transportStopRouteTextView = bageView.findViewById(R.id.transport_stop_route_text);
+		ImageView transportStopRouteImageView = bageView.findViewById(R.id.transport_stop_route_icon);
 
 		Drawable icPedestrian = getActiveIcon(R.drawable.ic_action_pedestrian_dark);
 		transportStopRouteImageView.setImageDrawable(AndroidUtils.getDrawableForDirection(app, icPedestrian));
@@ -443,7 +407,7 @@ public class PublicTransportCard extends MapBaseCard {
 				}
 			});
 		} else {
-			bageView.findViewById(R.id.button).setBackgroundDrawable(null);
+			bageView.findViewById(R.id.button).setBackground(null);
 		}
 		return bageView;
 	}

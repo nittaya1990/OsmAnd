@@ -1,23 +1,42 @@
 package net.osmand.plus;
 
+import android.app.ActivityManager;
+import android.content.Context;
+import android.content.pm.ConfigurationInfo;
 import android.content.pm.PackageInfo;
-import android.content.pm.PackageManager;
+import android.content.pm.PackageManager.NameNotFoundException;
+import android.os.Build;
 
 import androidx.annotation.NonNull;
 
-import net.osmand.plus.inapp.InAppPurchaseHelper;
+import net.osmand.PlatformUtil;
+import net.osmand.core.android.NativeCore;
+import net.osmand.plus.inapp.InAppPurchaseUtils;
+import net.osmand.util.Algorithms;
+import net.osmand.util.CollectionUtils;
+
+import org.apache.commons.logging.Log;
 
 import java.io.File;
 import java.io.UnsupportedEncodingException;
 import java.net.URLEncoder;
 
 public class Version {
-	
-	private final String appVersion; 
+
+	private static final Log log = PlatformUtil.getLog(Version.class);
+
+	public static final String TRIPLTEK_NAME = "TRIPLTEK";
+	public static final String HUGEROCK_NAME = "Hugerock";
+	public static final String FULL_VERSION_NAME = "net.osmand.plus";
+	private static final String FREE_VERSION_NAME = "net.osmand";
+	private static final String FREE_DEV_VERSION_NAME = "net.osmand.dev";
+	private static final String UTM_REF = "&referrer=utm_source%3Dosmand";
+
 	private final String appName;
-	private final static String FREE_VERSION_NAME = "net.osmand";
-	private final static String FREE_DEV_VERSION_NAME = "net.osmand.dev";
-	private final static String UTM_REF = "&referrer=utm_source%3Dosmand";
+	private final String appVersion;
+
+	private static Boolean openGlEsVersionSupported;
+	private static Boolean openGlExists;
 
 	public static boolean isHuawei() {
 		return getBuildFlavor().contains("huawei");
@@ -43,127 +62,184 @@ public class Version {
 		return isGooglePlayEnabled() || isHuawei() || isAmazon();
 	}
 
-	public static boolean isGooglePlayInstalled(@NonNull OsmandApplication ctx) {
+	public static boolean isGooglePlayInstalled(@NonNull OsmandApplication app) {
 		try {
-			ctx.getPackageManager().getPackageInfo("com.android.vending", 0);
-		} catch (PackageManager.NameNotFoundException e) {
+			app.getPackageManager().getPackageInfo("com.android.vending", 0);
+		} catch (NameNotFoundException e) {
 			return false;
 		}
 		return true;
 	}
-	
-	public static String marketPrefix(@NonNull OsmandApplication ctx) {
+
+	public static String marketPrefix(@NonNull OsmandApplication app) {
 		if (isAmazon()) {
 			return "amzn://apps/android?p=";
-		} else if (isGooglePlayEnabled() && isGooglePlayInstalled(ctx)) {
+		} else if (isGooglePlayEnabled() && isGooglePlayInstalled(app)) {
 			return "market://details?id=";
-		} 
+		}
 		return "https://osmand.net/apps?id=";
 	}
 
-	public static String getUrlWithUtmRef(OsmandApplication ctx, String appName) {
-		return marketPrefix(ctx) + appName + UTM_REF;
+	public static String getUrlWithUtmRef(@NonNull OsmandApplication app, String appName) {
+		return marketPrefix(app) + appName + UTM_REF;
 	}
-	
-	private Version(OsmandApplication ctx) {
+
+	private Version(@NonNull OsmandApplication app) {
 		String appVersion = "";
 		try {
-			PackageInfo packageInfo = ctx.getPackageManager().getPackageInfo(ctx.getPackageName(), 0);
-			appVersion = packageInfo.versionName;  //Version suffix  ctx.getString(R.string.app_version_suffix)  already appended in build.gradle
-		} catch (PackageManager.NameNotFoundException e) {
-			e.printStackTrace();
+			PackageInfo packageInfo = app.getPackageManager().getPackageInfo(app.getPackageName(), 0);
+			appVersion = packageInfo.versionName;  //Version suffix  app.getString(R.string.app_version_suffix)  already appended in build.gradle
+		} catch (NameNotFoundException e) {
+			log.error(e);
 		}
 		this.appVersion = appVersion;
-		appName = ctx.getString(R.string.app_name);
+		appName = app.getString(R.string.app_name);
 	}
 
-	private static Version ver = null;
-	private static Version getVersion(OsmandApplication ctx){
-		if (ver == null) {
-			ver = new Version(ctx);
+	private static Version version;
+
+	private static Version getVersion(@NonNull OsmandApplication app) {
+		if (version == null) {
+			version = new Version(app);
 		}
-		return ver;
-	}
-	
-	public static String getFullVersion(OsmandApplication ctx){
-		Version v = getVersion(ctx);
-		return v.appName + " " + v.appVersion;
-	}
-	
-	public static String getAppVersion(OsmandApplication ctx){
-		Version v = getVersion(ctx);
-		return v.appVersion;
+		return version;
 	}
 
-	public static String getBuildAppEdition(OsmandApplication ctx){
-		return ctx.getString(R.string.app_edition);
-	}
-	
-	public static String getAppName(OsmandApplication ctx){
-		Version v = getVersion(ctx);
-		return v.appName;
-	}
-	
-	public static boolean isProductionVersion(OsmandApplication ctx){
-		Version v = getVersion(ctx);
-		return !v.appVersion.contains("#");
+	public static String getFullVersion(@NonNull OsmandApplication app) {
+		Version version = getVersion(app);
+		return version.appName + " " + version.appVersion;
 	}
 
-	public static String getVersionAsURLParam(OsmandApplication ctx) {
+	public static String getAppVersion(@NonNull OsmandApplication app) {
+		Version version = getVersion(app);
+		return version.appVersion;
+	}
+
+	public static String getFullVersionWithReleaseDate(@NonNull OsmandApplication app) {
+		String appEdition = getBuildAppEdition(app);
+		if (!Algorithms.isEmpty(appEdition)) {
+			String release = app.getString(R.string.shared_string_release).toLowerCase();
+			return Version.getFullVersion(app) + ", " + release + ": " + appEdition;
+		}
+		return Version.getFullVersion(app);
+	}
+
+	public static String getBuildAppEdition(@NonNull OsmandApplication app) {
+		return app.getString(R.string.app_edition);
+	}
+
+	public static String getAppName(@NonNull OsmandApplication app) {
+		Version version = getVersion(app);
+		return version.appName;
+	}
+
+	public static boolean isProductionVersion(@NonNull OsmandApplication app) {
+		Version version = getVersion(app);
+		return !version.appVersion.contains("#");
+	}
+
+	public static String getVersionAsURLParam(@NonNull OsmandApplication app) {
 		try {
-			return "osmandver=" + URLEncoder.encode(getVersionForTracker(ctx), "UTF-8");
+			return "osmandver=" + URLEncoder.encode(getVersionForTracker(app), "UTF-8");
 		} catch (UnsupportedEncodingException e) {
 			throw new IllegalStateException(e);
 		}
 	}
-	
-	public static boolean isFreeVersion(OsmandApplication ctx){
-		return ctx.getPackageName().equals(FREE_VERSION_NAME) || 
-				ctx.getPackageName().equals(FREE_DEV_VERSION_NAME) ||
-				isHuawei();
+
+	public static boolean isFreeVersion(@NonNull OsmandApplication app) {
+		return CollectionUtils.equalsToAny(app.getPackageName(), FREE_VERSION_NAME, FREE_DEV_VERSION_NAME) || isHuawei();
 	}
 
-	public static boolean isPaidVersion(OsmandApplication ctx) {
-		return !isFreeVersion(ctx)
-				|| InAppPurchaseHelper.isFullVersionPurchased(ctx)
-				|| InAppPurchaseHelper.isSubscribedToLiveUpdates(ctx)
-				|| InAppPurchaseHelper.isSubscribedToMaps(ctx)
-				|| InAppPurchaseHelper.isOsmAndProAvailable(ctx);
-	}
-	
-	public static boolean isDeveloperVersion(OsmandApplication ctx){
-		return getAppName(ctx).contains("~") || ctx.getPackageName().equals(FREE_DEV_VERSION_NAME);
+	public static boolean isFullVersion(@NonNull OsmandApplication app) {
+		return app.getPackageName().equals(FULL_VERSION_NAME);
 	}
 
-	public static boolean isDeveloperBuild(OsmandApplication ctx){
-		return getAppName(ctx).contains("~");
+	public static boolean isPaidVersion(@NonNull OsmandApplication app) {
+		return !isFreeVersion(app)
+				|| InAppPurchaseUtils.isFullVersionAvailable(app)
+				|| InAppPurchaseUtils.isLiveUpdatesAvailable(app)
+				|| InAppPurchaseUtils.isMapsPlusAvailable(app)
+				|| InAppPurchaseUtils.isOsmAndProAvailable(app)
+				|| InAppPurchaseUtils.isTripltekPromoAvailable(app)
+				|| InAppPurchaseUtils.isHugerockPromoAvailable(app);
 	}
 
-	public static String getVersionForTracker(OsmandApplication ctx) {
-		String v = Version.getAppName(ctx);
-		if(Version.isProductionVersion(ctx)){
-			v = Version.getFullVersion(ctx);
+	public static boolean isDeveloperVersion(@NonNull OsmandApplication app) {
+		return getAppName(app).contains("~") || app.getPackageName().equals(FREE_DEV_VERSION_NAME);
+	}
+
+	public static boolean isDeveloperBuild(@NonNull OsmandApplication app) {
+		return getAppName(app).contains("~");
+	}
+
+	public static boolean isTripltekBuild() {
+		return TRIPLTEK_NAME.equalsIgnoreCase(Build.BRAND) || TRIPLTEK_NAME.equalsIgnoreCase(Build.MANUFACTURER);
+	}
+
+	public static boolean isHugerockBuild() {
+		return HUGEROCK_NAME.equalsIgnoreCase(Build.BRAND) || HUGEROCK_NAME.equalsIgnoreCase(Build.MANUFACTURER)
+				|| "alps".equalsIgnoreCase(Build.BRAND) && "SOTEN".equalsIgnoreCase(Build.MANUFACTURER);
+	}
+
+	public static String getVersionForTracker(@NonNull OsmandApplication app) {
+		String v = getAppName(app);
+		if (isProductionVersion(app)) {
+			v = getFullVersion(app);
 		} else {
-			v +=" test";
+			v += " test";
 		}
 		return v;
 	}
 
-	public static boolean isOpenGlAvailable(OsmandApplication app) {
-		if ("qnx".equals(System.getProperty("os.name"))) {
+	public static boolean isOpenGlAvailable(@NonNull OsmandApplication app) {
+		if (!NativeCore.isAvailable() || isQnxOperatingSystem() || !isOpenGlEsVersionSupported(app)) {
 			return false;
 		}
-		File nativeLibraryDir = new File(app.getApplicationInfo().nativeLibraryDir);
+		if (openGlExists == null) {
+			File nativeLibraryDir = new File(app.getApplicationInfo().nativeLibraryDir);
+			openGlExists = checkOpenGlExists(nativeLibraryDir);
+			// check opengl doesn't work correctly on some devices when native libs are not unpacked
+		}
+		return true;
+	}
+
+	public static boolean isOpenGlEsVersionSupported(@NonNull OsmandApplication app) {
+		if (openGlEsVersionSupported == null) {
+			ActivityManager activityManager = (ActivityManager) app.getSystemService(Context.ACTIVITY_SERVICE);
+			ConfigurationInfo deviceConfigurationInfo = activityManager.getDeviceConfigurationInfo();
+			int majorVersion = (deviceConfigurationInfo.reqGlEsVersion & 0xffff0000) >> 16;
+			openGlEsVersionSupported = majorVersion >= 3;
+		}
+		return openGlEsVersionSupported;
+	}
+
+	public static boolean isQnxOperatingSystem() {
+		return "qnx".equals(System.getProperty("os.name"));
+	}
+
+	public static boolean checkOpenGlExists(@NonNull File nativeLibraryDir) {
 		if (nativeLibraryDir.exists() && nativeLibraryDir.canRead()) {
 			File[] files = nativeLibraryDir.listFiles();
 			if (files != null) {
 				for (File file : files) {
-					if ("libOsmAndCoreWithJNI.so".equals(file.getName())) {
+					if (file.isDirectory()) {
+						if (checkOpenGlExists(file)) {
+							return true;
+						}
+					} else if ("libOsmAndCoreWithJNI.so".equals(file.getName())) {
 						return true;
 					}
 				}
 			}
 		}
 		return false;
+	}
+
+	public static long getInstallTime(@NonNull OsmandApplication app) {
+		return app.getAppInitializer().getFirstInstalledTime();
+	}
+
+	public static long getUpdateTime(@NonNull OsmandApplication app) {
+		return app.getAppInitializer().getUpdateVersionTime();
 	}
 }

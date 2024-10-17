@@ -9,23 +9,23 @@ import android.widget.TextView;
 import com.github.mikephil.charting.charts.HorizontalBarChart;
 import com.github.mikephil.charting.data.BarData;
 
-import net.osmand.AndroidUtils;
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
+import net.osmand.plus.charts.ChartUtils;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.shared.gpx.GpxTrackAnalysis;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.helpers.GpxUiHelper;
-import net.osmand.plus.measurementtool.graph.CustomGraphAdapter;
-import net.osmand.plus.measurementtool.graph.CustomGraphAdapter.LegendViewType;
+import net.osmand.plus.measurementtool.graph.CustomChartAdapter;
+import net.osmand.plus.measurementtool.graph.CustomChartAdapter.LegendViewType;
 import net.osmand.router.RouteStatisticsHelper.RouteStatistics;
 
 public class RouteInfoCard extends MapBaseCard {
-	private RouteStatistics statistics;
-	private GPXTrackAnalysis analysis;
-	private CustomGraphAdapter graphAdapter;
+	private final RouteStatistics statistics;
+	private final GpxTrackAnalysis analysis;
+	private CustomChartAdapter graphAdapter;
 
 	private boolean showLegend;
 
-	public RouteInfoCard(MapActivity mapActivity, RouteStatistics statistics, GPXTrackAnalysis analysis) {
+	public RouteInfoCard(MapActivity mapActivity, RouteStatistics statistics, GpxTrackAnalysis analysis) {
 		super(mapActivity);
 		this.statistics = statistics;
 		this.analysis = analysis;
@@ -39,12 +39,12 @@ public class RouteInfoCard extends MapBaseCard {
 	@Override
 	protected void updateContent() {
 		updateHeader();
-		LinearLayout container = (LinearLayout) view.findViewById(R.id.route_items);
-		HorizontalBarChart chart = (HorizontalBarChart) view.findViewById(R.id.chart);
-		GpxUiHelper.setupHorizontalGPXChart(getMyApplication(), chart, 5, 9, 24, true, nightMode);
-		BarData barData = GpxUiHelper.buildStatisticChart(app, chart, statistics, analysis, true, nightMode);
-		graphAdapter = new CustomGraphAdapter(app, chart, true);
-		graphAdapter.setLegendContainer(container);
+		LinearLayout container = view.findViewById(R.id.route_items);
+		HorizontalBarChart chart = view.findViewById(R.id.chart);
+		ChartUtils.setupHorizontalGPXChart(getMyApplication(), chart, 5, 9, 24, true, nightMode);
+		BarData barData = ChartUtils.buildStatisticChart(app, chart, statistics, analysis, true, nightMode);
+		graphAdapter = new CustomChartAdapter(app, chart, true);
+		graphAdapter.setBottomInfoContainer(container);
 		graphAdapter.updateData(barData, statistics);
 		updateView();
 
@@ -65,20 +65,20 @@ public class RouteInfoCard extends MapBaseCard {
 	}
 
 	private void updateHeader() {
-		TextView title = (TextView) view.findViewById(R.id.info_type_title);
+		TextView title = view.findViewById(R.id.info_type_title);
 		String name = AndroidUtils.getStringRouteInfoPropertyValue(app, statistics.name);
 		title.setText(name);
 	}
 
 	private void updateCollapseIcon() {
-		ImageView ivCollapse = (ImageView) view.findViewById(R.id.up_down_icon);
+		ImageView ivCollapse = view.findViewById(R.id.up_down_icon);
 		Drawable drawable = showLegend ?
 				getContentIcon(R.drawable.ic_action_arrow_down) :
 				getActiveIcon(R.drawable.ic_action_arrow_up);
 		ivCollapse.setImageDrawable(drawable);
 	}
 
-	public CustomGraphAdapter getGraphAdapter() {
+	public CustomChartAdapter getGraphAdapter() {
 		return graphAdapter;
 	}
 }

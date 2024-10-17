@@ -13,21 +13,20 @@ import android.widget.Toast;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
 import com.google.android.material.snackbar.Snackbar;
 
-import net.osmand.AndroidUtils;
 import net.osmand.Location;
 import net.osmand.data.LatLon;
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.LockableViewPager;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.mapmarkers.DirectionIndicationDialogFragment.DirectionIndicationFragmentListener;
 import net.osmand.plus.mapmarkers.OptionsBottomSheetDialogFragment.MarkerOptionsFragmentListener;
 import net.osmand.plus.mapmarkers.OrderByBottomSheetDialogFragment.OrderByFragmentListener;
 import net.osmand.plus.mapmarkers.SaveAsTrackBottomSheetDialogFragment.MarkerSaveAsTrackFragmentListener;
 import net.osmand.plus.mapmarkers.SyncGroupTask.OnGroupSyncedListener;
-import net.osmand.plus.track.TrackMenuFragment;
+import net.osmand.plus.track.fragments.TrackMenuFragment;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.UiUtilities;
 
 import java.io.File;
 import java.util.ArrayList;
@@ -56,6 +55,8 @@ public class MapMarkersDialogFragment extends DialogFragment implements OnGroupS
 	private static final int GROUPS_POSITION = 1;
 	private static final int HISTORY_MARKERS_POSITION = 2;
 
+	private OsmandApplication app;
+
 	private MapMarkersActiveFragment activeFragment;
 	private MapMarkersGroupsFragment groupsFragment;
 	private MapMarkersHistoryFragment historyFragment;
@@ -73,10 +74,9 @@ public class MapMarkersDialogFragment extends DialogFragment implements OnGroupS
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		OsmandApplication app = getMyApplication();
+		app = getMyApplication();
 		lightTheme = app.getSettings().isLightContent();
-		int themeId = lightTheme ? R.style.OsmandLightTheme : R.style.OsmandDarkTheme;
-		setStyle(STYLE_NO_FRAME, themeId);
+		setStyle(STYLE_NO_FRAME, lightTheme ? R.style.OsmandLightTheme : R.style.OsmandDarkTheme);
 	}
 
 	@NonNull
@@ -99,6 +99,8 @@ public class MapMarkersDialogFragment extends DialogFragment implements OnGroupS
 	@Nullable
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, Bundle savedInstanceState) {
+		lightTheme = app.getSettings().isLightContent();
+		inflater = UiUtilities.getInflater(getContext(), !lightTheme);
 		List<Fragment> fragments = getChildFragmentManager().getFragments();
 		for (Fragment fragment : fragments) {
 			if (fragment instanceof MapMarkersActiveFragment) {
@@ -124,11 +126,7 @@ public class MapMarkersDialogFragment extends DialogFragment implements OnGroupS
 		if (optionsFragment != null) {
 			((OptionsBottomSheetDialogFragment) optionsFragment).setListener(createOptionsFragmentListener());
 		}
-		Fragment directionIndicationFragment = fragmentManager.findFragmentByTag(DirectionIndicationDialogFragment.TAG);
-		if (directionIndicationFragment != null) {
-			((DirectionIndicationDialogFragment) directionIndicationFragment).setListener(createShowDirectionFragmentListener());
-		}
-		final Fragment orderByFragment = fragmentManager.findFragmentByTag(OrderByBottomSheetDialogFragment.TAG);
+		Fragment orderByFragment = fragmentManager.findFragmentByTag(OrderByBottomSheetDialogFragment.TAG);
 		if (orderByFragment != null) {
 			((OrderByBottomSheetDialogFragment) orderByFragment).setListener(createOrderByFragmentListener());
 		}
@@ -155,7 +153,7 @@ public class MapMarkersDialogFragment extends DialogFragment implements OnGroupS
 		viewPager = mainView.findViewById(R.id.map_markers_view_pager);
 		viewPager.setOffscreenPageLimit(3);
 		viewPager.setSwipeLocked(true);
-		final MapMarkersViewPagerAdapter adapter = new MapMarkersViewPagerAdapter(getChildFragmentManager());
+		MapMarkersViewPagerAdapter adapter = new MapMarkersViewPagerAdapter(getChildFragmentManager());
 		viewPager.setAdapter(adapter);
 
 		progressBar = mainView.findViewById(R.id.progress_bar);
@@ -172,7 +170,7 @@ public class MapMarkersDialogFragment extends DialogFragment implements OnGroupS
 			viewPager.setCurrentItem(GROUPS_POSITION, false);
 			bottomNav.getMenu().findItem(R.id.action_groups).setChecked(true);
 		}
-		bottomNav.setOnNavigationItemSelectedListener(menuItem -> {
+		bottomNav.setOnItemSelectedListener(menuItem -> {
 			int i = menuItem.getItemId();
 			if (i == R.id.action_active) {
 				setupLocationUpdate(true, false);
@@ -192,7 +190,7 @@ public class MapMarkersDialogFragment extends DialogFragment implements OnGroupS
 			}
 			return false;
 		});
-		bottomNav.setOnNavigationItemReselectedListener(menuItem -> {
+		bottomNav.setOnItemReselectedListener(menuItem -> {
 			if (menuItem.getItemId() == R.id.action_more) {
 				dismissOptionsMenuFragment();
 			}
@@ -364,7 +362,6 @@ public class MapMarkersDialogFragment extends DialogFragment implements OnGroupS
 			public void showDirectionOnClick() {
 				if (mapActivity != null) {
 					DirectionIndicationDialogFragment fragment = new DirectionIndicationDialogFragment();
-					fragment.setListener(createShowDirectionFragmentListener());
 					fragment.show(getChildFragmentManager(), DirectionIndicationDialogFragment.TAG);
 				}
 			}
@@ -407,8 +404,8 @@ public class MapMarkersDialogFragment extends DialogFragment implements OnGroupS
 			@Override
 			public void moveAllToHistoryOnClick() {
 				if (mapActivity != null) {
-					final MapMarkersHelper helper = mapActivity.getMyApplication().getMapMarkersHelper();
-					final List<MapMarker> markers = new ArrayList<>(helper.getMapMarkers());
+					MapMarkersHelper helper = mapActivity.getMyApplication().getMapMarkersHelper();
+					List<MapMarker> markers = new ArrayList<>(helper.getMapMarkers());
 					helper.moveAllActiveMarkersToHistory();
 					if (viewPager.getCurrentItem() == ACTIVE_MARKERS_POSITION) {
 						activeFragment.updateAdapter();
@@ -436,28 +433,14 @@ public class MapMarkersDialogFragment extends DialogFragment implements OnGroupS
 		};
 	}
 
-	private DirectionIndicationFragmentListener createShowDirectionFragmentListener() {
-		return new DirectionIndicationFragmentListener() {
-
-			final MapActivity mapActivity = getMapActivity();
-
-			@Override
-			public void onMapMarkersModeChanged(boolean showDirectionEnabled) {
-				mapActivity.getMapLayers().getMapWidgetRegistry().updateMapMarkersMode(mapActivity);
-				activeFragment.setShowDirectionEnabled(showDirectionEnabled);
-				updateAdapters();
-			}
-		};
-	}
-
 	private MarkerSaveAsTrackFragmentListener createSaveAsTrackFragmentListener() {
 		return new MarkerSaveAsTrackFragmentListener() {
 
 			final MapActivity mapActivity = getMapActivity();
 
 			@Override
-			public void saveGpx(final String fileName) {
-				final String gpxPath = mapActivity.getMyApplication().getMapMarkersHelper().getDataHelper().saveMarkersToFile(fileName);
+			public void saveGpx(String fileName) {
+				String gpxPath = mapActivity.getMyApplication().getMapMarkersHelper().getDataHelper().saveMarkersToFile(fileName);
 				snackbar = Snackbar.make(viewPager, String.format(getString(R.string.shared_string_file_is_saved), fileName) + ".", Snackbar.LENGTH_LONG)
 						.setAction(R.string.shared_string_show, view -> TrackMenuFragment.openTrack(mapActivity, new File(gpxPath), null));
 				UiUtilities.setupSnackbar(snackbar, !lightTheme);

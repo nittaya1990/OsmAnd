@@ -1,8 +1,9 @@
 package net.osmand.plus.wikivoyage.data;
 
-import static net.osmand.GPXUtilities.GPXFile;
-import static net.osmand.GPXUtilities.GPXTrackAnalysis;
-import static net.osmand.GPXUtilities.WptPt;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.primitives.WptPt;
+import static net.osmand.osm.MapPoiTypes.ROUTE_ARTICLE;
 import static net.osmand.osm.MapPoiTypes.ROUTE_ARTICLE_POINT;
 import static net.osmand.util.Algorithms.capitalizeFirstLetter;
 
@@ -20,8 +21,9 @@ import net.osmand.binary.BinaryMapIndexReader;
 import net.osmand.data.Amenity;
 import net.osmand.osm.PoiCategory;
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.helpers.ColorDialogs;
+import net.osmand.plus.card.color.palette.main.data.DefaultColors;
 import net.osmand.util.Algorithms;
+import net.osmand.wiki.WikivoyageOSMTags;
 
 import org.apache.commons.codec.binary.Hex;
 import org.apache.commons.codec.digest.DigestUtils;
@@ -39,6 +41,7 @@ public class TravelArticle {
 	private static final String THUMB_PREFIX = "320px-";
 	private static final String REGULAR_PREFIX = "1280px-";//1280, 1024, 800
 
+
 	File file;
 	String title;
 	String content;
@@ -47,7 +50,7 @@ public class TravelArticle {
 	double lat = Double.NaN;
 	double lon = Double.NaN;
 	String imageTitle;
-	GPXFile gpxFile;
+	GpxFile gpxFile;
 	String routeId;
 	int routeRadius = -1;
 	public String ref;
@@ -56,6 +59,7 @@ public class TravelArticle {
 	String lang;
 	String contentsJson;
 	String aggregatedPartOf;
+	String description;
 
 	long lastModified;
 	boolean gpxFileReading;
@@ -91,6 +95,10 @@ public class TravelArticle {
 		return title;
 	}
 
+	public String getDescription() {
+		return description;
+	}
+
 	public String getContent() {
 		return content;
 	}
@@ -111,7 +119,7 @@ public class TravelArticle {
 		return imageTitle;
 	}
 
-	public GPXFile getGpxFile() {
+	public GpxFile getGpxFile() {
 		return gpxFile;
 	}
 
@@ -183,16 +191,21 @@ public class TravelArticle {
 	}
 
 	@NonNull
+	public String getMainFilterString() {
+		return ROUTE_ARTICLE;
+	}
+
+	@NonNull
 	public WptPt createWptPt(@NonNull Amenity amenity, @Nullable String lang) {
 		WptPt wptPt = new WptPt();
-		wptPt.name = amenity.getName();
-		wptPt.lat = amenity.getLocation().getLatitude();
-		wptPt.lon = amenity.getLocation().getLongitude();
-		wptPt.desc = amenity.getDescription(lang);
-		wptPt.link = amenity.getSite();
-		String color = amenity.getColor();
-		if (color != null) {
-			wptPt.setColor(ColorDialogs.getColorByTag(color));
+		wptPt.setName(amenity.getName());
+		wptPt.setLat(amenity.getLocation().getLatitude());
+		wptPt.setLon(amenity.getLocation().getLongitude());
+		wptPt.setDesc(amenity.getDescription(lang));
+		wptPt.setLink(amenity.getSite());
+		String colorId = amenity.getColor();
+		if (colorId != null) {
+			wptPt.setColor(DefaultColors.valueOf(colorId));
 		}
 		String iconName = amenity.getGpxIcon();
 		if (iconName != null) {
@@ -200,13 +213,22 @@ public class TravelArticle {
 		}
 		String category = amenity.getTagSuffix("category_");
 		if (category != null) {
-			wptPt.category = capitalizeFirstLetter(category);
+			wptPt.setCategory(capitalizeFirstLetter(category));
+		}
+		for (String key : amenity.getAdditionalInfoKeys()) {
+			if (!WikivoyageOSMTags.contains(key)) {
+				continue;
+			}
+			String amenityAdditionalInfo = amenity.getAdditionalInfo(key);
+			if (amenityAdditionalInfo != null) {
+				wptPt.getExtensionsToWrite().put(key, amenityAdditionalInfo);
+			}
 		}
 		return wptPt;
 	}
 
 	@Nullable
-	public GPXTrackAnalysis getAnalysis() {
+	public GpxTrackAnalysis getAnalysis() {
 		return null;
 	}
 

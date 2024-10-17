@@ -14,7 +14,7 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 
-import net.osmand.AndroidUtils;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.plus.R;
 import net.osmand.plus.helpers.AndroidUiHelper;
 import net.osmand.plus.wikivoyage.explore.WikivoyageExploreActivity;
@@ -26,35 +26,28 @@ public class WikivoyageWelcomeDialogFragment extends WikiBaseDialogFragment {
 	@Nullable
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-		final boolean portrait = AndroidUiHelper.isOrientationPortrait(getActivity());
+		updateNightMode();
+		boolean portrait = AndroidUiHelper.isOrientationPortrait(getActivity());
 
 		View mainView = inflate(R.layout.fragment_wikivoyage_welcome_dialog, container);
 
 		Drawable icBack = getContentIcon(AndroidUtils.getNavigationIconResId(getContext()));
-		ImageView backBtn = (ImageView) mainView.findViewById(R.id.back_button);
+		ImageView backBtn = mainView.findViewById(R.id.back_button);
 		backBtn.setImageDrawable(icBack);
-		backBtn.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				dismiss();
-			}
-		});
+		backBtn.setOnClickListener(v -> dismiss());
 
 		int imgId = nightMode ? R.drawable.img_start_screen_travel_night : R.drawable.img_start_screen_travel_day;
-		ImageView mainImage = (ImageView) mainView.findViewById(R.id.main_image);
+		ImageView mainImage = mainView.findViewById(R.id.main_image);
 		mainImage.setScaleType(portrait ? ScaleType.CENTER_CROP : ScaleType.CENTER_INSIDE);
 		mainImage.setImageResource(imgId);
 
-		mainView.findViewById(R.id.continue_button).setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				FragmentActivity activity = getActivity();
-				if (activity != null) {
-					dismiss();
-					Intent intent = new Intent(activity, WikivoyageExploreActivity.class);
-					intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-					activity.startActivity(intent);
-				}
+		mainView.findViewById(R.id.continue_button).setOnClickListener(v -> {
+			FragmentActivity activity = getActivity();
+			if (activity != null) {
+				dismiss();
+				Intent intent = new Intent(activity, WikivoyageExploreActivity.class);
+				intent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+				activity.startActivity(intent);
 			}
 		});
 

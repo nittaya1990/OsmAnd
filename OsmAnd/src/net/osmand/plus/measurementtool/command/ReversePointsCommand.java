@@ -1,27 +1,29 @@
 package net.osmand.plus.measurementtool.command;
 
+import static net.osmand.plus.measurementtool.MeasurementEditingContext.DEFAULT_APP_MODE;
+
 import android.util.Pair;
 
-import net.osmand.GPXUtilities.WptPt;
+import androidx.annotation.NonNull;
+
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.plus.measurementtool.MeasurementEditingContext;
-import net.osmand.plus.measurementtool.RoadSegmentData;
 import net.osmand.plus.measurementtool.MeasurementToolLayer;
+import net.osmand.plus.measurementtool.RoadSegmentData;
 import net.osmand.plus.settings.backend.ApplicationMode;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-import static net.osmand.plus.measurementtool.MeasurementEditingContext.DEFAULT_APP_MODE;
-
 public class ReversePointsCommand extends MeasurementModeCommand {
 
 	private List<WptPt> oldPoints;
 	private List<WptPt> newPoints;
 	private Map<Pair<WptPt, WptPt>, RoadSegmentData> oldRoadSegmentData;
-	private ApplicationMode oldMode;
+	private final ApplicationMode oldMode;
 
-	public ReversePointsCommand(MeasurementToolLayer measurementLayer) {
+	public ReversePointsCommand(@NonNull MeasurementToolLayer measurementLayer) {
 		super(measurementLayer);
 		this.oldMode = getEditingCtx().getAppMode();
 	}
@@ -79,6 +81,7 @@ public class ReversePointsCommand extends MeasurementModeCommand {
 		executeCommand();
 	}
 
+	@NonNull
 	@Override
 	public MeasurementCommandType getType() {
 		return MeasurementCommandType.REVERSE_POINTS;

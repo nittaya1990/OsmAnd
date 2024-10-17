@@ -1,16 +1,20 @@
 package net.osmand.plus.routing;
 
+import static java.util.concurrent.TimeUnit.MILLISECONDS;
+
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import net.osmand.LocationsHolder;
 import net.osmand.PlatformUtil;
 import net.osmand.ResultMatcher;
 import net.osmand.data.LatLon;
 import net.osmand.plus.OsmandApplication;
+import net.osmand.plus.measurementtool.GpxApproximationListener;
 import net.osmand.plus.settings.backend.ApplicationMode;
+import net.osmand.router.GpxRouteApproximation;
 import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
-import net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
 
 import org.apache.commons.logging.Log;
 
@@ -19,9 +23,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 
 public class GpxApproximator {
+
+	public static final int DEFAULT_POINT_APPROXIMATION = 50;
 
 	protected static final Log log = PlatformUtil.getLog(GpxApproximator.class);
 
@@ -35,22 +40,11 @@ public class GpxApproximator {
 	private List<GpxPoint> points;
 	private LatLon start;
 	private LatLon end;
-	private double pointApproximation = 50;
+	private float pointApproximation = DEFAULT_POINT_APPROXIMATION;
+	private GpxApproximationListener listener;
 	private Runnable approximationTask;
 
-	private static final ThreadPoolExecutor SINGLE_THREAD_EXECUTOR
-			= new ThreadPoolExecutor(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());;
-
-	private GpxApproximationProgressCallback approximationProgress;
-
-	public interface GpxApproximationProgressCallback {
-
-		void start(GpxApproximator approximator);
-
-		void updateProgress(GpxApproximator approximator, int progress);
-
-		void finish(GpxApproximator approximator);
-	}
+	private static final ThreadPoolExecutor SINGLE_THREAD_EXECUTOR = new ThreadPoolExecutor(1, 1, 0L, MILLISECONDS, new LinkedBlockingQueue<>());
 
 	public GpxApproximator(@NonNull OsmandApplication ctx, @NonNull LocationsHolder locationsHolder) throws IOException {
 		this.ctx = ctx;
@@ -60,7 +54,7 @@ public class GpxApproximator {
 		initEnvironment(mode, locationsHolder);
 	}
 
-	public GpxApproximator(@NonNull OsmandApplication ctx, @NonNull ApplicationMode mode, double pointApproximation, @NonNull LocationsHolder locationsHolder) throws IOException {
+	public GpxApproximator(@NonNull OsmandApplication ctx, @NonNull ApplicationMode mode, float pointApproximation, @NonNull LocationsHolder locationsHolder) throws IOException {
 		this.ctx = ctx;
 		this.locationsHolder = locationsHolder;
 		this.pointApproximation = pointApproximation;
@@ -81,10 +75,10 @@ public class GpxApproximator {
 		this.env = routingHelper.getRoutingEnvironment(ctx, mode, start, end);
 	}
 
-	private GpxRouteApproximation getNewGpxApproximationContext() {
+	public GpxRouteApproximation getNewGpxApproximationContext() {
 		GpxRouteApproximation newContext = new GpxRouteApproximation(env.getCtx());
 		newContext.ctx.calculationProgress = new RouteCalculationProgress();
-		newContext.MINIMUM_POINT_APPROXIMATION = pointApproximation;
+		newContext.ctx.config.minPointApproximation = pointApproximation;
 		return newContext;
 	}
 
@@ -92,11 +86,11 @@ public class GpxApproximator {
 		if (points == null) {
 			points = routingHelper.generateGpxPoints(env, getNewGpxApproximationContext(), locationsHolder);
 		}
-		List<GpxPoint> points = new ArrayList<>(this.points.size());
+		List<GpxPoint> pointsCopy = new ArrayList<>(this.points.size());
 		for (GpxPoint p : this.points) {
-			points.add(new GpxPoint(p));
+			pointsCopy.add(new GpxPoint(p));
 		}
-		return points;
+		return pointsCopy;
 	}
 
 	public ApplicationMode getMode() {
@@ -110,11 +104,7 @@ public class GpxApproximator {
 		}
 	}
 
-	public double getPointApproximation() {
-		return pointApproximation;
-	}
-
-	public void setPointApproximation(double pointApproximation) {
+	public void setPointApproximation(float pointApproximation) {
 		this.pointApproximation = pointApproximation;
 	}
 
@@ -122,12 +112,8 @@ public class GpxApproximator {
 		return locationsHolder;
 	}
 
-	public GpxApproximationProgressCallback getApproximationProgress() {
-		return approximationProgress;
-	}
-
-	public void setApproximationProgress(GpxApproximationProgressCallback approximationProgress) {
-		this.approximationProgress = approximationProgress;
+	public void setApproximationListener(@Nullable GpxApproximationListener listener) {
+		this.listener = listener;
 	}
 
 	public boolean isCancelled() {
@@ -140,60 +126,60 @@ public class GpxApproximator {
 		}
 	}
 
-	public void calculateGpxApproximation(@NonNull final ResultMatcher<GpxRouteApproximation> resultMatcher) {
+	public void calculateGpxApproximationAsync(@NonNull ResultMatcher<GpxRouteApproximation> resultMatcher) {
 		if (gctx != null) {
 			gctx.ctx.calculationProgress.isCancelled = true;
 		}
-		final GpxRouteApproximation gctx = getNewGpxApproximationContext();
+		GpxRouteApproximation gctx = getNewGpxApproximationContext();
 		this.gctx = gctx;
-		startProgress();
-		updateProgress(gctx);
-		approximationTask = new Runnable() {
-			@Override
-			public void run() {
-				try {
-					routingHelper.calculateGpxApproximation(env, gctx, getPoints(), resultMatcher);
-				} catch (Exception e) {
-					resultMatcher.publish(null);
-					log.error(e.getMessage(), e);
-				}
-				approximationTask = null;
-			}
+		notifyOnStart();
+		notifyUpdateProgress(gctx);
+		approximationTask = () -> {
+			calculateGpxApproximationSync(gctx, resultMatcher);
+			approximationTask = null;
 		};
 		SINGLE_THREAD_EXECUTOR.submit(approximationTask);
 	}
 
-	private void startProgress() {
-		final GpxApproximationProgressCallback approximationProgress = this.approximationProgress;
-		if (approximationProgress != null) {
-			approximationProgress.start(this);
+	public void calculateGpxApproximationSync(@NonNull GpxRouteApproximation gctx,
+	                                          @NonNull ResultMatcher<GpxRouteApproximation> matcher) {
+		try {
+			routingHelper.calculateGpxApproximation(env, gctx, getPoints(), matcher, false);
+		} catch (Exception e) {
+			matcher.publish(null);
+			log.error(e.getMessage(), e);
 		}
 	}
 
-	private void finishProgress() {
-		final GpxApproximationProgressCallback approximationProgress = this.approximationProgress;
-		if (approximationProgress != null) {
-			approximationProgress.finish(this);
+	private void notifyOnStart() {
+		if (listener != null) {
+			listener.onSegmentApproximationStarted(this);
 		}
 	}
 
-	private void updateProgress(@NonNull final GpxRouteApproximation gctx) {
-		final GpxApproximationProgressCallback approximationProgress = this.approximationProgress;
-		if (approximationProgress != null) {
-			ctx.runInUIThread(new Runnable() {
+	private void notifyOnUpdateProgress(float progress) {
+		if (listener != null) {
+			listener.updateApproximationProgress(this, (int) progress);
+		}
+	}
 
-				@Override
-				public void run() {
-					RouteCalculationProgress calculationProgress = gctx.ctx.calculationProgress;
-					if (approximationTask == null && GpxApproximator.this.gctx == gctx) {
-						finishProgress();
-					}
-					if (approximationTask != null && calculationProgress != null && !calculationProgress.isCancelled) {
-						float pr = calculationProgress.getLinearProgress();
-						approximationProgress.updateProgress(GpxApproximator.this, (int) pr);
-						if (GpxApproximator.this.gctx == gctx) {
-							updateProgress(gctx);
-						}
+	private void notifyOnFinish() {
+		if (listener != null) {
+			listener.onSegmentApproximationFinished(this);
+		}
+	}
+
+	private void notifyUpdateProgress(@NonNull GpxRouteApproximation gctx) {
+		if (listener != null) {
+			ctx.runInUIThread(() -> {
+				RouteCalculationProgress progressInfo = gctx.ctx.calculationProgress;
+				if (approximationTask == null && GpxApproximator.this.gctx == gctx) {
+					notifyOnFinish();
+				}
+				if (approximationTask != null && progressInfo != null && !progressInfo.isCancelled) {
+					notifyOnUpdateProgress(progressInfo.getApproximationProgress());
+					if (GpxApproximator.this.gctx == gctx) {
+						notifyUpdateProgress(gctx);
 					}
 				}
 			}, 300);

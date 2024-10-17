@@ -9,7 +9,7 @@ import net.osmand.data.PointDescription;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.helpers.AvoidSpecificRoads.AvoidRoadInfo;
+import net.osmand.plus.avoidroads.AvoidRoadInfo;
 import net.osmand.plus.mapcontextmenu.MenuBuilder;
 import net.osmand.plus.mapcontextmenu.MenuController;
 
@@ -22,7 +22,7 @@ public class ImpassibleRoadsMenuController extends MenuController {
 										 @NonNull AvoidRoadInfo avoidRoadInfo) {
 		super(new MenuBuilder(mapActivity), pointDescription, mapActivity);
 		this.avoidRoadInfo = avoidRoadInfo;
-		final OsmandApplication app = mapActivity.getMyApplication();
+		OsmandApplication app = mapActivity.getMyApplication();
 		leftTitleButtonController = new TitleButtonController() {
 			@Override
 			public void buttonPressed() {

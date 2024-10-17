@@ -1,38 +1,65 @@
 package net.osmand.plus.routepreparationmenu.cards;
 
-import android.os.Build;
-import android.view.View;
+import static android.graphics.Typeface.DEFAULT;
+import static net.osmand.plus.charts.ChartUtils.createGPXElevationDataSet;
+import static net.osmand.plus.charts.ChartUtils.createGPXSlopeDataSet;
+import static net.osmand.plus.charts.GPXDataSetAxisType.DISTANCE;
+import static net.osmand.plus.settings.enums.TrackApproximationType.MANUAL;
+import static net.osmand.plus.utils.AndroidUtils.spToPx;
+import static net.osmand.plus.utils.ColorUtilities.getPrimaryTextColor;
+import static net.osmand.plus.utils.ColorUtilities.getSecondaryIconColor;
+import static net.osmand.plus.utils.ColorUtilities.getSecondaryTextColor;
+import static net.osmand.plus.utils.OsmAndFormatter.getFormattedAlt;
+import static net.osmand.plus.utils.OsmAndFormatter.getFormattedDistanceValue;
+import static net.osmand.plus.utils.OsmAndFormatter.getFormattedDuration;
+import static net.osmand.plus.utils.OsmAndFormatter.getFormattedTimeShort;
+
+import android.text.SpannableStringBuilder;
+import android.text.TextUtils;
+import android.text.style.AbsoluteSizeSpan;
+import android.text.style.ForegroundColorSpan;
 import android.widget.FrameLayout;
-import android.widget.ImageView;
 import android.widget.TextView;
 
-import com.github.mikephil.charting.charts.LineChart;
+import androidx.annotation.NonNull;
+
+import com.github.mikephil.charting.charts.ElevationChart;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 
-import net.osmand.AndroidUtils;
-import net.osmand.GPXUtilities;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.plus.OsmAndFormatter;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.helpers.GpxUiHelper;
-import net.osmand.plus.helpers.GpxUiHelper.OrderedLineDataSet;
+import net.osmand.plus.charts.ChartUtils;
+import net.osmand.plus.charts.GPXDataSetType;
+import net.osmand.plus.charts.OrderedLineDataSet;
+import net.osmand.plus.helpers.AndroidUiHelper;
+import net.osmand.plus.routepreparationmenu.EmissionHelper;
+import net.osmand.plus.routepreparationmenu.EmissionHelper.MotorType;
 import net.osmand.plus.routing.RoutingHelper;
+import net.osmand.plus.settings.backend.ApplicationMode;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.FontCache;
+import net.osmand.plus.utils.OsmAndFormatter.FormattedValue;
+import net.osmand.plus.widgets.dialogbutton.DialogButton;
+import net.osmand.plus.widgets.style.CustomTypefaceSpan;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.util.Algorithms;
 
 import java.util.ArrayList;
 import java.util.List;
 
 public class SimpleRouteCard extends MapBaseCard {
 
-	private MapActivity mapActivity;
-	private GPXFile gpx;
-	private LineData data;
+	private final GpxFile gpxFile;
+	private final RoutingHelper routingHelper;
 
-	public SimpleRouteCard(MapActivity mapActivity, GPXFile gpx) {
+	private LineData lineData;
+
+	public SimpleRouteCard(@NonNull MapActivity mapActivity, @NonNull GpxFile gpxFile) {
 		super(mapActivity);
-		this.mapActivity = mapActivity;
-		this.gpx = gpx;
+		this.gpxFile = gpxFile;
+		routingHelper = mapActivity.getRoutingHelper();
 	}
 
 	@Override
@@ -42,100 +69,160 @@ public class SimpleRouteCard extends MapBaseCard {
 
 	@Override
 	protected void updateContent() {
-		RoutingHelper routingHelper = mapActivity.getRoutingHelper();
-
-		view.findViewById(R.id.dividerToDropDown).setVisibility(View.VISIBLE);
-		view.findViewById(R.id.route_info_details_card).setVisibility(View.VISIBLE);
-
-		View info = view.findViewById(R.id.info_container);
-		info.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				CardListener listener = getListener();
-				if (listener != null) {
-					listener.onCardPressed(SimpleRouteCard.this);
-				}
-			}
-		});
-
-		ImageView infoIcon = (ImageView) view.findViewById(R.id.InfoIcon);
-		ImageView durationIcon = (ImageView) view.findViewById(R.id.DurationIcon);
-		View infoDistanceView = view.findViewById(R.id.InfoDistance);
-		View infoDurationView = view.findViewById(R.id.InfoDuration);
-//		if (directionInfo >= 0) {
-//			infoIcon.setVisibility(View.GONE);
-//			durationIcon.setVisibility(View.GONE);
-//			infoDistanceView.setVisibility(View.GONE);
-//			infoDurationView.setVisibility(View.GONE);
-//		} else {
-		infoIcon.setImageDrawable(getContentIcon(R.drawable.ic_action_route_distance));
-		infoIcon.setVisibility(View.VISIBLE);
-		durationIcon.setImageDrawable(getContentIcon(R.drawable.ic_action_time_span));
-		durationIcon.setVisibility(View.VISIBLE);
-		infoDistanceView.setVisibility(View.VISIBLE);
-		infoDurationView.setVisibility(View.VISIBLE);
-//		}
-//		if (directionInfo >= 0 && routingHelper.getRouteDirections() != null
-//				&& directionInfo < routingHelper.getRouteDirections().size()) {
-//			RouteDirectionInfo ri = routingHelper.getRouteDirections().get(directionInfo);
-//		} else {
-		TextView distanceText = (TextView) view.findViewById(R.id.DistanceText);
-		TextView distanceTitle = (TextView) view.findViewById(R.id.DistanceTitle);
-		TextView durationText = (TextView) view.findViewById(R.id.DurationText);
-		TextView durationTitle = (TextView) view.findViewById(R.id.DurationTitle);
-
-		distanceText.setText(OsmAndFormatter.getFormattedDistance(routingHelper.getLeftDistance(), app));
-		durationText.setText(OsmAndFormatter.getFormattedDuration(routingHelper.getLeftTime(), app));
-		durationTitle.setText(app.getString(R.string.arrive_at_time, OsmAndFormatter.getFormattedTime(routingHelper.getLeftTime(), true)));
-
-		view.findViewById(R.id.details_button).setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				CardListener listener = getListener();
-				if (listener != null) {
-					listener.onCardButtonPressed(SimpleRouteCard.this, 0);
-				}
-			}
-		});
-
-		FrameLayout detailsButton = view.findViewById(R.id.details_button);
-		if (Build.VERSION.SDK_INT > Build.VERSION_CODES.LOLLIPOP) {
-			AndroidUtils.setBackground(app, detailsButton, nightMode, R.drawable.btn_border_light, R.drawable.btn_border_dark);
-			AndroidUtils.setBackground(app, view.findViewById(R.id.details_button_descr), nightMode, R.drawable.ripple_light, R.drawable.ripple_dark);
-		} else {
-			AndroidUtils.setBackground(app, view.findViewById(R.id.details_button_descr), nightMode, R.drawable.btn_border_trans_light, R.drawable.btn_border_trans_dark);
-		}
-
-		buildHeader(view);
+		setupChart();
+		setupInfoRows();
+		setupDetailsButton();
+		setupAttachToRoadsCard();
+		view.findViewById(R.id.route_info_controls).setOnClickListener(v -> notifyCardPressed());
 	}
 
-	private void buildHeader(View headerView) {
-		final LineChart mChart = (LineChart) headerView.findViewById(R.id.chart);
-		final GPXUtilities.GPXTrackAnalysis analysis = gpx.getAnalysis(0);
+	private void setupInfoRows() {
+		setupFirstRow();
+		setupSecondRow();
+	}
 
-		GpxUiHelper.setupGPXChart(mChart, 4, 10f, 4f, !nightMode, false);
-		if (analysis.hasElevationData) {
-			LineData data = this.data;
+	private void setupSecondRow() {
+		GpxTrackAnalysis analysis = gpxFile.getAnalysis(0);
+		boolean hasElevationData = analysis.hasElevationData();
+		if (hasElevationData) {
+			TextView uphill = view.findViewById(R.id.uphill);
+			TextView downhill = view.findViewById(R.id.downhill);
+
+			uphill.setText(getFormattedAlt(analysis.getDiffElevationUp(), app));
+			downhill.setText(getFormattedAlt(analysis.getDiffElevationDown(), app));
+		}
+		AndroidUiHelper.updateVisibility(view.findViewById(R.id.uphill_container), hasElevationData);
+		AndroidUiHelper.updateVisibility(view.findViewById(R.id.downhill_container), hasElevationData);
+		setupEmission();
+	}
+
+	private void setupEmission() {
+		EmissionHelper emissionHelper = new EmissionHelper(app);
+		MotorType motorType = emissionHelper.getMotorTypeForMode(routingHelper.getAppMode());
+		if (motorType != null) {
+			emissionHelper.getEmission(motorType, routingHelper.getLeftDistance(), result -> {
+				TextView textView = view.findViewById(R.id.emission);
+				textView.setText(result);
+				AndroidUiHelper.updateVisibility(view.findViewById(R.id.emission_container), true);
+				return true;
+			});
+		}
+	}
+
+	private void setupChart() {
+		ElevationChart chart = view.findViewById(R.id.chart);
+		GpxTrackAnalysis analysis = gpxFile.getAnalysis(0);
+
+		if (analysis.hasElevationData()) {
+			ChartUtils.setupElevationChart(chart, 10f, 4f, false);
+
+			LineData data = lineData;
 			if (data == null) {
 				List<ILineDataSet> dataSets = new ArrayList<>();
-				OrderedLineDataSet slopeDataSet = null;
-				OrderedLineDataSet elevationDataSet = GpxUiHelper.createGPXElevationDataSet(app, mChart, analysis,
-						GpxUiHelper.GPXDataSetAxisType.DISTANCE, false, true, false);
-				if (elevationDataSet != null) {
-					dataSets.add(elevationDataSet);
-					slopeDataSet = GpxUiHelper.createGPXSlopeDataSet(app, mChart, analysis,
-							GpxUiHelper.GPXDataSetAxisType.DISTANCE, elevationDataSet.getValues(), true, true, false);
-				}
+				OrderedLineDataSet slopeDataSet;
+				OrderedLineDataSet elevationDataSet = createGPXElevationDataSet(app, chart, analysis,
+						GPXDataSetType.ALTITUDE, DISTANCE, false, true, false);
+				dataSets.add(elevationDataSet);
+				slopeDataSet = createGPXSlopeDataSet(app, chart, analysis, GPXDataSetType.SLOPE, DISTANCE,
+						elevationDataSet.getEntries(), true, true, false);
 				if (slopeDataSet != null) {
 					dataSets.add(slopeDataSet);
 				}
 				data = new LineData(dataSets);
-				this.data = data;
+				lineData = data;
 			}
-			mChart.setData(data);
-			mChart.setVisibility(View.VISIBLE);
-		} else {
-			mChart.setVisibility(View.GONE);
+			chart.setData(data);
 		}
+		AndroidUiHelper.updateVisibility(chart, analysis.hasElevationData());
+	}
+
+	private void setupDetailsButton() {
+		DialogButton button = view.findViewById(R.id.details_button);
+		button.setOnClickListener(v -> notifyCardPressed());
+		AndroidUtils.setBackground(app, button.getButtonView(), nightMode, R.drawable.btn_border_light, R.drawable.btn_border_dark);
+	}
+
+	private void setupFirstRow() {
+		SpannableStringBuilder builder = new SpannableStringBuilder();
+		setupDistance(builder);
+		setupBullet(builder);
+		setupDuration(builder);
+		setupArrivalTime(builder);
+
+		TextView textView = view.findViewById(R.id.firstRow);
+		textView.setText(builder);
+	}
+
+	private void setupArrivalTime(@NonNull SpannableStringBuilder builder) {
+		int index = builder.length();
+		String arriveTime = getFormattedTimeShort(routingHelper.getLeftTime(), true);
+
+		builder.append(" (").append(arriveTime).append(")");
+		builder.setSpan(new AbsoluteSizeSpan(spToPx(app, 20)), index, builder.length(), 0);
+		builder.setSpan(new CustomTypefaceSpan(DEFAULT), index, builder.length(), 0);
+		builder.setSpan(new ForegroundColorSpan(getSecondaryTextColor(app, nightMode)), index, builder.length(), 0);
+	}
+
+	private void setupBullet(@NonNull SpannableStringBuilder builder) {
+		int index = builder.length();
+		builder.append(" • ");
+		builder.setSpan(new AbsoluteSizeSpan(spToPx(app, 20)), index, builder.length(), 0);
+		builder.setSpan(new CustomTypefaceSpan(DEFAULT), index, builder.length(), 0);
+		builder.setSpan(new ForegroundColorSpan(getSecondaryIconColor(app, nightMode)), index, builder.length(), 0);
+	}
+
+	private void setupDuration(@NonNull SpannableStringBuilder builder) {
+		String duration = getFormattedDuration(routingHelper.getLeftTime(), app);
+		String[] items = duration.split(" ");
+		for (String item : items) {
+			int index = builder.length();
+			builder.append(item).append(" ");
+			if (TextUtils.isDigitsOnly(item) || Algorithms.stringsEqual("<1", item)) {
+				setupNumberSpans(builder, index);
+			} else {
+				setupTextSpans(builder, index);
+			}
+		}
+	}
+
+	private void setupDistance(@NonNull SpannableStringBuilder builder) {
+		int distance = routingHelper.getLeftDistance();
+		FormattedValue value = getFormattedDistanceValue(distance, app);
+
+		int index = builder.length();
+		builder.append(value.value);
+		setupNumberSpans(builder, index);
+
+		index = builder.length();
+		builder.append(" ").append(value.unit);
+		setupTextSpans(builder, index);
+	}
+
+	private void setupAttachToRoadsCard() {
+		FrameLayout container = view.findViewById(R.id.attach_to_roads_banner_container);
+		container.removeAllViews();
+
+		GpxFile gpxFile = routingHelper.getCurrentGPX();
+		ApplicationMode appMode = routingHelper.getAppMode();
+		if (gpxFile != null && !gpxFile.isAttachedToRoads() && settings.DETAILED_TRACK_GUIDANCE.getModeValue(appMode) == MANUAL) {
+			AttachTrackToRoadsBannerCard card = new AttachTrackToRoadsBannerCard(mapActivity);
+			card.setListener(getListener());
+			container.addView(card.build(mapActivity));
+			AndroidUiHelper.updateVisibility(container, true);
+		} else {
+			AndroidUiHelper.updateVisibility(container, false);
+		}
+	}
+
+	private void setupTextSpans(@NonNull SpannableStringBuilder builder, int index) {
+		builder.setSpan(new AbsoluteSizeSpan(spToPx(app, 16)), index, builder.length(), 0);
+		builder.setSpan(new CustomTypefaceSpan(DEFAULT), index, builder.length(), 0);
+		builder.setSpan(new ForegroundColorSpan(getSecondaryTextColor(app, nightMode)), index, builder.length(), 0);
+	}
+
+	private void setupNumberSpans(@NonNull SpannableStringBuilder builder, int index) {
+		builder.setSpan(new AbsoluteSizeSpan(spToPx(app, 20)), index, builder.length(), 0);
+		builder.setSpan(new CustomTypefaceSpan(FontCache.getMediumFont()), index, builder.length(), 0);
+		builder.setSpan(new ForegroundColorSpan(getPrimaryTextColor(app, nightMode)), index, builder.length(), 0);
 	}
 }

@@ -17,26 +17,33 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 
-import net.osmand.AndroidUtils;
 import net.osmand.PlatformUtil;
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.Version;
 import net.osmand.plus.chooseplan.button.PriceButton;
 import net.osmand.plus.helpers.AndroidUiHelper;
+import net.osmand.plus.inapp.InAppPurchaseUtils;
+import net.osmand.plus.inapp.InAppPurchases.InAppPurchase;
 import net.osmand.plus.routepreparationmenu.cards.BaseCard;
 import net.osmand.plus.routepreparationmenu.cards.BaseCard.CardListener;
+import net.osmand.plus.settings.purchase.PurchasesFragment;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.UiUtilities;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
+import java.util.Locale;
 
 public class ChoosePlanFragment extends BasePurchaseDialogFragment implements CardListener {
 
@@ -46,6 +53,8 @@ public class ChoosePlanFragment extends BasePurchaseDialogFragment implements Ca
 	public static final String OPEN_CHOOSE_PLAN = "open_choose_plan";
 	public static final String CHOOSE_PLAN_FEATURE = "choose_plan_feature";
 	public static final String SELECTED_FEATURE = "selected_feature";
+
+	private final SimpleDateFormat DATE_FORMAT = new SimpleDateFormat("MMM d, yyyy", Locale.getDefault());
 
 	private LinearLayout listContainer;
 	private OsmAndFeature selectedFeature;
@@ -119,6 +128,12 @@ public class ChoosePlanFragment extends BasePurchaseDialogFragment implements Ca
 		int visibility = feature.isAvailableInMapsPlus() ? View.VISIBLE : View.INVISIBLE;
 		AndroidUiHelper.setVisibility(visibility, view.findViewById(R.id.secondary_icon));
 
+		String osmandPro = getString(R.string.osmand_pro);
+		String osmandPlus = getString(R.string.osmand_plus);
+		String plan = feature.isAvailableInMapsPlus() ? getString(R.string.ltr_or_rtl_combine_via_or, osmandPlus , osmandPro) : osmandPro;
+		String contentDescription = getString(R.string.feature_available_as_part_of_plan, getString(feature.getListTitleId()), plan);
+		view.setContentDescription(contentDescription);
+
 		boolean isLastItem = feature == allFeatures.get(allFeatures.size() - 1);
 		AndroidUiHelper.updateVisibility(view.findViewById(R.id.bottom_divider), !isLastItem);
 	}
@@ -162,7 +177,7 @@ public class ChoosePlanFragment extends BasePurchaseDialogFragment implements Ca
 		FragmentActivity activity = getActivity();
 		if (activity != null) {
 			FrameLayout container = mainView.findViewById(R.id.troubleshooting_card);
-			TroubleshootingCard card = new TroubleshootingCard(activity, purchaseHelper, usedOnMap);
+			TroubleshootingCard card = new TroubleshootingCard(activity, purchaseHelper, isUsedOnMap());
 			card.setListener(this);
 			container.addView(card.build(activity));
 		}
@@ -183,7 +198,7 @@ public class ChoosePlanFragment extends BasePurchaseDialogFragment implements Ca
 			String title = getString(selectedFeature.getTitleId());
 			((TextView) mainView.findViewById(R.id.header_title)).setText(title);
 
-			String desc = getString(selectedFeature.getDescriptionId());
+			String desc = selectedFeature.getDescription(app);
 			((TextView) mainView.findViewById(R.id.primary_description)).setText(desc);
 
 			String mapsPlus = getString(R.string.maps_plus);
@@ -215,12 +230,11 @@ public class ChoosePlanFragment extends BasePurchaseDialogFragment implements Ca
 
 	private void updateContinueButtons() {
 		List<PriceButton<?>> priceButtons = OsmAndProPlanFragment.collectPriceButtons(app, purchaseHelper, nightMode);
-		int osmAndProIconId = nightMode
-				? R.drawable.ic_action_osmand_pro_logo_colored_night
-				: R.drawable.ic_action_osmand_pro_logo_colored;
+		int iconId = nightMode ? R.drawable.ic_action_osmand_pro_logo_colored_night : R.drawable.ic_action_osmand_pro_logo_colored;
 		CharSequence price = priceButtons.size() == 0 ? null : Collections.min(priceButtons).getPrice();
+
 		updateContinueButton(mainView.findViewById(R.id.button_continue_pro),
-				osmAndProIconId,
+				iconId,
 				getString(R.string.osmand_pro),
 				price,
 				v -> OsmAndProPlanFragment.showInstance(requireActivity()),
@@ -228,19 +242,43 @@ public class ChoosePlanFragment extends BasePurchaseDialogFragment implements Ca
 
 		priceButtons = MapsPlusPlanFragment.collectPriceButtons(app, purchaseHelper, nightMode);
 		price = priceButtons.size() == 0 ? null : Collections.min(priceButtons).getPrice();
-		boolean availableInMapsPlus = selectedFeature.isAvailableInMapsPlus();
-		int mapsPlusIconId = availableInMapsPlus
-				? R.drawable.ic_action_osmand_maps_plus
-				: R.drawable.ic_action_osmand_maps_plus_desaturated;
-		updateContinueButton(mainView.findViewById(R.id.button_continue_maps_plus),
-				mapsPlusIconId,
-				getString(R.string.maps_plus),
-				price,
-				v -> MapsPlusPlanFragment.showInstance(requireActivity()),
-				availableInMapsPlus && Version.isInAppPurchaseSupported());
+
+		boolean fullVersion = !Version.isFreeVersion(app);
+		boolean subscribedToMaps = InAppPurchaseUtils.isMapsPlusAvailable(app, false);
+		boolean fullVersionPurchased = InAppPurchaseUtils.isFullVersionAvailable(app, false);
+
+		boolean isFullVersion = fullVersion || fullVersionPurchased;
+		boolean mapsPlusPurchased = subscribedToMaps || isFullVersion;
+		boolean available = !mapsPlusPurchased && selectedFeature.isAvailableInMapsPlus() && Version.isInAppPurchaseSupported();
+
+		iconId = available ? R.drawable.ic_action_osmand_maps_plus : R.drawable.ic_action_osmand_maps_plus_desaturated;
+
+		View mapsPlusView = mainView.findViewById(R.id.button_continue_maps_plus);
+		updateContinueButton(mapsPlusView, iconId, getString(R.string.maps_plus), price, v -> {
+			FragmentActivity activity = getActivity();
+			if (activity != null) {
+				if (mapsPlusPurchased) {
+					FragmentManager fragmentManager = activity.getSupportFragmentManager();
+					Fragment purchasesFragment = fragmentManager.findFragmentByTag(PurchasesFragment.TAG);
+					boolean returnToPurchasesFragment = purchasesFragment != null;
+					if (returnToPurchasesFragment) {
+						dismiss();
+					} else {
+						PurchasesFragment.showInstance(fragmentManager);
+					}
+				} else {
+					MapsPlusPlanFragment.showInstance(activity);
+				}
+			}
+		}, available);
+
+		if (mapsPlusPurchased) {
+			updatePurchasedButton(mapsPlusView, fullVersion);
+		}
 	}
 
-	private void updateContinueButton(View view, int iconId, String plan, CharSequence price, OnClickListener listener, boolean available) {
+	private void updateContinueButton(@NonNull View view, int iconId, String plan,
+	                                  CharSequence price, OnClickListener listener, boolean available) {
 		int activeColor = ColorUtilities.getActiveColor(app, nightMode);
 		int defaultIconColor = ColorUtilities.getDefaultIconColor(app, nightMode);
 		int colorNoAlpha = available ? activeColor : defaultIconColor;
@@ -264,16 +302,36 @@ public class ChoosePlanFragment extends BasePurchaseDialogFragment implements Ca
 		view.setEnabled(available);
 	}
 
+	private void updatePurchasedButton(@NonNull View view, boolean isFullVersion) {
+		TextView tvTitle = view.findViewById(R.id.title);
+		TextView tvDescription = view.findViewById(R.id.description);
+
+		String version = getString(isFullVersion ? R.string.osmand_plus : R.string.maps_plus);
+		boolean featureIncluded = selectedFeature.isAvailableInMapsPlus();
+		int pattern = featureIncluded ? R.string.included_in_your_current_plan : R.string.not_available_with;
+		tvTitle.setText(String.format(getString(pattern), version));
+
+		String description = null;
+		InAppPurchase purchase = purchaseHelper.getFullVersion();
+		long purchaseTime = purchase != null ? purchase.getPurchaseTime() : 0;
+		if (purchaseTime > 0) {
+			description = DATE_FORMAT.format(purchaseTime);
+		}
+		tvDescription.setText(description);
+		AndroidUiHelper.updateVisibility(tvDescription, !Algorithms.isEmpty(description));
+		view.setEnabled(true);
+	}
+
 	public static void showDefaultInstance(@NonNull FragmentActivity activity) {
-		showInstance(activity, OsmAndFeature.values()[0]);
+		showInstance(activity, OsmAndFeature.UNLIMITED_MAP_DOWNLOADS);
 	}
 
 	public static void showInstance(@NonNull FragmentActivity activity, @NonNull OsmAndFeature selectedFeature) {
-		FragmentManager fm = activity.getSupportFragmentManager();
-		if (!fm.isStateSaved() && fm.findFragmentByTag(TAG) == null) {
+		FragmentManager fragmentManager = activity.getSupportFragmentManager();
+		if (AndroidUtils.isFragmentCanBeAdded(fragmentManager, TAG)) {
 			ChoosePlanFragment fragment = new ChoosePlanFragment();
 			fragment.selectedFeature = selectedFeature;
-			fragment.show(activity.getSupportFragmentManager(), TAG);
+			fragment.show(fragmentManager, TAG);
 		}
 	}
 

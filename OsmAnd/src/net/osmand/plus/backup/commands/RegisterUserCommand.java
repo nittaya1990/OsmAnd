@@ -3,7 +3,7 @@ package net.osmand.plus.backup.commands;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import net.osmand.AndroidNetworkUtils;
+import net.osmand.plus.utils.AndroidNetworkUtils;
 import net.osmand.OperationLog;
 import net.osmand.plus.backup.BackupCommand;
 import net.osmand.plus.backup.BackupHelper;
@@ -47,11 +47,12 @@ public class RegisterUserCommand extends BackupCommand {
 		Map<String, String> params = new HashMap<>();
 		params.put("email", email);
 		params.put("login", String.valueOf(login));
-		final String orderId = Algorithms.isEmpty(promoCode) ? getHelper().getOrderId() : promoCode;
+		params.put("lang", getApp().getLocaleHelper().getLanguage());
+		String orderId = Algorithms.isEmpty(promoCode) ? getHelper().getOrderId() : promoCode;
 		if (!Algorithms.isEmpty(orderId)) {
 			params.put("orderid", orderId);
 		}
-		final String deviceId = getApp().getUserAndroidId();
+		String deviceId = getApp().getUserAndroidId();
 		params.put("deviceid", deviceId);
 		OperationLog operationLog = createOperationLog("registerUser");
 		AndroidNetworkUtils.sendRequest(getApp(), USER_REGISTER_URL, params, "Register user", false, true, (resultJson, error, resultCode) -> {

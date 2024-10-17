@@ -5,20 +5,25 @@ import androidx.annotation.Nullable;
 
 import net.osmand.Location;
 import net.osmand.data.LatLon;
+import net.osmand.gpx.GPXFile;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.onlinerouting.EngineParameter;
 import net.osmand.plus.onlinerouting.VehicleType;
 import net.osmand.plus.routing.RouteDirectionInfo;
+import net.osmand.router.RouteCalculationProgress;
 import net.osmand.router.TurnType;
+import net.osmand.shared.gpx.GpxFile;
 
 import org.json.JSONArray;
 import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
 import java.util.Set;
 
 import static net.osmand.plus.onlinerouting.engine.EngineType.ORS_TYPE;
@@ -54,6 +59,24 @@ public class OrsEngine extends JsonOnlineRoutingEngine {
 		return "https://api.openrouteservice.org/v2/directions/";
 	}
 
+	@NonNull
+	@Override
+	public String getHTTPMethod() {
+		return "POST";
+	}
+
+	@NonNull
+	@Override
+	public Map<String, String> getRequestHeaders() {
+		Map<String, String> headers = new HashMap<>();
+		String apiKey = get(EngineParameter.API_KEY);
+		if (!isEmpty(apiKey)) {
+			headers.put("Authorization", apiKey);
+		}
+		headers.put("Content-Type", "application/json");
+		return headers;
+	}
+
 	@Override
 	protected void collectAllowedParameters(@NonNull Set<EngineParameter> params) {
 		params.add(EngineParameter.KEY);
@@ -83,32 +106,42 @@ public class OrsEngine extends JsonOnlineRoutingEngine {
 	}
 
 	@Override
-	protected void makeFullUrl(@NonNull StringBuilder sb,
-	                           @NonNull List<LatLon> path) {
-		if (path.size() > 1) {
-			String vehicleKey = getVehicleKeyForUrl();
-			if (!isEmpty(vehicleKey)) {
-				sb.append(vehicleKey);
-			}
-			sb.append('?');
-			String apiKey = get(EngineParameter.API_KEY);
-			if (!isEmpty(apiKey)) {
-				sb.append("api_key=").append(apiKey);
-			}
-			LatLon start = path.get(0);
-			LatLon end = path.get(path.size() - 1);
-			sb.append('&').append("start=")
-					.append(start.getLongitude()).append(',').append(start.getLatitude());
-			sb.append('&').append("end=")
-					.append(end.getLongitude()).append(',').append(end.getLatitude());
+	protected void makeFullUrl(@NonNull StringBuilder sb, @NonNull List<LatLon> path,
+							   @Nullable Float startBearing) {
+		// add ORS routing profile (= vehicle key)
+		String vehicleKey = getVehicleKeyForUrl();
+		if (!isEmpty(vehicleKey)) {
+			sb.append(vehicleKey);
 		}
+		sb.append("/geojson");
+	}
+
+	@NonNull
+	@Override
+	public String getRequestBody(@NonNull List<LatLon> path, @Nullable Float startBearing)
+			throws JSONException {
+		JSONObject jsonBody = new JSONObject();
+		if (path.size() > 1) {
+			JSONArray coordinates = new JSONArray();
+			for (LatLon p : path) {
+				coordinates.put(new JSONArray(Arrays.asList(p.getLongitude(), p.getLatitude())));
+			}
+			jsonBody.put("coordinates", coordinates);
+		}
+		return jsonBody.toString();
+	}
+
+	@Override
+	public OnlineRoutingResponse responseByGpxFile(@NonNull OsmandApplication app, @NonNull GpxFile gpxFile, boolean initialCalculation, @Nullable RouteCalculationProgress calculationProgress) {
+		return null;
 	}
 
 	@Nullable
 	@Override
 	public OnlineRoutingResponse parseServerResponse(@NonNull JSONObject root,
 	                                                 @NonNull OsmandApplication app,
-	                                                 boolean leftSideNavigation) throws JSONException {
+	                                                 boolean leftSideNavigation)
+			throws JSONException {
 		JSONArray coordinates = root.getJSONObject("geometry").getJSONArray("coordinates");
 		List<LatLon> points = new ArrayList<>();
 		for (int i = 0; i < coordinates.length(); i++) {
@@ -138,7 +171,6 @@ public class OrsEngine extends JsonOnlineRoutingEngine {
 				// create direction step
 				RouteDirectionInfo direction = new RouteDirectionInfo(averageSpeed, turnType);
 				direction.routePointOffset = routePointOffset;
-				direction.routeEndPointOffset = routeEndPointOffset;
 				direction.setDescriptionRoute(instruction);
 				direction.setStreetName(streetName);
 				direction.setDistance((int) Math.round(distance));

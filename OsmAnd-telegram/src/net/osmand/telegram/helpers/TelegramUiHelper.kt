@@ -9,7 +9,7 @@ import net.osmand.telegram.TelegramApplication
 import net.osmand.telegram.utils.OsmandLocationUtils
 import net.osmand.telegram.utils.OsmandLocationUtils.MessageOsmAndBotLocation
 import net.osmand.telegram.utils.OsmandLocationUtils.MessageUserLocation
-import org.drinkless.td.libcore.telegram.TdApi
+import org.drinkless.tdlib.TdApi
 
 object TelegramUiHelper {
 
@@ -63,7 +63,7 @@ object TelegramUiHelper {
 			if (!chatWithBot) {
 				res.userId = userId
 				val user = helper.getUser(userId)
-				val message = messages.firstOrNull { it.viaBotUserId == 0 }
+				val message = messages.firstOrNull { it.viaBotUserId == 0L }
 				if (message != null) {
 					res.lastUpdated = OsmandLocationUtils.getLastUpdatedTime(message)
 					val content = OsmandLocationUtils.parseMessageContent(message, helper)
@@ -96,14 +96,7 @@ object TelegramUiHelper {
 	}
 
 	fun getUserName(user: TdApi.User): String {
-		var name = "${user.firstName} ${user.lastName}".trim()
-		if (name.isEmpty()) {
-			name = user.username
-		}
-		if (name.isEmpty()) {
-			name = user.phoneNumber
-		}
-		return name
+		return user.getName()
 	}
 
 	fun messageToLocationItem(
@@ -304,7 +297,7 @@ object TelegramUiHelper {
 			internal set
 		var placeholderId: Int = 0
 			internal set
-		var userId: Int = 0
+		var userId: Long = 0
 			internal set
 		var lastUpdated: Int = 0
 			internal set
@@ -359,7 +352,7 @@ object TelegramUiHelper {
 		override fun canBeOpenedOnMap() = latLon != null
 
 		override fun getMapPointId(): String {
-			val id = if (userId != 0) userId.toString() else name
+			val id = if (userId != 0L) userId.toString() else name
 			return "${chatId}_$id"
 		}
 

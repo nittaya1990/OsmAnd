@@ -7,6 +7,7 @@ import androidx.annotation.ColorRes
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
 import net.osmand.PlatformUtil
+import net.osmand.telegram.TelegramSettings.LocationSource.GOOGLE_PLAY_SERVICES
 import net.osmand.telegram.helpers.OsmandAidlHelper
 import net.osmand.telegram.helpers.ShareLocationHelper.Companion.MAX_MESSAGES_IN_TDLIB_PER_CHAT
 import net.osmand.telegram.helpers.ShowLocationHelper
@@ -14,7 +15,7 @@ import net.osmand.telegram.helpers.TelegramHelper
 import net.osmand.telegram.utils.*
 import net.osmand.telegram.utils.OsmandFormatter.MetricsConstants
 import net.osmand.telegram.utils.OsmandFormatter.SpeedConstants
-import org.drinkless.td.libcore.telegram.TdApi
+import org.drinkless.tdlib.TdApi
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
@@ -73,6 +74,7 @@ private const val SETTINGS_NAME = "osmand_telegram_settings"
 
 private const val SHARE_LOCATION_CHATS_KEY = "share_location_chats"
 private const val HIDDEN_ON_MAP_CHATS_KEY = "hidden_on_map_chats"
+private const val LOCATION_SOURCE = "location_source"
 
 private const val SHARING_MODE_KEY = "current_sharing_mode"
 
@@ -133,6 +135,8 @@ class TelegramSettings(private val app: TelegramApplication) {
 	var currentProxyPref: ProxyPref = ProxySOCKS5Pref(-1, "", -1, "", "")
 		private set
 
+	var locationSource: LocationSource = GOOGLE_PLAY_SERVICES
+
 	var metricsConstants = MetricsConstants.KILOMETERS_AND_METERS
 	var speedConstants = SpeedConstants.KILOMETERS_PER_HOUR
 	var utcOffset = DataConstants.UTC_FORMAT
@@ -178,7 +182,7 @@ class TelegramSettings(private val app: TelegramApplication) {
 
 	fun isSharingLocationToChat(chatId: Long) = shareChatsInfo.containsKey(chatId)
 
-	fun isSharingLocationToUser(userId: Int) = shareChatsInfo.values.any { it.userId == userId }
+	fun isSharingLocationToUser(userId: Long) = shareChatsInfo.values.any { it.userId == userId }
 
 	fun hasAnyChatToShowOnMap() = !hiddenOnMapChats.containsAll(getLiveNowChats())
 
@@ -195,15 +199,15 @@ class TelegramSettings(private val app: TelegramApplication) {
 
 	fun getLiveTracksInfo() = liveTracksInfo
 
-	fun getLiveTrackInfo(userId: Int, chatId: Long, deviceName: String) =
+	fun getLiveTrackInfo(userId: Long, chatId: Long, deviceName: String) =
 		liveTracksInfo.firstOrNull { it.userId == userId && it.chatId == chatId && it.deviceName == deviceName }
 
 	fun isShowingChatOnMap(chatId: Long) = !hiddenOnMapChats.contains(chatId)
 
-	fun isLiveTrackEnabled(userId: Int, chatId: Long, deviceName: String) =
+	fun isLiveTrackEnabled(userId: Long, chatId: Long, deviceName: String) =
 		liveTracksInfo.any { (it.chatId == chatId && it.userId == userId && it.deviceName == deviceName) }
 
-	fun updateLiveTrack(userId: Int, chatId: Long, deviceName: String, enable: Boolean) {
+	fun updateLiveTrack(userId: Long, chatId: Long, deviceName: String, enable: Boolean) {
 		val tracksInfo = liveTracksInfo.toMutableList()
 		if (enable) {
 			val colorIndex = if (tracksInfo.size > 0) (tracksInfo.last().colorIndex + 1) % ShowLocationHelper.GPX_COLORS.size else 0
@@ -246,7 +250,7 @@ class TelegramSettings(private val app: TelegramApplication) {
 	}
 
 	fun shareLocationToUser(
-		userId: Int,
+		userId: Long,
 		livePeriod: Long = DEFAULT_VISIBLE_TIME_SECONDS,
 		addActiveTime: Long = ADDITIONAL_ACTIVE_TIME_VALUES_SEC[0]
 	) {
@@ -386,7 +390,7 @@ class TelegramSettings(private val app: TelegramApplication) {
 								shareInfo.shouldSendViaBotMapMessage = false
 							}
 						} else if (state.constructor == TdApi.MessageSendingStateFailed.CONSTRUCTOR) {
-							shareInfo.hasSharingError = true
+							shareInfo.hasMapSharingError = true
 							shareInfo.pendingMapMessage = false
 							if (!isOsmAndBot) {
 								shareInfo.pendingTdLibMap--
@@ -420,7 +424,7 @@ class TelegramSettings(private val app: TelegramApplication) {
 							}
 						} else if (state.constructor == TdApi.MessageSendingStateFailed.CONSTRUCTOR) {
 							log.debug("updateShareInfo TEXT ${message.id} MessageSendingStateFailed")
-							shareInfo.hasSharingError = true
+							shareInfo.hasTextSharingError = true
 							shareInfo.pendingTextMessage = false
 							if (!isOsmAndBot) {
 								shareInfo.pendingTdLibText--
@@ -557,7 +561,7 @@ class TelegramSettings(private val app: TelegramApplication) {
 								"\nLast map message handled: ${shareInfo.lastMapMessageHandled}" +
 								"\nMap sharing waiting time: ${mapSharingWaitingTime}s")
 					}
-					if (shareInfo.hasSharingError || waitingTimeError) {
+					if (shareInfo.hasTextSharingError || shareInfo.hasMapSharingError || waitingTimeError) {
 						sendChatsErrors = true
 						locationTime = max(shareInfo.lastTextSuccessfulSendTime, shareInfo.lastMapSuccessfulSendTime)
 						chatsIds.add(shareInfo.chatId)
@@ -631,7 +635,7 @@ class TelegramSettings(private val app: TelegramApplication) {
 			shareChatsInfo[chatId]?.shouldSendViaBotTextMessage = true
 		}
 	}
-	
+
 	fun save() {
 		val prefs = app.getSharedPreferences(SETTINGS_NAME, Context.MODE_PRIVATE)
 		val edit = prefs.edit()
@@ -674,6 +678,8 @@ class TelegramSettings(private val app: TelegramApplication) {
 		edit.putLong(BUFFER_TIME_KEY, bufferTime)
 
 		edit.putLong(FREE_TIMELINE_INFO_SHOWN_TIME_KEY, freeTimelineInfoShownTime)
+
+		edit.putString(LOCATION_SOURCE, locationSource.name)
 
 		val jArray = convertShareChatsInfoToJson()
 		if (jArray != null) {
@@ -754,7 +760,7 @@ class TelegramSettings(private val app: TelegramApplication) {
 		minLocationSpeed = prefs.getFloat(MIN_LOCATION_SPEED_KEY, minLocationSpeedDef)
 
 		val currentUserId = app.telegramHelper.getCurrentUserId()
-		currentSharingMode = prefs.getString(SHARING_MODE_KEY, if (currentUserId != -1) currentUserId.toString() else "")!!
+		currentSharingMode = prefs.getString(SHARING_MODE_KEY, if (currentUserId != -1L) currentUserId.toString() else "")!!
 
 		val defPackage = if (AppConnect.getInstalledApps(app).size == 1) AppConnect.getInstalledApps(app).first().appPackage else ""
 		appToConnectPackage = prefs.getString(APP_TO_CONNECT_PACKAGE_KEY, defPackage)!!
@@ -774,6 +780,9 @@ class TelegramSettings(private val app: TelegramApplication) {
 		bufferTime = prefs.getLong(BUFFER_TIME_KEY, BUFFER_TIME[BUFFER_TIME_INDEX])
 
 		freeTimelineInfoShownTime = prefs.getLong(FREE_TIMELINE_INFO_SHOWN_TIME_KEY, 0L)
+
+		val locationSourceName = prefs.getString(LOCATION_SOURCE, GOOGLE_PLAY_SERVICES.name)
+		locationSource = LocationSource.valueOf(locationSourceName!!)
 
 		try {
 			parseProxyPreferences(JSONObject(prefs.getString(PROXY_PREFERENCES_KEY, "")))
@@ -900,7 +909,7 @@ class TelegramSettings(private val app: TelegramApplication) {
 			val obj = json.getJSONObject(i)
 			val shareInfo = ShareChatInfo().apply {
 				chatId = obj.optLong(ShareChatInfo.CHAT_ID_KEY)
-				userId = obj.optInt(ShareChatInfo.USER_ID_KEY)
+				userId = obj.optLong(ShareChatInfo.USER_ID_KEY)
 				start = obj.optLong(ShareChatInfo.START_KEY)
 				livePeriod = obj.optLong(ShareChatInfo.LIVE_PERIOD_KEY)
 				currentMessageLimit = obj.optLong(ShareChatInfo.LIMIT_KEY)
@@ -947,7 +956,7 @@ class TelegramSettings(private val app: TelegramApplication) {
 		val list = mutableListOf<LiveTrackInfo>()
 		for (i in 0 until json.length()) {
 			val obj = json.getJSONObject(i)
-			val userId = obj.optInt(LiveTrackInfo.USER_ID)
+			val userId = obj.optLong(LiveTrackInfo.USER_ID)
 			val chatId = obj.optLong(LiveTrackInfo.CHAT_ID)
 			val deviceName = obj.optString(LiveTrackInfo.DEVICE_NAME)
 			val colorIndex = obj.optInt(LiveTrackInfo.COLOR_INDEX)
@@ -1335,6 +1344,13 @@ class TelegramSettings(private val app: TelegramApplication) {
 		);
 	}
 
+	enum class LocationSource(
+		val nameId: Int
+	) {
+		GOOGLE_PLAY_SERVICES(R.string.google_play_services),
+		ANDROID_API(R.string.android_api)
+	}
+
 	class DeviceBot {
 		var id: Long = -1
 		var userId: Long = -1
@@ -1354,7 +1370,7 @@ class TelegramSettings(private val app: TelegramApplication) {
 		}
 	}
 
-	data class LiveTrackInfo(val userId: Int, val chatId: Long, val deviceName: String, val colorIndex: Int) {
+	data class LiveTrackInfo(val userId: Long, val chatId: Long, val deviceName: String, val colorIndex: Int) {
 		companion object {
 
 			internal const val USER_ID = "userId"
@@ -1437,7 +1453,7 @@ class TelegramSettings(private val app: TelegramApplication) {
 	class ShareChatInfo {
 
 		var chatId = -1L
-		var userId = -1
+		var userId = -1L
 		var start = -1L
 		var livePeriod = -1L
 		var updateTextMessageId = 1
@@ -1473,7 +1489,8 @@ class TelegramSettings(private val app: TelegramApplication) {
 		var pendingMapMessage = false
 		var shouldSendViaBotTextMessage = false
 		var shouldSendViaBotMapMessage = false
-		var hasSharingError = false
+		var hasTextSharingError = false
+		var hasMapSharingError = false
 		var additionalActiveTime = ADDITIONAL_ACTIVE_TIME_VALUES_SEC[0]
 		var lastMapMessageHandled = false
 		var lastTextMessageHandled = false
@@ -1508,12 +1525,14 @@ class TelegramSettings(private val app: TelegramApplication) {
 			pendingTdLibText = 0
 			currentTextMessageId = -1L
 			pendingTextMessage = false
+			hasTextSharingError = false
 		}
 
 		fun resetMapMessageInfo() {
 			pendingTdLibMap = 0
 			currentMapMessageId = -1L
 			pendingMapMessage = false
+			hasMapSharingError = false
 		}
 
 		fun isTextMessageIdPresent() = currentTextMessageId != -1L

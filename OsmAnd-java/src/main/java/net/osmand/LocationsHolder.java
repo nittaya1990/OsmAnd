@@ -1,7 +1,7 @@
 package net.osmand;
 
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.data.LatLon;
+import net.osmand.gpx.GPXUtilities.WptPt;
 import net.osmand.util.Algorithms;
 
 import java.util.ArrayList;
@@ -127,6 +127,14 @@ public class LocationsHolder {
 			return locationList;
 		} else {
 			return getList(LOCATION_TYPE_LOCATION);
+		}
+	}
+
+	public long getTime(int index) {
+		if (this.locationType == LOCATION_TYPE_WPTPT) {
+			return wptPtList.get(index).time;
+		} else {
+			return 0;
 		}
 	}
 

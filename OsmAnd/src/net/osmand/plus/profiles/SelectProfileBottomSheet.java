@@ -1,8 +1,8 @@
 package net.osmand.plus.profiles;
 
+
 import android.app.Activity;
 import android.content.Context;
-import android.graphics.Typeface;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
 import android.text.SpannableString;
@@ -26,18 +26,19 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.bottomsheetmenu.BaseBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.DividerItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.ProgressWithTitleItem;
-import net.osmand.plus.helpers.FontCache;
 import net.osmand.plus.profiles.data.ProfileDataObject;
+import net.osmand.plus.profiles.data.RoutingDataObject;
 import net.osmand.plus.settings.bottomsheets.BasePreferenceBottomSheet;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.FontCache;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.widgets.multistatetoggle.TextToggleButton;
 import net.osmand.plus.widgets.multistatetoggle.TextToggleButton.TextRadioItem;
 import net.osmand.plus.widgets.tools.ClickableSpanTouchListener;
@@ -47,11 +48,12 @@ public abstract class SelectProfileBottomSheet extends BasePreferenceBottomSheet
 
 	public static final String TAG = SelectProfileBottomSheet.class.getSimpleName();
 
-	public final static String SELECTED_KEY = "selected_base";
+	public static final String SELECTED_KEY = "selected_base";
 
-	public final static String PROFILE_KEY_ARG = "profile_key_arg";
-	public final static String USE_LAST_PROFILE_ARG = "use_last_profile_arg";
-	public final static String PROFILES_LIST_UPDATED_ARG = "is_profiles_list_updated";
+	public static final String PROFILE_KEY_ARG = "profile_key_arg";
+	public static final String USE_LAST_PROFILE_ARG = "use_last_profile_arg";
+	public static final String PROFILES_LIST_UPDATED_ARG = "is_profiles_list_updated";
+	public static final String DERIVED_PROFILE_ARG = "derived_profile";
 
 	protected OsmandApplication app;
 	protected String selectedItemKey;
@@ -79,7 +81,7 @@ public abstract class SelectProfileBottomSheet extends BasePreferenceBottomSheet
 		});
 	}
 
-	protected void addProfileItem(final ProfileDataObject profile) {
+	protected void addProfileItem(ProfileDataObject profile) {
 		LayoutInflater inflater = UiUtilities.getInflater(getContext(), nightMode);
 		View itemView = inflater.inflate(getItemLayoutId(profile), null);
 
@@ -129,9 +131,8 @@ public abstract class SelectProfileBottomSheet extends BasePreferenceBottomSheet
 		itemView.findViewById(R.id.icon).setVisibility(View.GONE);
 		itemView.findViewById(R.id.description).setVisibility(View.GONE);
 
-		Typeface typeface = FontCache.getRobotoMedium(app);
 		String title = getString(titleId);
-		SpannableString spannable = UiUtilities.createCustomFontSpannable(typeface, title, title, title);
+		SpannableString spannable = UiUtilities.createCustomFontSpannable(FontCache.getMediumFont(), title, title, title);
 		int activeColor = ContextCompat.getColor(app, getActiveColorId());
 		ForegroundColorSpan colorSpan = new ForegroundColorSpan(activeColor);
 		spannable.setSpan(colorSpan, 0, title.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -225,7 +226,7 @@ public abstract class SelectProfileBottomSheet extends BasePreferenceBottomSheet
 		);
 	}
 
-	protected OnClickListener getItemClickListener(final ProfileDataObject profile) {
+	protected OnClickListener getItemClickListener(ProfileDataObject profile) {
 		return view -> onItemSelected(profile);
 	}
 
@@ -233,6 +234,9 @@ public abstract class SelectProfileBottomSheet extends BasePreferenceBottomSheet
 		Bundle args = new Bundle();
 		args.putString(PROFILE_KEY_ARG, profile.getStringKey());
 		args.putBoolean(PROFILES_LIST_UPDATED_ARG, isProfilesListUpdated(profile));
+		if (profile instanceof RoutingDataObject) {
+			args.putString(DERIVED_PROFILE_ARG, ((RoutingDataObject) profile).getDerivedProfile());
+		}
 		Fragment target = getTargetFragment();
 		if (target instanceof OnSelectProfileCallback) {
 			((OnSelectProfileCallback) target).onProfileSelected(args);
@@ -278,8 +282,8 @@ public abstract class SelectProfileBottomSheet extends BasePreferenceBottomSheet
 	@ColorRes
 	protected int getRouteInfoColorId() {
 		return nightMode ?
-				R.color.route_info_control_icon_color_dark :
-				R.color.route_info_control_icon_color_light;
+				R.color.icon_color_default_dark :
+				R.color.icon_color_default_light;
 	}
 
 	@Nullable

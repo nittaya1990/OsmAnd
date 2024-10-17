@@ -4,6 +4,14 @@
 	xmlns:tools="http://schemas.android.com/tools"
 	android:title="@string/monitoring_settings">
 
+	<Preference
+		android:key="disable_battery_optimization"
+		android:layout="@layout/preference_permission"
+		android:persistent="false"
+		android:summary="@string/read_more"
+		android:title="@string/battery_optimization_banner_content"
+		tools:icon="@drawable/ic_action_warning_colored" />
+
 	<net.osmand.plus.settings.preferences.SwitchPreferenceEx
 		android:key="show_trip_recording_start_dialog"
 		android:layout="@layout/preference_with_descr_dialog_and_switch"
@@ -17,9 +25,9 @@
 		android:layout="@layout/preference_category_with_descr"
 		android:title="@string/shared_string_navigation" />
 
-	<net.osmand.plus.settings.preferences.SwitchPreferenceEx
+	<SwitchPreferenceCompat
 		android:key="save_track_to_gpx"
-		android:layout="@layout/preference_with_descr_dialog_and_switch"
+		android:layout="@layout/preference_switch_with_descr"
 		android:summaryOff="@string/shared_string_disabled"
 		android:summaryOn="@string/shared_string_enabled"
 		android:title="@string/save_track_to_gpx"
@@ -28,11 +36,19 @@
 	<net.osmand.plus.settings.preferences.ListPreferenceEx
 		android:key="save_track_interval"
 		android:layout="@layout/preference_with_descr"
-		android:title="@string/save_track_interval"
+		android:title="@string/save_track_interval_globally"
 		tools:icon="@drawable/ic_action_time_span"
 		tools:summary="3 seconds" />
 
 	<Preference
+		android:key="save_track_to_gpx_description"
+		android:layout="@layout/preference_category_with_descr"
+		android:persistent="false"
+		android:selectable="false"
+		android:summary="@string/save_track_to_gpx_descrp"/>
+
+	<Preference
+		android:key="navigation_divider"
 		android:layout="@layout/simple_divider_item"
 		android:selectable="false" />
 
@@ -81,16 +97,34 @@
 		android:summaryOn="@string/shared_string_enabled"
 		android:title="@string/disable_recording_once_app_killed" />
 
-	<net.osmand.plus.settings.preferences.SwitchPreferenceEx
-		android:key="save_heading_to_gpx"
-		android:layout="@layout/preference_with_descr_dialog_and_switch"
-		android:summaryOff="@string/shared_string_disabled"
-		android:summaryOn="@string/shared_string_enabled"
-		android:title="@string/save_heading" />
-
 	<Preference
+		android:key="logging_accuracy_divider"
 		android:layout="@layout/simple_divider_item"
 		android:selectable="false" />
+
+	<PreferenceCategory
+		android:key="logging_data"
+		android:layout="@layout/preference_category_with_descr"
+		android:title="@string/save_track_external_sensors_data"/>
+
+	<Preference
+		android:key="open_sensor_settings"
+		android:layout="@layout/preference_with_descr"
+		android:title="@string/external_sensor_widgets"
+		tools:icon="@drawable/ic_action_sensor"
+		app:fragment="net.osmand.plus.plugins.externalsensors.ExternalSettingsWriteToTrackSettingsFragment"
+		app:isPreferenceVisible="false" />
+
+	<Preference
+		android:key="current_track_route_activity"
+		android:layout="@layout/preference_with_descr"
+		android:title="@string/shared_string_activity"
+		tools:icon="@drawable/ic_action_activity" />
+
+	<Preference
+		android:key="logging_data_divider"
+		android:layout="@layout/simple_divider_item"
+		android:selectable="false"/>
 
 	<net.osmand.plus.settings.preferences.ListPreferenceEx
 		android:key="track_storage_directory"
@@ -108,6 +142,7 @@
 		tools:icon="@drawable/ic_action_notification" />
 
 	<Preference
+		android:key="notification_divider"
 		android:layout="@layout/simple_divider_item"
 		android:selectable="false" />
 
@@ -121,6 +156,7 @@
 		tools:icon="@drawable/ic_world_globe_dark" />
 
 	<Preference
+		android:key="online_tracking_divider"
 		android:layout="@layout/simple_divider_item"
 		android:selectable="false" />
 
@@ -139,6 +175,7 @@
 		tools:icon="@drawable/ic_action_folder" />
 
 	<Preference
+		android:key="tracks_divider"
 		android:layout="@layout/divider_half_item"
 		android:selectable="false" />
 

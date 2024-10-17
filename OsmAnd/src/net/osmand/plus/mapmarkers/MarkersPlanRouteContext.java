@@ -2,20 +2,17 @@ package net.osmand.plus.mapmarkers;
 
 import android.util.Pair;
 
-import androidx.annotation.Nullable;
-
 import net.osmand.Location;
 import net.osmand.data.LatLon;
-import net.osmand.map.WorldRegion;
-import net.osmand.plus.routing.RouteCalculationProgressCallback;
-import net.osmand.plus.settings.backend.ApplicationMode;
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.routing.RouteCalculationParams;
+import net.osmand.plus.routing.RouteCalculationProgressListener;
 import net.osmand.plus.routing.RouteCalculationResult;
 import net.osmand.plus.routing.RoutingHelper;
+import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.router.RouteCalculationProgress;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.MapUtils;
 
 import java.util.ArrayList;
@@ -31,7 +28,7 @@ public class MarkersPlanRouteContext {
 
 	private static final int MAX_DIST_FOR_SNAP_TO_ROAD = 500 * 1000; // 500 km
 
-	private OsmandApplication app;
+	private final OsmandApplication app;
 
 	private final Map<Pair<WptPt, WptPt>, List<WptPt>> snappedToRoadPoints = new ConcurrentHashMap<>();
 	private final Queue<Pair<WptPt, WptPt>> snapToRoadPairsToCalculate = new ConcurrentLinkedQueue<>();
@@ -132,12 +129,7 @@ public class MarkersPlanRouteContext {
 		RoutingHelper routingHelper = app.getRoutingHelper();
 		if (!snapToRoadPairsToCalculate.isEmpty() && !routingHelper.isRouteBeingCalculated()) {
 			routingHelper.startRouteCalculationThread(getParams());
-			app.runInUIThread(new Runnable() {
-				@Override
-				public void run() {
-					listener.showProgressBar();
-				}
-			});
+			app.runInUIThread(listener::showProgressBar);
 		}
 	}
 
@@ -146,7 +138,8 @@ public class MarkersPlanRouteContext {
 		for (int i = 0; i < points.size() - 1; i++) {
 			Pair<WptPt, WptPt> pair = new Pair<>(points.get(i), points.get(i + 1));
 			if (snappedToRoadPoints.get(pair) == null) {
-				double dist = MapUtils.getDistance(pair.first.lat, pair.first.lon, pair.second.lat, pair.second.lon);
+				double dist = MapUtils.getDistance(pair.first.getLat(), pair.first.getLon(),
+						pair.second.getLat(), pair.second.getLon());
 				if (dist < MAX_DIST_FOR_SNAP_TO_ROAD) {
 					snapToRoadPairsToCalculate.add(pair);
 				}
@@ -155,29 +148,24 @@ public class MarkersPlanRouteContext {
 	}
 
 	void recreateSnapTrkSegment(boolean adjustMap) {
-		snapTrkSegment.points.clear();
+		snapTrkSegment.getPoints().clear();
 		List<WptPt> points = getPointsToCalculate();
 		if (snappedMode == ApplicationMode.DEFAULT) {
-			snapTrkSegment.points.addAll(points);
+			snapTrkSegment.getPoints().addAll(points);
 		} else if (points.size() > 1) {
 			for (int i = 0; i < points.size() - 1; i++) {
 				Pair<WptPt, WptPt> pair = new Pair<>(points.get(i), points.get(i + 1));
 				List<WptPt> pts = snappedToRoadPoints.get(pair);
 				if (pts != null) {
-					snapTrkSegment.points.addAll(pts);
+					snapTrkSegment.getPoints().addAll(pts);
 				} else {
 					scheduleRouteCalculateIfNotEmpty(points);
-					snapTrkSegment.points.addAll(Arrays.asList(pair.first, pair.second));
+					snapTrkSegment.getPoints().addAll(Arrays.asList(pair.first, pair.second));
 				}
 			}
 		}
 		listener.showMarkersRouteOnMap(adjustMap);
-		app.runInUIThread(new Runnable() {
-			@Override
-			public void run() {
-				listener.updateText();
-			}
-		});
+		app.runInUIThread(listener::updateText);
 	}
 
 	private List<WptPt> getPointsToCalculate() {
@@ -199,13 +187,13 @@ public class MarkersPlanRouteContext {
 
 	private void addWptPt(List<WptPt> points, double lat, double lon) {
 		WptPt pt = new WptPt();
-		pt.lat = lat;
-		pt.lon = lon;
+		pt.setLat(lat);
+		pt.setLon(lon);
 		points.add(pt);
 	}
 
 	private RouteCalculationParams getParams() {
-		final Pair<WptPt, WptPt> currentPair = snapToRoadPairsToCalculate.poll();
+		Pair<WptPt, WptPt> currentPair = snapToRoadPairsToCalculate.poll();
 
 		Location start = new Location("");
 		start.setLatitude(currentPair.first.getLatitude());
@@ -213,22 +201,22 @@ public class MarkersPlanRouteContext {
 
 		LatLon end = new LatLon(currentPair.second.getLatitude(), currentPair.second.getLongitude());
 
-		final RouteCalculationParams params = new RouteCalculationParams();
+		RouteCalculationParams params = new RouteCalculationParams();
 		params.start = start;
 		params.end = end;
 		RoutingHelper.applyApplicationSettings(params, app.getSettings(), snappedMode);
 		params.mode = snappedMode;
 		params.ctx = app;
 		params.calculationProgress = calculationProgress = new RouteCalculationProgress();
-		params.calculationProgressCallback = new RouteCalculationProgressCallback() {
+		params.calculationProgressListener = new RouteCalculationProgressListener() {
 
 			@Override
-			public void start() {
+			public void onCalculationStart() {
 
 			}
 
 			@Override
-			public void updateProgress(int progress) {
+			public void onUpdateCalculationProgress(int progress) {
 				int pairs = calculatedPairs + snapToRoadPairsToCalculate.size();
 				if (pairs != 0) {
 					int pairProgress = 100 / pairs;
@@ -238,15 +226,11 @@ public class MarkersPlanRouteContext {
 			}
 
 			@Override
-			public void requestPrivateAccessRouting() {
+			public void onRequestPrivateAccessRouting() {
 			}
 
 			@Override
-			public void updateMissingMaps(@Nullable List<WorldRegion> missingMaps, boolean onlineSearch) {
-			}
-
-			@Override
-			public void finish() {
+			public void onCalculationFinish() {
 				calculatedPairs = 0;
 			}
 		};
@@ -257,28 +241,18 @@ public class MarkersPlanRouteContext {
 				ArrayList<WptPt> pts = new ArrayList<>(locations.size());
 				for (Location loc : locations) {
 					WptPt pt = new WptPt();
-					pt.lat = loc.getLatitude();
-					pt.lon = loc.getLongitude();
+					pt.setLat(loc.getLatitude());
+					pt.setLon(loc.getLongitude());
 					pts.add(pt);
 				}
 				calculatedPairs++;
 				snappedToRoadPoints.put(currentPair, pts);
 				recreateSnapTrkSegment(false);
-				app.runInUIThread(new Runnable() {
-					@Override
-					public void run() {
-						listener.refresh();
-					}
-				});
+				app.runInUIThread(listener::refresh);
 				if (!snapToRoadPairsToCalculate.isEmpty()) {
 					app.getRoutingHelper().startRouteCalculationThread(getParams());
 				} else {
-					app.runInUIThread(new Runnable() {
-						@Override
-						public void run() {
-							listener.hideProgressBar(false);
-						}
-					});
+					app.runInUIThread(() -> listener.hideProgressBar(false));
 				}
 			}
 		};

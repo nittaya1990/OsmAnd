@@ -9,10 +9,10 @@ import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
-import net.osmand.AndroidUtils;
-import net.osmand.GPXUtilities.GPXFile;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.shared.gpx.GpxFile;
 import net.osmand.plus.R;
-import net.osmand.plus.helpers.GpxUiHelper;
+import net.osmand.plus.track.helpers.GpxUiHelper;
 import net.osmand.plus.mapmarkers.ItineraryDataHelper;
 import net.osmand.plus.mapmarkers.MapMarker;
 
@@ -74,7 +74,7 @@ public class MarkersHistorySettingsFragment extends HistoryItemsFragment {
 	protected void shareItems() {
 		List<MapMarker> mapMarkers = getSelectedMarkers();
 		ItineraryDataHelper dataHelper = app.getMapMarkersHelper().getDataHelper();
-		GPXFile gpxFile = dataHelper.generateGpx(mapMarkers, true);
+		GpxFile gpxFile = dataHelper.generateGpx(mapMarkers, true);
 		GpxUiHelper.saveAndShareGpx(app, gpxFile);
 	}
 

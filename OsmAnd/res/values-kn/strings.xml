@@ -35,7 +35,7 @@
     <string name="shared_string_go">ಹೋಗು</string>
     <string name="osmand_parking_overdue">ಕಾಲಮೀರಿದ</string>
     <string name="osmand_parking_hour">ಗಂಟೆ</string>
-    <string name="osmand_parking_minute">ನಿಮಿಷ</string>
+    <string name="shared_string_minute_lowercase">ನಿಮಿಷ</string>
     <string name="osmand_parking_time_left">ಉಳಿದ ಸಮಯ</string>
     <string name="your_edits">ನಿಮ್ಮ ಸಂಪಾದನೆಗಳು</string>
     <string name="tips_and_tricks_descr">ಹೆಚ್ಚಾಗಿ ಕೆಳಲಾಗುವ ಪ್ರಶ್ನೆಗಳು, ಇತ್ತೀಚಿನ ಬದಲಾವಣೆಗಳು, ಮತ್ತು ಇತರೆ</string>
@@ -258,7 +258,7 @@
     <string name="enter_gpx_name">GPX ಕಡತದ ಹೆಸರು:</string>
     <string name="shared_string_to">ಗೆ</string>
     <string name="mapillary_menu_date_from">ಇಂದ</string>
-    <string name="mapillary_menu_title_dates">ದಿನಾಂಕಗಳು</string>
+    <string name="shared_string_date">ದಿನಾಂಕಗಳು</string>
     <string name="mapillary_menu_edit_text_hint">ಬಳಕೆದಾರರ ಹೆಸರನ್ನು ಟೈಪ್ ಮಾಡಿ</string>
     <string name="mapillary_menu_title_username">ಬಳಕೆದಾರರ ಹೆಸರು</string>
     <string name="mapillary_image">Mapillary ಚಿತ್ರ</string>
@@ -290,7 +290,6 @@
     <string name="shared_string_memory_used_gb_desc">%1$s GB ಬಳಸಲಾಗಿದೆ</string>
     <string name="shared_string_memory_used_mb_desc">%1$s MB ಬಳಸಲಾಗಿದೆ</string>
     <string name="shared_string_memory_used_kb_desc">%1$s kB ಬಳಸಲಾಗುತ್ತದೆ</string>
-    <string name="contour_lines_and_hillshade">ಬಾಹ್ಯರೇಖೆ ರೇಖೆಗಳು ಮತ್ತು ಹಿಲ್ಶೇಡ್</string>
     <string name="routing_attr_prefer_unpaved_name">ಸುಸಜ್ಜಿತ ರಸ್ತೆಗಳಿಗೆ ಆದ್ಯತೆ ನೀಡಿ</string>
     <string name="routing_attr_prefer_unpaved_description">ಸುಸಜ್ಜಿತ ರಸ್ತೆಗಳಿಗೆ ಆದ್ಯತೆ ನೀಡಿ.</string>
     <string name="update_all_maps">ಎಲ್ಲಾ ನಕ್ಷೆಗಳನ್ನು ನವೀಕರಿಸಿ</string>

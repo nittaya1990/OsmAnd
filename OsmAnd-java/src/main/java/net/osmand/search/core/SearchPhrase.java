@@ -22,7 +22,8 @@ import net.osmand.util.MapUtils;
 // Immutable object !
 public class SearchPhrase {
 	public static final String DELIMITER = " ";
-	private static final String ALLDELIMITERS = "\\s|,|-";
+	public static final String ALLDELIMITERS = "\\s|,";
+	public static final String ALLDELIMITERS_WITH_HYPHEN = "\\s|,|-";
 	private static final Pattern reg = Pattern.compile(ALLDELIMITERS);
 	private static Comparator<String> commonWordsComparator;
 	private static Set<String> conjunctions = new TreeSet<>();
@@ -30,6 +31,8 @@ public class SearchPhrase {
 	private final Collator clt;
 	private final SearchSettings settings;
 	private List<BinaryMapIndexReader> indexes;
+	
+	private BinaryMapIndexReader fileRequest;
 	
 	// Object consists of 2 part [known + unknown] 
 	private String fullTextSearchPhrase = "";
@@ -53,7 +56,7 @@ public class SearchPhrase {
 	private List<NameStringMatcher> unknownWordsMatcher = new ArrayList<>();
 
 	private AbstractPoiType unselectedPoiType;
-	
+	private boolean acceptPrivate;
 	private QuadRect cache1kmRect;
 	
 	static {
@@ -153,15 +156,26 @@ public class SearchPhrase {
 		return clt;
 	}
 	
+	public BinaryMapIndexReader getFileRequest() {
+		return fileRequest;
+	}
+	
+	public SearchPhrase generateNewPhrase(SearchPhrase phrase, BinaryMapIndexReader file) {
+		SearchPhrase nphrase = generateNewPhrase(phrase.getUnknownSearchPhrase(), phrase.getSettings());
+		nphrase.fileRequest = file;
+		return nphrase;
+	}
+	
 	
 	public SearchPhrase generateNewPhrase(String text, SearchSettings settings) {
 		String textToSearch = Algorithms.normalizeSearchText(text);
 		List<SearchWord> leftWords = this.words;
 		String thisTxt = getText(true);
 		List<SearchWord> foundWords = new ArrayList<>();
-		if (text.startsWith(thisTxt)) {
+		thisTxt = Algorithms.normalizeSearchText(thisTxt);
+		if (textToSearch.startsWith(thisTxt)) {
 			// string is longer
-			textToSearch = text.substring(getText(false).length());
+			textToSearch = textToSearch.substring(getText(false).length());
 			foundWords.addAll(this.words);
 			leftWords = leftWords.subList(leftWords.size(), leftWords.size());
 		}
@@ -173,8 +187,7 @@ public class SearchPhrase {
 				break;
 			}
 		}
-		SearchPhrase sp = createNewSearchPhrase(settings, text, foundWords, textToSearch);
-		return sp;
+		return createNewSearchPhrase(settings, text, foundWords, textToSearch);
 	}
 
 	
@@ -236,11 +249,11 @@ public class SearchPhrase {
 		return false;
 	}
 
-	public static List<String> splitWords(String w, List<String> ws) {
+	public static List<String> splitWords(String w, List<String> ws, String delimiters) {
 		if (!Algorithms.isEmpty(w)) {
-			String[] wrs = w.split(ALLDELIMITERS);
-			for (int i = 0; i < wrs.length; i++) {
-				String wd = wrs[i].trim();
+			String[] wrs = w.split(delimiters);
+			for (String wr : wrs) {
+				String wd = wr.trim();
 				if (wd.length() > 0) {
 					ws.add(wd);
 				}
@@ -297,13 +310,13 @@ public class SearchPhrase {
 		List<String> unknownSearchWords = otherUnknownWords;
 		mainUnknownWordToSearch = firstUnknownSearchWord;
 		mainUnknownSearchWordComplete = lastUnknownSearchWordComplete;
-		if (unknownSearchWords.size() > 0) {
+		if (!unknownSearchWords.isEmpty()) {
 			mainUnknownSearchWordComplete = true;
 			List<String> searchWords = new ArrayList<>(unknownSearchWords);
 			searchWords.add(0, getFirstUnknownSearchWord());
 			Collections.sort(searchWords, commonWordsComparator);
 			for (String s : searchWords) {
-				if (s.length() > 0 && !Character.isDigit(s.charAt(0)) && !LocationParser.isValidOLC(s)) {
+				if (s.length() > 0 && !LocationParser.isValidOLC(s)) {
 					mainUnknownWordToSearch = s.trim();
 					if (mainUnknownWordToSearch.endsWith(".")) {
 						mainUnknownWordToSearch = mainUnknownWordToSearch.substring(0,
@@ -358,6 +371,14 @@ public class SearchPhrase {
 		return hasMoreThanOneUnknownSearchWord() || isLastUnknownSearchWordComplete();
 	}
 
+	public boolean isAcceptPrivate() {
+		return acceptPrivate;
+	}
+
+	public void setAcceptPrivate(boolean acceptPrivate) {
+		this.acceptPrivate = acceptPrivate;
+	}
+
 	public String getFullSearchPhrase() {
 		return fullTextSearchPhrase;
 	}
@@ -371,6 +392,11 @@ public class SearchPhrase {
 	}
 	
 	public QuadRect getRadiusBBoxToSearch(int radius) {
+		QuadRect searchBBox31 = this.settings.getSearchBBox31();
+		if (searchBBox31 != null) {
+			return searchBBox31;
+		}
+		
 		int radiusInMeters = getRadiusSearch(radius);
 		QuadRect cache1kmRect = get1km31Rect();
 		if(cache1kmRect == null) {
@@ -523,7 +549,7 @@ public class SearchPhrase {
 	}
 	
 
-	private void addResult(SearchResult res, SearchPhrase sp) {
+	public void addResult(SearchResult res, SearchPhrase sp) {
 		SearchWord sw = new SearchWord(res.wordsSpan != null ? res.wordsSpan : res.localeName.trim(), res);
 		sp.words.add(0, sw);
 	}
@@ -573,10 +599,6 @@ public class SearchPhrase {
 			unknownWordsMatcher.add(getNameStringMatcher(otherUnknownWords.get(ind), completeMatch));
 		}
 		return unknownWordsMatcher.get(i);
-	}
-
-	public NameStringMatcher getFullNameStringMatcher() {
-		return getNameStringMatcher(fullTextSearchPhrase, false);
 	}
 
 	private NameStringMatcher getNameStringMatcher(String word, boolean complete) {
@@ -911,17 +933,13 @@ public class SearchPhrase {
 
 	private boolean isTextComplete(String fullText) {
 		boolean lastUnknownSearchWordComplete = false;
-		if (fullText.length() > 0 ) {
+		if (fullText.length() > 0) {
 			char ch = fullText.charAt(fullText.length() - 1);
-			lastUnknownSearchWordComplete  = ch == ' ' || ch == ',' || ch == '\r' || ch == '\n'
+			lastUnknownSearchWordComplete = ch == ' ' || ch == ',' || ch == '\r' || ch == '\n'
 					|| ch == ';';
 		}
 		return lastUnknownSearchWordComplete;
 	}
-
-	
-
-	
 
 	
 }

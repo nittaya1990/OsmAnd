@@ -1,67 +1,72 @@
 package net.osmand.plus.views.mapwidgets.widgets;
 
+import static net.osmand.plus.views.mapwidgets.WidgetType.DISTANCE_TO_DESTINATION;
+import static net.osmand.plus.views.mapwidgets.WidgetType.INTERMEDIATE_DESTINATION;
+
 import android.view.View;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import net.osmand.Location;
 import net.osmand.data.LatLon;
-import net.osmand.plus.OsmAndFormatter;
 import net.osmand.plus.activities.MapActivity;
+import net.osmand.plus.helpers.TargetPointsHelper;
+import net.osmand.plus.helpers.TargetPointsHelper.TargetPoint;
+import net.osmand.plus.utils.OsmAndFormatter;
+import net.osmand.plus.utils.OsmAndFormatter.FormattedValue;
 import net.osmand.plus.views.AnimateDraggingMapThread;
-import net.osmand.plus.views.OsmandMapLayer;
 import net.osmand.plus.views.OsmandMapTileView;
-import net.osmand.plus.views.mapwidgets.RouteInfoWidgetsFactory;
+import net.osmand.plus.views.layers.base.OsmandMapLayer.DrawSettings;
+import net.osmand.plus.views.mapwidgets.WidgetType;
+import net.osmand.plus.views.mapwidgets.WidgetsPanel;
 
-public abstract class DistanceToPointWidget extends TextInfoWidget {
+public abstract class DistanceToPointWidget extends SimpleWidget {
+
+	private static final int DISTANCE_CHANGE_THRESHOLD = 10;
+	private static final int DESTINATION_REACHED_THRESHOLD = 20;
 
 	private final OsmandMapTileView view;
-	private float[] calculations = new float[1];
+	private final float[] calculations = new float[1];
 	private int cachedMeters;
 
-	public DistanceToPointWidget(MapActivity ma, int res, int resNight) {
-		super(ma);
-		this.view = ma.getMapView();
-		if (res != 0 && resNight != 0) {
-			setIcons(res, resNight);
-		}
-		setText(null, null);
-		setOnClickListener(new View.OnClickListener() {
+	public DistanceToPointWidget(@NonNull MapActivity mapActivity, @NonNull WidgetType widgetType, @Nullable String customId, @Nullable WidgetsPanel widgetsPanel) {
+		super(mapActivity, widgetType, customId, widgetsPanel);
+		this.view = mapActivity.getMapView();
 
-			@Override
-			public void onClick(View v) {
-				click(view);
-			}
-		});
+		setIcons(widgetType);
+		setText(null, null);
+		setOnClickListener(getOnClickListener());
 	}
 
-	protected void click(final OsmandMapTileView view) {
+	@Override
+	protected View.OnClickListener getOnClickListener() {
+		return v -> onClick(view);
+	}
+
+	protected void onClick(OsmandMapTileView view) {
 		AnimateDraggingMapThread thread = view.getAnimatedDraggingThread();
 		LatLon pointToNavigate = getPointToNavigate();
 		if (pointToNavigate != null) {
 			int fZoom = Math.max(view.getZoom(), 15);
-			thread.startMoving(pointToNavigate.getLatitude(), pointToNavigate.getLongitude(), fZoom, true);
+			thread.startMoving(pointToNavigate.getLatitude(), pointToNavigate.getLongitude(), fZoom);
 		}
 	}
 
 	@Override
-	public boolean updateInfo(OsmandMapLayer.DrawSettings drawSettings) {
-		int d = getDistance();
-		if (isUpdateNeeded() || RouteInfoWidgetsFactory.distChanged(cachedMeters, d)) {
-			cachedMeters = d;
-			if (cachedMeters <= 20) {
+	protected void updateSimpleWidgetInfo(@Nullable DrawSettings drawSettings) {
+		int distance = getDistance();
+		if (isUpdateNeeded() || cachedMeters == 0 || Math.abs(cachedMeters - distance) > DISTANCE_CHANGE_THRESHOLD) {
+			cachedMeters = distance;
+			if (cachedMeters <= DESTINATION_REACHED_THRESHOLD) {
 				cachedMeters = 0;
-				setText(null, null);
+				setText(isVerticalWidget() ? NO_VALUE : null, null);
 			} else {
-				String ds = OsmAndFormatter.getFormattedDistance(cachedMeters, view.getApplication());
-				int ls = ds.lastIndexOf(' ');
-				if (ls == -1) {
-					setText(ds, null);
-				} else {
-					setText(ds.substring(0, ls), ds.substring(ls + 1));
-				}
+				FormattedValue formattedDistance = OsmAndFormatter
+						.getFormattedDistanceValue(cachedMeters, app, OsmAndFormatter.OsmAndFormatterParams.USE_LOWER_BOUNDS);
+				setText(formattedDistance.value, formattedDistance.unit);
 			}
-			return true;
 		}
-		return false;
 	}
 
 	@Override
@@ -79,5 +84,57 @@ public abstract class DistanceToPointWidget extends TextInfoWidget {
 			d = (int) calculations[0];
 		}
 		return d;
+	}
+
+	public static class DistanceToDestinationWidget extends DistanceToPointWidget {
+
+		public DistanceToDestinationWidget(@NonNull MapActivity mapActivity, @Nullable String customId, @Nullable WidgetsPanel panel) {
+			super(mapActivity, DISTANCE_TO_DESTINATION, customId, panel);
+		}
+
+		@Override
+		public LatLon getPointToNavigate() {
+			TargetPoint targetPoint = mapActivity.getPointToNavigate();
+			return targetPoint == null ? null : targetPoint.point;
+		}
+
+		@Override
+		public int getDistance() {
+			return routingHelper.isRouteCalculated()
+					? routingHelper.getLeftDistance()
+					: super.getDistance();
+		}
+	}
+
+	public static class DistanceToIntermediateDestinationWidget extends DistanceToPointWidget {
+
+		private final TargetPointsHelper targetPointsHelper;
+
+		public DistanceToIntermediateDestinationWidget(@NonNull MapActivity mapActivity, @Nullable String customId, @Nullable WidgetsPanel panel) {
+			super(mapActivity, INTERMEDIATE_DESTINATION, customId, panel);
+			targetPointsHelper = app.getTargetPointsHelper();
+		}
+
+		@Override
+		protected void onClick(OsmandMapTileView view) {
+			if (targetPointsHelper.getIntermediatePoints().size() > 1) {
+				mapActivity.getMapActions().openIntermediatePointsDialog();
+			} else {
+				super.onClick(view);
+			}
+		}
+
+		@Override
+		public LatLon getPointToNavigate() {
+			TargetPoint targetPoint = targetPointsHelper.getFirstIntermediatePoint();
+			return targetPoint == null ? null : targetPoint.point;
+		}
+
+		@Override
+		public int getDistance() {
+			return getPointToNavigate() != null && routingHelper.isRouteCalculated()
+					? routingHelper.getLeftDistanceNextIntermediate()
+					: super.getDistance();
+		}
 	}
 }

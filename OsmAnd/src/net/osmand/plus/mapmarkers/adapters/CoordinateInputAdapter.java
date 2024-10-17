@@ -1,5 +1,6 @@
 package net.osmand.plus.mapmarkers.adapters;
 
+import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -8,28 +9,29 @@ import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
-import net.osmand.AndroidUtils;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.WptPt;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
-import net.osmand.plus.UiUtilities.UpdateLocationViewCache;
-import net.osmand.plus.base.PointImageDrawable;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.UiUtilities;
+import net.osmand.plus.utils.UpdateLocationUtils;
+import net.osmand.plus.utils.UpdateLocationUtils.UpdateLocationViewCache;
+import net.osmand.plus.views.PointImageUtils;
 
 
 public class CoordinateInputAdapter extends RecyclerView.Adapter<MapMarkerItemViewHolder> {
 
 	public static final String ADAPTER_POSITION_KEY = "adapter_position_key";
-	private GPXFile gpx;
+	private GpxFile gpx;
 
-	private OsmandApplication app;
+	private final OsmandApplication app;
 
-	private UiUtilities uiUtilities;
-	private UpdateLocationViewCache updateViewCache;
+	private final UiUtilities uiUtilities;
+	private final UpdateLocationViewCache updateViewCache;
 
-	private boolean nightTheme;
+	private final boolean nightTheme;
 
 	private View.OnClickListener listener;
 	private View.OnClickListener actionsListener;
@@ -42,12 +44,12 @@ public class CoordinateInputAdapter extends RecyclerView.Adapter<MapMarkerItemVi
 		this.actionsListener = actionsListener;
 	}
 	
-	public CoordinateInputAdapter(OsmandApplication app, GPXFile gpx) {
-		this.app = app;
+	public CoordinateInputAdapter(@NonNull Context context, GpxFile gpx) {
+		this.app = (OsmandApplication) context.getApplicationContext();
 		this.gpx = gpx;
 
 		uiUtilities = app.getUIUtilities();
-		updateViewCache = uiUtilities.getUpdateLocationViewCache();
+		updateViewCache = UpdateLocationUtils.getUpdateLocationViewCache(context);
 		nightTheme = !app.getSettings().isLightContent();
 	}
 
@@ -60,14 +62,14 @@ public class CoordinateInputAdapter extends RecyclerView.Adapter<MapMarkerItemVi
 	}
 
 	@Override
-	public void onBindViewHolder(@NonNull final MapMarkerItemViewHolder holder, int position) {
+	public void onBindViewHolder(@NonNull MapMarkerItemViewHolder holder, int position) {
 		WptPt wpt = getItem(position);
 
 		holder.iconDirection.setVisibility(View.VISIBLE);
-		holder.icon.setImageDrawable(PointImageDrawable.getFromWpt(app, wpt.getColor(), false, wpt));
+		holder.icon.setImageDrawable(PointImageUtils.getFromPoint(app, wpt.getColor(), false, wpt));
 		holder.mainLayout.setBackgroundColor(ColorUtilities.getListBgColor(app, nightTheme));
 		holder.title.setTextColor(ColorUtilities.getPrimaryTextColor(app, nightTheme));
-		holder.divider.setBackgroundColor(ContextCompat.getColor(app, nightTheme ? R.color.coordinate_input_edit_text_normal_dark : R.color.divider_color_light));
+		holder.divider.setBackgroundColor(ContextCompat.getColor(app, nightTheme ? R.color.divider_color_dark : R.color.divider_color_light));
 		holder.iconReorder.setVisibility(View.GONE);
 		holder.numberText.setVisibility(View.VISIBLE);
 		holder.numberText.setText(String.valueOf(position + 1));
@@ -84,8 +86,8 @@ public class CoordinateInputAdapter extends RecyclerView.Adapter<MapMarkerItemVi
 		holder.bottomShadow.setVisibility(lastItem ? View.VISIBLE : View.GONE);
 		holder.divider.setVisibility((!singleItem && !lastItem) ? View.VISIBLE : View.GONE);
 
-		holder.title.setText(wpt.name);
-		uiUtilities.updateLocationView(updateViewCache, holder.iconDirection, holder.distance, wpt.lat, wpt.lon);
+		holder.title.setText(wpt.getName());
+		UpdateLocationUtils.updateLocationView(app, updateViewCache, holder.iconDirection, holder.distance, wpt.getLat(), wpt.getLon());
 	}
 
 	@Override
@@ -98,11 +100,11 @@ public class CoordinateInputAdapter extends RecyclerView.Adapter<MapMarkerItemVi
 	}
 
 	public WptPt getItem(int position) {
-		return gpx.getPoints().get(position);
+		return gpx.getPointsList().get(position);
 	}
 
 	public int getItemPosition(WptPt wptPt) {
-		return gpx.getPoints().indexOf(wptPt);
+		return gpx.getPointsList().indexOf(wptPt);
 	}
 
 	public void removeItem(int position) {
@@ -112,7 +114,7 @@ public class CoordinateInputAdapter extends RecyclerView.Adapter<MapMarkerItemVi
 		}
 	}
 	
-	public void setGpx(GPXFile gpx) {
+	public void setGpx(GpxFile gpx) {
 		this.gpx = gpx;
 		notifyDataSetChanged();
 	}

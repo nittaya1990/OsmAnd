@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.Context;
 import android.graphics.drawable.Drawable;
 import android.os.Build;
-import android.os.Build.VERSION_CODES;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -17,12 +16,12 @@ import android.widget.LinearLayout.LayoutParams;
 import androidx.annotation.LayoutRes;
 import androidx.core.content.ContextCompat;
 
-import net.osmand.AndroidUtils;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.UiUtilities;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -32,42 +31,42 @@ public class AppModeDialog {
 
 	//special method for drawer menu
 	//needed because if there's more than 4 items  - the don't fit in drawer
-	public static View prepareAppModeDrawerView(Activity a, final Set<ApplicationMode> selected,
-												boolean useMapTheme, final View.OnClickListener onClickListener) {
+	public static View prepareAppModeDrawerView(Activity a, Set<ApplicationMode> selected,
+												boolean useMapTheme, View.OnClickListener onClickListener) {
 		OsmandApplication app = (OsmandApplication) a.getApplication();
 		OsmandSettings settings = app.getSettings();
-		final List<ApplicationMode> values = new ArrayList<>(ApplicationMode.values(app));
+		List<ApplicationMode> values = new ArrayList<>(ApplicationMode.values(app));
 		selected.add(settings.getApplicationMode());
 		return prepareAppModeView(a, values, selected, null, true, true, useMapTheme, onClickListener);
 	}
 
-	public static View prepareAppModeView(Activity a, final List<ApplicationMode> values, final Set<ApplicationMode> selected,
-										  ViewGroup parent, final boolean singleSelection, boolean useListBg, boolean useMapTheme, final View.OnClickListener onClickListener) {
+	public static View prepareAppModeView(Activity a, List<ApplicationMode> values, Set<ApplicationMode> selected,
+										  ViewGroup parent, boolean singleSelection, boolean useListBg, boolean useMapTheme, View.OnClickListener onClickListener) {
 		boolean nightMode = isNightMode(((OsmandApplication) a.getApplication()), useMapTheme);
 
 		return prepareAppModeView(a, values, selected, parent, singleSelection, useListBg, useMapTheme, onClickListener, nightMode);
 	}
 
-	public static View prepareAppModeView(Activity a, final List<ApplicationMode> values, final Set<ApplicationMode> selected,
-										  ViewGroup parent, final boolean singleSelection, boolean useListBg, boolean useMapTheme, final View.OnClickListener onClickListener, boolean nightMode) {
+	public static View prepareAppModeView(Activity a, List<ApplicationMode> values, Set<ApplicationMode> selected,
+										  ViewGroup parent, boolean singleSelection, boolean useListBg, boolean useMapTheme, View.OnClickListener onClickListener, boolean nightMode) {
 		OsmandApplication app = (OsmandApplication) a.getApplication();
-		final View ll = a.getLayoutInflater().inflate(R.layout.mode_toggles, parent);
+		View ll = a.getLayoutInflater().inflate(R.layout.mode_toggles, parent);
 		if (useListBg) {
 			AndroidUtils.setListItemBackground(a, ll, nightMode);
 		} else {
-			ll.setBackgroundColor(ContextCompat.getColor(a, nightMode ? R.color.route_info_bg_dark : R.color.route_info_bg_light));
+			ll.setBackgroundColor(ContextCompat.getColor(a, nightMode ? R.color.card_and_list_background_dark : R.color.card_and_list_background_light));
 		}
-		final View[] buttons = new View[values.size()];
+		View[] buttons = new View[values.size()];
 		int k = 0;
 		for (ApplicationMode ma : values) {
-			buttons[k++] = createToggle(a.getLayoutInflater(), app, R.layout.mode_view, (LinearLayout) ll.findViewById(R.id.app_modes_content), ma, useMapTheme);
+			buttons[k++] = createToggle(a.getLayoutInflater(), app, R.layout.mode_view, ll.findViewById(R.id.app_modes_content), ma, useMapTheme);
 		}
 		for (int i = 0; i < buttons.length; i++) {
 			updateButtonState(app, values, selected, onClickListener, buttons, i, singleSelection, useMapTheme, nightMode);
 		}
 
 		ApplicationMode activeMode = app.getSettings().getApplicationMode();
-		final int idx = values.indexOf(activeMode);
+		int idx = values.indexOf(activeMode);
 
 		OnGlobalLayoutListener globalListener = new OnGlobalLayoutListener() {
 			@Override
@@ -76,11 +75,7 @@ public class AppModeDialog {
 				LinearLayout container = ll.findViewById(R.id.app_modes_content);
 				int s = container.getChildAt(idx) != null ? container.getChildAt(idx).getRight() : 0;
 				scrollView.scrollTo(Math.max(s - scrollView.getWidth(), 0), 0);
-				if (Build.VERSION.SDK_INT >= VERSION_CODES.JELLY_BEAN) {
-					ll.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-				} else {
-					ll.getViewTreeObserver().removeGlobalOnLayoutListener(this);
-				}
+				ll.getViewTreeObserver().removeOnGlobalLayoutListener(this);
 			}
 		};
 		ll.getViewTreeObserver().addOnGlobalLayoutListener(globalListener);
@@ -89,16 +84,16 @@ public class AppModeDialog {
 	}
 
 
-	public static void updateButtonState(final OsmandApplication app, final List<ApplicationMode> visible,
-										 final Set<ApplicationMode> selected, final View.OnClickListener onClickListener, final View[] buttons,
-										 int i, final boolean singleChoice, final boolean useMapTheme, final boolean nightMode) {
+	public static void updateButtonState(OsmandApplication app, List<ApplicationMode> visible,
+	                                     Set<ApplicationMode> selected, View.OnClickListener onClickListener, View[] buttons,
+	                                     int i, boolean singleChoice, boolean useMapTheme, boolean nightMode) {
 		Context themedCtx = UiUtilities.getThemedContext(app, nightMode);
 		if (buttons[i] != null) {
 			View tb = buttons[i];
-			final ApplicationMode mode = visible.get(i);
-			final boolean checked = selected.contains(mode);
-			final View selection = tb.findViewById(R.id.selection);
-			ImageView iv = (ImageView) tb.findViewById(R.id.app_mode_icon);
+			ApplicationMode mode = visible.get(i);
+			boolean checked = selected.contains(mode);
+			View selection = tb.findViewById(R.id.selection);
+			ImageView iv = tb.findViewById(R.id.app_mode_icon);
 			if (checked) {
 				iv.setImageDrawable(app.getUIUtilities().getPaintedIcon(mode.getIconRes(), mode.getProfileColor(nightMode)));
 				iv.setContentDescription(String.format("%s %s", mode.toHumanString(), app.getString(R.string.item_checked)));
@@ -142,14 +137,14 @@ public class AppModeDialog {
 		}
 	}
 
-	public static void updateButtonStateForRoute(final OsmandApplication ctx, final List<ApplicationMode> visible,
-												 final Set<ApplicationMode> selected, final View.OnClickListener onClickListener, final View[] buttons,
-												 int i, final boolean singleChoice, final boolean useMapTheme, final boolean nightMode) {
+	public static void updateButtonStateForRoute(OsmandApplication ctx, List<ApplicationMode> visible,
+	                                             Set<ApplicationMode> selected, View.OnClickListener onClickListener, View[] buttons,
+	                                             int i, boolean singleChoice, boolean useMapTheme, boolean nightMode) {
 		if (buttons[i] != null) {
 			View tb = buttons[i];
-			final ApplicationMode mode = visible.get(i);
-			final boolean checked = selected.contains(mode);
-			ImageView iv = (ImageView) tb.findViewById(R.id.app_mode_icon);
+			ApplicationMode mode = visible.get(i);
+			boolean checked = selected.contains(mode);
+			ImageView iv = tb.findViewById(R.id.app_mode_icon);
 			ImageView selection = tb.findViewById(R.id.selection);
 			Drawable drawable = ctx.getUIUtilities().getPaintedIcon(mode.getIconRes(), mode.getProfileColor(nightMode));
 			if (checked) {
@@ -207,11 +202,11 @@ public class AppModeDialog {
 		}
 	}
 
-	static public View createToggle(LayoutInflater layoutInflater, OsmandApplication ctx, @LayoutRes int layoutId, LinearLayout layout, ApplicationMode mode, boolean useMapTheme) {
+	public static View createToggle(LayoutInflater layoutInflater, OsmandApplication ctx, @LayoutRes int layoutId, LinearLayout layout, ApplicationMode mode, boolean useMapTheme) {
 		int metricsX = (int) ctx.getResources().getDimension(R.dimen.route_info_modes_height);
 		int metricsY = (int) ctx.getResources().getDimension(R.dimen.route_info_modes_height);
 		View tb = layoutInflater.inflate(layoutId, null);
-		ImageView iv = (ImageView) tb.findViewById(R.id.app_mode_icon);
+		ImageView iv = tb.findViewById(R.id.app_mode_icon);
 		iv.setImageDrawable(ctx.getUIUtilities().getPaintedIcon(mode.getIconRes(), mode.getProfileColor(isNightMode(ctx, useMapTheme))));
 		iv.setContentDescription(mode.toHumanString());
 		LayoutParams lp = new LinearLayout.LayoutParams(metricsX, metricsY);
@@ -219,11 +214,7 @@ public class AppModeDialog {
 		return tb;
 	}
 
-	private static boolean isNightMode(OsmandApplication ctx, boolean useMapTheme) {
-		if (useMapTheme) {
-			return ctx.getDaynightHelper().isNightModeForMapControls();
-		} else {
-			return !ctx.getSettings().isLightContent();
-		}
+	private static boolean isNightMode(OsmandApplication app, boolean usedOnMap) {
+		return app.getDaynightHelper().isNightMode(usedOnMap);
 	}
 }

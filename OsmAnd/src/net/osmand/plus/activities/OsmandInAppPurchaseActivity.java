@@ -1,9 +1,11 @@
 package net.osmand.plus.activities;
 
-import android.annotation.SuppressLint;
+import static net.osmand.plus.Version.FULL_VERSION_NAME;
+
 import android.app.Activity;
 import android.content.Intent;
 import android.net.Uri;
+import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -11,7 +13,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
-import net.osmand.AndroidUtils;
 import net.osmand.PlatformUtil;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.Version;
@@ -21,34 +22,69 @@ import net.osmand.plus.inapp.InAppPurchaseHelper.InAppPurchaseListener;
 import net.osmand.plus.inapp.InAppPurchaseHelper.InAppPurchaseTaskType;
 import net.osmand.plus.inapp.InAppPurchases.InAppPurchase;
 import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.TalkbackUtils;
+import net.osmand.plus.utils.TalkbackUtils.TalkbackHandler;
 
 import org.apache.commons.logging.Log;
 
 import java.lang.ref.WeakReference;
 import java.util.List;
 
-@SuppressLint("Registered")
-public class OsmandInAppPurchaseActivity extends AppCompatActivity implements InAppPurchaseListener {
+public class OsmandInAppPurchaseActivity extends AppCompatActivity implements InAppPurchaseListener, TalkbackHandler {
+
 	private static final Log LOG = PlatformUtil.getLog(OsmandInAppPurchaseActivity.class);
 
 	private InAppPurchaseHelper purchaseHelper;
 	private boolean activityDestroyed;
+	private boolean activityHiddenForTalkback = false;
+	protected FragmentManager.FragmentLifecycleCallbacks lifecycleCallbacks = TalkbackUtils.getLifecycleCallbacks(this);
 
 	@Override
 	protected void onResume() {
 		super.onResume();
 		initInAppPurchaseHelper();
+		getSupportFragmentManager().registerFragmentLifecycleCallbacks(lifecycleCallbacks, false);
+	}
+
+	@Override
+	protected void onPause() {
+		super.onPause();
+		getSupportFragmentManager().unregisterFragmentLifecycleCallbacks(lifecycleCallbacks);
+	}
+
+	@Override
+	public void setActivityAccessibility(boolean hideActivity) {
+		List<View> views = getHidingViews();
+		if (views == null) {
+			View view = getWindow().getDecorView();
+			TalkbackUtils.setActivityViewsAccessibility(view, hideActivity, this);
+		} else {
+			for (View hidingView : views) {
+				hidingView.setImportantForAccessibility(hideActivity ? View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS : View.IMPORTANT_FOR_ACCESSIBILITY_YES);
+			}
+		}
+	}
+
+	@Nullable
+	protected List<View> getHidingViews() {
+		return null;
+	}
+
+	@Override
+	public List<Fragment> getActiveTalkbackFragments() {
+		return getSupportFragmentManager().getFragments();
 	}
 
 	@Override
 	protected void onDestroy() {
 		super.onDestroy();
-		deinitInAppPurchaseHelper();
+		stopInAppPurchaseHelper();
 		activityDestroyed = true;
 	}
 
 	private void initInAppPurchaseHelper() {
-		deinitInAppPurchaseHelper();
+		stopInAppPurchaseHelper();
 		OsmandApplication app = getMyApplication();
 		OsmandSettings settings = app.getSettings();
 		if (purchaseHelper == null) {
@@ -60,7 +96,7 @@ public class OsmandInAppPurchaseActivity extends AppCompatActivity implements In
 			}
 		}
 		if (purchaseHelper != null) {
-			final WeakReference<OsmandInAppPurchaseActivity> activityRef = new WeakReference<>(this);
+			WeakReference<OsmandInAppPurchaseActivity> activityRef = new WeakReference<>(this);
 			purchaseHelper.isInAppPurchaseSupported(this, new InAppPurchaseInitCallback() {
 				@Override
 				public void onSuccess() {
@@ -85,14 +121,14 @@ public class OsmandInAppPurchaseActivity extends AppCompatActivity implements In
 		}
 	}
 
-	private void deinitInAppPurchaseHelper() {
+	private void stopInAppPurchaseHelper() {
 		if (purchaseHelper != null) {
 			purchaseHelper.resetUiActivity(this);
 			purchaseHelper.stop();
 		}
 	}
 
-	public static void purchaseFullVersion(@NonNull final Activity activity) {
+	public static void purchaseFullVersion(@NonNull Activity activity) {
 		OsmandApplication app = (OsmandApplication) activity.getApplication();
 		if (app != null && Version.isFreeVersion(app)) {
 			if (app.isPlusVersionInApp()) {
@@ -108,13 +144,13 @@ public class OsmandInAppPurchaseActivity extends AppCompatActivity implements In
 			} else {
 				app.logEvent("paid_version_redirect");
 				Intent intent = new Intent(Intent.ACTION_VIEW,
-						Uri.parse(Version.getUrlWithUtmRef(app, "net.osmand.plus")));
+						Uri.parse(Version.getUrlWithUtmRef(app, FULL_VERSION_NAME)));
 				AndroidUtils.startActivityIfSafe(activity, intent);
 			}
 		}
 	}
 
-	public static void purchaseDepthContours(@NonNull final Activity activity) {
+	public static void purchaseDepthContours(@NonNull Activity activity) {
 		OsmandApplication app = (OsmandApplication) activity.getApplication();
 		if (app != null) {
 			InAppPurchaseHelper purchaseHelper = app.getInAppPurchaseHelper();
@@ -129,7 +165,7 @@ public class OsmandInAppPurchaseActivity extends AppCompatActivity implements In
 		}
 	}
 
-	public static void purchaseContourLines(@NonNull final Activity activity) {
+	public static void purchaseContourLines(@NonNull Activity activity) {
 		OsmandApplication app = (OsmandApplication) activity.getApplication();
 		if (app != null) {
 			InAppPurchaseHelper purchaseHelper = app.getInAppPurchaseHelper();
@@ -144,6 +180,7 @@ public class OsmandInAppPurchaseActivity extends AppCompatActivity implements In
 		}
 	}
 
+	@NonNull
 	public OsmandApplication getMyApplication() {
 		return (OsmandApplication) getApplication();
 	}
@@ -275,5 +312,15 @@ public class OsmandInAppPurchaseActivity extends AppCompatActivity implements In
 
 	public void dismissInAppPurchaseProgress(InAppPurchaseTaskType taskType) {
 		// not implemented
+	}
+
+	@Override
+	public boolean isActivityHiddenForTalkback() {
+		return activityHiddenForTalkback;
+	}
+
+	@Override
+	public void setActivityHiddenForTalkback(boolean activityHiddenForTalkback) {
+		this.activityHiddenForTalkback = activityHiddenForTalkback;
 	}
 }

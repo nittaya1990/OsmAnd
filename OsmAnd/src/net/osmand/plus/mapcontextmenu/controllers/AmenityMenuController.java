@@ -14,8 +14,7 @@ import net.osmand.data.TransportStop;
 import net.osmand.osm.PoiCategory;
 import net.osmand.osm.PoiFilter;
 import net.osmand.osm.PoiType;
-import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
+import net.osmand.plus.plugins.PluginsHelper;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.mapcontextmenu.MenuBuilder;
@@ -35,12 +34,12 @@ import java.util.List;
 public class AmenityMenuController extends MenuController {
 
 	private Amenity amenity;
-	private MapMarker marker;
+	private final MapMarker marker;
 	private TransportStopController transportStopController;
 
 	public AmenityMenuController(@NonNull MapActivity mapActivity,
 	                             @NonNull PointDescription pointDescription,
-	                             @NonNull final Amenity amenity) {
+	                             @NonNull Amenity amenity) {
 		super(new AmenityMenuBuilder(mapActivity, amenity), pointDescription, mapActivity);
 		this.amenity = amenity;
 		if (amenity.getType().getKeyName().equals("transportation")) {
@@ -76,7 +75,7 @@ public class AmenityMenuController extends MenuController {
 				public void buttonPressed() {
 					MapActivity mapActivity = getMapActivity();
 					if (mapActivity != null) {
-						openTrack();
+						openTrack(mapActivity);
 					}
 				}
 			};
@@ -100,14 +99,13 @@ public class AmenityMenuController extends MenuController {
 		openingHoursInfo = OpeningHoursParser.getInfo(amenity.getOpeningHours());
 	}
 
-	void openTrack() {
-		OsmandApplication app = getMapActivity().getMyApplication();
-		TravelHelper travelHelper = app.getTravelHelper();
+	void openTrack(MapActivity mapActivity) {
+		TravelHelper travelHelper = mapActivity.getMyApplication().getTravelHelper();
 		String lang = amenity.getTagSuffix(Amenity.LANG_YES + ":");
 		String name = amenity.getTagContent(Amenity.ROUTE_NAME);
 		TravelArticle article = travelHelper.getArticleByTitle(name, lang, true, null);
 		if (article != null) {
-			travelHelper.openTrackMenu(article, getMapActivity(), name, amenity.getLocation());
+			travelHelper.openTrackMenu(article, mapActivity, name, amenity.getLocation());
 		}
 	}
 
@@ -132,9 +130,7 @@ public class AmenityMenuController extends MenuController {
 	public boolean needStreetName() {
 		if (amenity.getSubType() != null && amenity.getType() != null) {
 			PoiType pt = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-			if (pt != null && pt.getOsmTag() != null && pt.getOsmTag().equals("place")) {
-				return false;
-			}
+			return pt == null || pt.getOsmTag() == null || !pt.getOsmTag().equals("place");
 		}
 		return true;
 	}
@@ -145,21 +141,16 @@ public class AmenityMenuController extends MenuController {
 	}
 
 	public static int getRightIconId(Amenity amenity) {
-		String id = amenity.getGpxIcon();
-		if (id == null) {
-			PoiType st = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
-			if (st != null) {
-				if (RenderingIcons.containsBigIcon(st.getIconKeyName())) {
-					id = st.getIconKeyName();
-				} else if (RenderingIcons.containsBigIcon(st.getOsmTag() + "_" + st.getOsmValue())) {
-					id = st.getOsmTag() + "_" + st.getOsmValue();
-				}
+		String iconName = amenity.getGpxIcon();
+		if (iconName == null) {
+			String mapIconName = amenity.getMapIconName();
+			if (!Algorithms.isEmpty(mapIconName) && (RenderingIcons.containsBigIcon(mapIconName))) {
+				iconName = mapIconName;
+			} else {
+				iconName = RenderingIcons.getBigIconNameForAmenity(amenity);
 			}
 		}
-		if (id != null) {
-			return RenderingIcons.getBigIconResourceId(id);
-		}
-		return 0;
+		return iconName == null ? 0 : RenderingIcons.getBigIconResourceId(iconName);
 	}
 
 	@Override
@@ -186,7 +177,7 @@ public class AmenityMenuController extends MenuController {
 	@NonNull
 	@Override
 	public String getNameStr() {
-		String preferredLang = OsmandPlugin.onGetMapObjectPreferredLang(amenity,
+		String preferredLang = PluginsHelper.onGetMapObjectPreferredLang(amenity,
 				getPreferredMapAppLang(), getPreferredMapLang());
 		String name = amenity.getName(preferredLang, isTransliterateNames());
 		String ref = amenity.getAdditionalInfo("ref");
@@ -218,15 +209,7 @@ public class AmenityMenuController extends MenuController {
 	}
 
 	public static String getTypeStr(Amenity amenity) {
-		PoiCategory pc = amenity.getType();
-		PoiType pt = pc.getPoiTypeByKeyName(amenity.getSubType());
-		String typeStr = amenity.getSubType();
-		if (pt != null) {
-			typeStr = pt.getTranslation();
-		} else if (typeStr != null) {
-			typeStr = Algorithms.capitalizeFirstLetterAndLowercase(typeStr.replace('_', ' '));
-		}
-		return typeStr;
+		return amenity.getSubTypeStr();
 	}
 
 	@NonNull

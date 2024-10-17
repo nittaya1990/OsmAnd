@@ -6,12 +6,12 @@ import android.graphics.drawable.LayerDrawable;
 import android.view.View;
 import android.view.ViewGroup;
 
-import net.osmand.AndroidUtils;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.PlatformUtil;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.profiles.data.ProfileDataUtils;
 import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.util.Algorithms;
@@ -32,16 +32,16 @@ public class SelectProfileMenuAdapter extends AbstractProfileMenuAdapter<SelectP
 
 	private static final Log LOG = PlatformUtil.getLog(SelectProfileMenuAdapter.class);
 
-	private List<Object> items = new ArrayList<>();
+	private final List<Object> items = new ArrayList<>();
 	private final OsmandApplication app;
-	private ApplicationMode appMode;
+	private final ApplicationMode appMode;
 	@ColorInt
 	private int selectedIconColor;
 	private boolean bottomButton;
-	private String bottomButtonText;
+	private final String bottomButtonText;
 	private static final String BUTTON_ITEM = "button_item";
 
-	private boolean nightMode;
+	private final boolean nightMode;
 
 	public SelectProfileMenuAdapter(List<ApplicationMode> items, @NonNull OsmandApplication app,
 	                                String bottomButtonText, boolean nightMode,
@@ -73,11 +73,6 @@ public class SelectProfileMenuAdapter extends AbstractProfileMenuAdapter<SelectP
 		notifyDataSetChanged();
 	}
 
-	@Override
-	public int getItemViewType(int position) {
-		return super.getItemViewType(position);
-	}
-
 	@NonNull
 	@Override
 	public SelectProfileViewHolder onCreateViewHolder(@NonNull ViewGroup parent, int viewType) {
@@ -88,7 +83,7 @@ public class SelectProfileMenuAdapter extends AbstractProfileMenuAdapter<SelectP
 	}
 
 	@Override
-	public void onBindViewHolder(@NonNull final SelectProfileViewHolder holder, int position) {
+	public void onBindViewHolder(@NonNull SelectProfileViewHolder holder, int position) {
 		Object obj = items.get(position);
 		if (obj instanceof ApplicationMode) {
 			holder.dividerBottom.setVisibility(View.INVISIBLE);
@@ -97,7 +92,7 @@ public class SelectProfileMenuAdapter extends AbstractProfileMenuAdapter<SelectP
 			holder.descr.setVisibility(View.VISIBLE);
 			holder.compoundButton.setVisibility(View.GONE);
 			holder.menuIcon.setVisibility(View.GONE);
-			final ApplicationMode item = (ApplicationMode) obj;
+			ApplicationMode item = (ApplicationMode) obj;
 			holder.title.setText(item.toHumanString());
 			holder.descr.setText(ProfileDataUtils.getAppModeDescription(app, item));
 
@@ -116,7 +111,7 @@ public class SelectProfileMenuAdapter extends AbstractProfileMenuAdapter<SelectP
 
 			updateViewHolder(holder, item);
 		} else {
-			final String title = (String) obj;
+			String title = (String) obj;
 			if (title.equals(BUTTON_ITEM)) {
 				holder.dividerBottom.setVisibility(View.INVISIBLE);
 				holder.dividerUp.setVisibility(View.VISIBLE);

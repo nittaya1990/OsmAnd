@@ -9,6 +9,7 @@ import net.osmand.search.core.SearchCoreFactory;
 import net.osmand.search.core.SearchPhrase;
 
 import org.junit.Assert;
+import org.junit.Ignore;
 import org.junit.Test;
 
 
@@ -16,7 +17,7 @@ public class LocationSearchTest {
 
 	private void search(String string, LatLon latLon) throws IOException {
 		SearchResultMatcher srm = new SearchUICore.SearchResultMatcher(null, null, 0, null, 100);
-		new SearchCoreFactory.SearchLocationAndUrlAPI().
+		new SearchCoreFactory.SearchLocationAndUrlAPI(null).
 			search(SearchPhrase.emptyPhrase().generateNewPhrase(string, null), srm);
 		Assert.assertEquals(1, srm.getRequestResults().size());
 		Assert.assertEquals(latLon, srm.getRequestResults().get(0).location);
@@ -55,6 +56,10 @@ public class LocationSearchTest {
 		search("5#1#1 3#1", new LatLon(5 + 1/60f + 1/3600f, 3 + 1/60f));
 		search("5'1'1 3'1", new LatLon(5 + 1/60f + 1/3600f, 3 + 1/60f));
 		search("Lat: 5.0 Lon: 3.0", new LatLon(5, 3));
+		search("0 n, 78 w", new LatLon(0, -78));
+		search("0 N, 78 W", new LatLon(0, -78));
+		search("N 0 W 78", new LatLon(0, -78));
+		search("n 0 w 78", new LatLon(0, -78));
 	}
 	
 	@Test
@@ -83,7 +88,16 @@ public class LocationSearchTest {
 		search("43°38′ 79°23′13.7″E", new LatLon(43 + 38/60f,79 + 23/60f + 13.7/3600f));
 		search("43°38′23\" 79°23′13.7″E", new LatLon(43 + 38/60f + 23/3600f,79 + 23/60f + 13.7/3600f));
 	}
-	
 
-	
+	@Test
+	public void testCommaLatLonSearch() throws IOException {
+		
+		search("33,95060 °S, 151,14453° E", new LatLon(-33.95060, 151.14453));
+		search("33,95060, 151,14453", new LatLon(33.95060, 151.14453));
+		search("33,95060 151,14453", new LatLon(33.95060,151.14453));
+
+		search("15,1235 S, 23,1244 W", new LatLon(-15.1235, -23.1244));
+		search("-15,1235, 23,1244", new LatLon(-15.1235, 23.1244));
+//		search("15,1235 S, 23,1244", new LatLon(-15.1235, 23.1244));
+	}
 }

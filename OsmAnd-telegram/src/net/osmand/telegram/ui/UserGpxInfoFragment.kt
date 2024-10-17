@@ -21,9 +21,10 @@ import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.ContextCompat
 import com.google.android.material.snackbar.Snackbar
-import net.osmand.GPXUtilities
 import net.osmand.PlatformUtil
 import net.osmand.aidl.gpx.AGpxBitmap
+import net.osmand.gpx.GPXFile
+import net.osmand.gpx.GPXTrackAnalysis
 import net.osmand.telegram.R
 import net.osmand.telegram.TelegramApplication
 import net.osmand.telegram.TelegramSettings
@@ -62,7 +63,7 @@ class UserGpxInfoFragment : BaseDialogFragment() {
 	private var startCalendar = Calendar.getInstance()
 	private var endCalendar = Calendar.getInstance()
 
-	private var userId = -1
+	private var userId = -1L
 	private var chatId = -1L
 	private var deviceName = ""
 
@@ -77,7 +78,7 @@ class UserGpxInfoFragment : BaseDialogFragment() {
 		savedInstanceState: Bundle?
 	): View {
 		mainView = inflater.inflate(R.layout.fragment_user_gpx_info, parent)
-		AndroidUtils.addStatusBarPadding19v(context!!, mainView)
+		AndroidUtils.addStatusBarPadding19v(requireContext(), mainView)
 
 		readFromBundle(savedInstanceState ?: arguments)
 
@@ -214,7 +215,7 @@ class UserGpxInfoFragment : BaseDialogFragment() {
 
 	override fun onSaveInstanceState(outState: Bundle) {
 		super.onSaveInstanceState(outState)
-		outState.putInt(USER_ID_KEY, userId)
+		outState.putLong(USER_ID_KEY, userId)
 		outState.putLong(CHAT_ID_KEY, chatId)
 		outState.putString(DEVICE_NAME_KEY, deviceName)
 		outState.putLong(START_KEY, startCalendar.timeInMillis)
@@ -285,7 +286,7 @@ class UserGpxInfoFragment : BaseDialogFragment() {
 
 	private fun readFromBundle(bundle: Bundle?) {
 		bundle?.also {
-			userId = it.getInt(USER_ID_KEY)
+			userId = it.getLong(USER_ID_KEY)
 			chatId = it.getLong(CHAT_ID_KEY)
 			deviceName = it.getString(DEVICE_NAME_KEY, "")
 			startCalendar.timeInMillis = it.getLong(START_KEY)
@@ -380,7 +381,7 @@ class UserGpxInfoFragment : BaseDialogFragment() {
 		avgElevationTv.text = if (analysis != null && analysis.avgElevation != 0.0) OsmandFormatter.getFormattedAlt(analysis.avgElevation, app) else "-"
 		avgSpeedTv.text = if (analysis != null && analysis.isSpeedSpecified) OsmandFormatter.getFormattedSpeed(analysis.avgSpeed, app) else "-"
 		totalDistanceTv.text = if (analysis != null && analysis.totalDistance != 0.0f) OsmandFormatter.getFormattedDistance(analysis.totalDistance, app) else "-"
-		timeSpanTv.text = if (analysis != null && analysis.timeSpan != 0L) Algorithms.formatDuration((analysis.timeSpan / 1000).toInt(), true) else "-"
+		timeSpanTv.text = if (analysis != null && analysis.durationInSeconds != 0) Algorithms.formatDuration(analysis.getDurationInSeconds(), true) else "-"
 	}
 
 	private fun updateGPXMap() {
@@ -428,7 +429,7 @@ class UserGpxInfoFragment : BaseDialogFragment() {
 
 	private class LoadGpxAsyncTask internal constructor(
 		private val app: TelegramApplication,
-		private val userId: Int,
+		private val userId: Long,
 		private val chatId: Long,
 		private val deviceName: String,
 		private val start: Long,
@@ -470,8 +471,8 @@ class UserGpxInfoFragment : BaseDialogFragment() {
 	}
 
 	data class GpxDataItem(
-		val gpxFile: GPXUtilities.GPXFile,
-		val analysis: GPXUtilities.GPXTrackAnalysis
+            val gpxFile: GPXFile,
+            val analysis: GPXTrackAnalysis
 	)
 
 	companion object {
@@ -489,11 +490,11 @@ class UserGpxInfoFragment : BaseDialogFragment() {
 		private const val UPDATE_TRACK_INTERVAL_MS = 30 * 1000L // 30 sec
 		private const val TRACK_UPDATE_MSG_ID = 1001
 
-		fun showInstance(fm: androidx.fragment.app.FragmentManager, userId: Int, chatId: Long, deviceName: String, start: Long, end: Long): Boolean {
+		fun showInstance(fm: androidx.fragment.app.FragmentManager, userId: Long, chatId: Long, deviceName: String, start: Long, end: Long): Boolean {
 			return try {
 				val fragment = UserGpxInfoFragment().apply {
 					arguments = Bundle().apply {
-						putInt(USER_ID_KEY, userId)
+						putLong(USER_ID_KEY, userId)
 						putLong(CHAT_ID_KEY, chatId)
 						putString(DEVICE_NAME_KEY, deviceName)
 						putLong(START_KEY, start)

@@ -8,7 +8,7 @@ import android.webkit.WebView;
 
 import androidx.appcompat.widget.PopupMenu;
 
-import net.osmand.PicassoUtils;
+import net.osmand.plus.utils.PicassoUtils;
 import net.osmand.plus.OnDialogFragmentResultListener;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
@@ -18,13 +18,13 @@ import net.osmand.plus.base.bottomsheetmenu.BottomSheetItemWithDescription;
 import net.osmand.plus.base.bottomsheetmenu.SimpleBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.DividerHalfItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.TitleItem;
-import net.osmand.plus.settings.backend.CommonPreference;
+import net.osmand.plus.settings.backend.preferences.CommonPreference;
 import net.osmand.plus.wikipedia.WikiArticleShowImages;
 import net.osmand.plus.wikivoyage.data.TravelLocalDataHelper;
 
 public class WikivoyageOptionsBottomSheetDialogFragment extends MenuBottomSheetDialogFragment {
 
-	public final static String TAG = WikivoyageOptionsBottomSheetDialogFragment.class.getSimpleName();
+	public static final String TAG = WikivoyageOptionsBottomSheetDialogFragment.class.getSimpleName();
 
 	public static final int DOWNLOAD_IMAGES_CHANGED = 1;
 	public static final int CACHE_CLEARED = 2;
@@ -32,24 +32,24 @@ public class WikivoyageOptionsBottomSheetDialogFragment extends MenuBottomSheetD
 
 	@Override
 	public void createMenuItems(Bundle savedInstanceState) {
-		final OsmandApplication app = getMyApplication();
+		OsmandApplication app = getMyApplication();
 		if (app == null) {
 			return;
 		}
 		items.add(new TitleItem(getString(R.string.shared_string_options)));
 
-		final CommonPreference<WikiArticleShowImages> showImagesPref = app.getSettings().WIKI_ARTICLE_SHOW_IMAGES;
+		CommonPreference<WikiArticleShowImages> showImagesPref = app.getSettings().WIKI_ARTICLE_SHOW_IMAGES;
 		BaseBottomSheetItem showImagesItem = new BottomSheetItemWithDescription.Builder()
 				.setDescription(getString(showImagesPref.get().name))
-				.setDescriptionColorId(nightMode ? R.color.wikivoyage_active_dark : R.color.wikivoyage_active_light)
+				.setDescriptionColorId(nightMode ? R.color.active_color_primary_dark : R.color.active_color_primary_light)
 				.setIcon(getContentIcon(R.drawable.ic_type_img))
 				.setTitle(getString(R.string.download_images))
 				.setLayoutId(R.layout.bottom_sheet_item_with_right_descr)
 				.setOnClickListener(new View.OnClickListener() {
 					@Override
 					public void onClick(View v) {
-						final PopupMenu popup = new PopupMenu(v.getContext(), v, Gravity.END);
-						for (final WikiArticleShowImages showImages : WikiArticleShowImages.values()) {
+						PopupMenu popup = new PopupMenu(v.getContext(), v, Gravity.END);
+						for (WikiArticleShowImages showImages : WikiArticleShowImages.values()) {
 							MenuItem item = popup.getMenu().add(getString(showImages.name));
 							item.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
 								@Override
@@ -69,7 +69,7 @@ public class WikivoyageOptionsBottomSheetDialogFragment extends MenuBottomSheetD
 
 		BaseBottomSheetItem clearCacheItem = new BottomSheetItemWithDescription.Builder()
 				.setDescription(getString(R.string.shared_string_clear))
-				.setDescriptionColorId(nightMode ? R.color.wikivoyage_active_dark : R.color.wikivoyage_active_light)
+				.setDescriptionColorId(nightMode ? R.color.active_color_primary_dark : R.color.active_color_primary_light)
 				.setTitle(getString(R.string.images_cache))
 				.setLayoutId(R.layout.bottom_sheet_item_with_right_descr)
 				.setOnClickListener(new View.OnClickListener() {

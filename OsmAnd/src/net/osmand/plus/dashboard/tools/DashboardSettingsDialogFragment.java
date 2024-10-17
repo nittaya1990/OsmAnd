@@ -21,14 +21,13 @@ import androidx.fragment.app.DialogFragment;
 import androidx.fragment.app.FragmentActivity;
 
 import net.osmand.PlatformUtil;
-import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
-import net.osmand.plus.settings.backend.OsmandSettings;
-import net.osmand.plus.settings.backend.CommonPreference;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.dashboard.DashboardOnMap;
+import net.osmand.plus.plugins.PluginsHelper;
+import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.settings.backend.preferences.CommonPreference;
+import net.osmand.plus.utils.UiUtilities;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -57,7 +56,7 @@ public class DashboardSettingsDialogFragment extends DialogFragment
 		for (DashFragmentData fragmentData : mapActivity.getDashboard().getFragmentsData()) {
 			if (fragmentData.canBeDisabled()) mFragmentsData.add(fragmentData);
 		}
-		mFragmentsData.addAll(OsmandPlugin.getPluginsCardsList());
+		mFragmentsData.addAll(PluginsHelper.getPluginsCardsList());
 		Collections.sort(mFragmentsData);
 	}
 
@@ -74,11 +73,11 @@ public class DashboardSettingsDialogFragment extends DialogFragment
 		theme.resolveAttribute(android.R.attr.textColorSecondary, typedValue, true);
 		textColorSecondary = typedValue.data;
 
-		final OsmandSettings settings = mapActivity.getMyApplication().getSettings();
-		final View showDashboardOnStart = createCheckboxItem(settings.SHOW_DASHBOARD_ON_START, 
-				R.string.show_on_start , R.string.show_on_start_description);
-		final View accessFromMap = createCheckboxItem(settings.SHOW_DASHBOARD_ON_MAP_SCREEN, 
-				R.string.access_from_map, R.string.access_from_map_description); 
+		OsmandSettings settings = mapActivity.getMyApplication().getSettings();
+		View showDashboardOnStart = createCheckboxItem(settings.SHOW_DASHBOARD_ON_START,
+				R.string.show_on_start, R.string.show_on_start_description);
+		View accessFromMap = createCheckboxItem(settings.SHOW_DASHBOARD_ON_MAP_SCREEN,
+				R.string.access_from_map, R.string.access_from_map_description);
 
 		AlertDialog.Builder builder = new AlertDialog.Builder(context);
 		if (savedInstanceState != null && savedInstanceState.containsKey(CHECKED_ITEMS)) {
@@ -96,9 +95,9 @@ public class DashboardSettingsDialogFragment extends DialogFragment
 						boolean[] shouldShow = mAdapter.getCheckedItems();
 						int[] numberOfRows = mAdapter.getNumbersOfRows();
 						for (int i = 0; i < shouldShow.length; i++) {
-							final DashFragmentData fragmentData = mFragmentsData.get(i);
+							DashFragmentData fragmentData = mFragmentsData.get(i);
 							settings.registerBooleanPreference(
-									DashboardOnMap.SHOULD_SHOW + fragmentData.tag, true)
+											DashboardOnMap.SHOULD_SHOW + fragmentData.tag, true)
 									.makeGlobal().set(shouldShow[i]);
 							if (fragmentData.rowNumberTag != null) {
 								settings.registerIntPreference(fragmentData.rowNumberTag, DEFAULT_NUMBER_OF_ROWS)
@@ -110,11 +109,11 @@ public class DashboardSettingsDialogFragment extends DialogFragment
 								((CompoundButton) showDashboardOnStart.findViewById(R.id.toggle_item)).isChecked());
 						settings.SHOW_DASHBOARD_ON_MAP_SCREEN.set(
 								((CompoundButton) accessFromMap.findViewById(R.id.toggle_item)).isChecked());
-						mapActivity.getMapLayers().getMapControlsLayer().initDasboardRelatedControls();
+						mapActivity.getMapLayers().getMapControlsLayer().refreshButtons();
 					}
 				})
 				.setNegativeButton(R.string.shared_string_cancel, null);
-		final AlertDialog dialog = builder.create();
+		AlertDialog dialog = builder.create();
 
 		ListView listView = dialog.getListView();
 		listView.addHeaderView(showDashboardOnStart);
@@ -122,14 +121,14 @@ public class DashboardSettingsDialogFragment extends DialogFragment
 		return dialog;
 	}
 
-	private View createCheckboxItem(final CommonPreference<Boolean> pref, int text, int description) {
-		final View view = LayoutInflater.from(context).inflate(
+	private View createCheckboxItem(CommonPreference<Boolean> pref, int text, int description) {
+		View view = LayoutInflater.from(context).inflate(
 				R.layout.show_dashboard_on_start_dialog_item, null, false);
-		final TextView textView = (TextView) view.findViewById(R.id.text);
-		final TextView subtextView = (TextView) view.findViewById(R.id.subtext);
+		TextView textView = view.findViewById(R.id.text);
+		TextView subtextView = view.findViewById(R.id.subtext);
 		textView.setText(text);
 		subtextView.setText(description);
-		final CompoundButton compoundButton = (CompoundButton) view.findViewById(R.id.toggle_item);
+		CompoundButton compoundButton = view.findViewById(R.id.toggle_item);
 		compoundButton.setChecked(pref.get());
 		view.setOnClickListener(new View.OnClickListener() {
 			@Override
@@ -159,7 +158,7 @@ public class DashboardSettingsDialogFragment extends DialogFragment
 		private final int[] numbersOfRows;
 
 		public DashFragmentAdapter(@NonNull Context context, @NonNull List<DashFragmentData> objects,
-				@NonNull boolean[] checkedItems, @NonNull int[] numbersOfRows) {
+		                           @NonNull boolean[] checkedItems, @NonNull int[] numbersOfRows) {
 			super(context, 0, objects);
 			this.checkedItems = checkedItems;
 			this.numbersOfRows = numbersOfRows;
@@ -167,7 +166,7 @@ public class DashboardSettingsDialogFragment extends DialogFragment
 		}
 
 		public DashFragmentAdapter(@NonNull Context context, @NonNull List<DashFragmentData> objects,
-				@NonNull OsmandSettings settings) {
+		                           @NonNull OsmandSettings settings) {
 			super(context, 0, objects);
 			numbersOfRows = new int[objects.size()];
 			checkedItems = new boolean[objects.size()];
@@ -183,8 +182,8 @@ public class DashboardSettingsDialogFragment extends DialogFragment
 		}
 
 		@Override
-		public View getView(final int position, View convertView, ViewGroup parent) {
-			final DashViewHolder viewHolder;
+		public View getView(int position, View convertView, ViewGroup parent) {
+			DashViewHolder viewHolder;
 			if (convertView == null) {
 				convertView = LayoutInflater.from(context).inflate(R.layout.dashboard_settings_dialog_item,
 						parent, false);
@@ -233,29 +232,29 @@ public class DashboardSettingsDialogFragment extends DialogFragment
 				String header = getContext().getString(getItem(localViewHolder.position)
 						.shouldShowFunction.getTitleId());
 				String subheader = getContext().getResources().getString(R.string.count_of_lines);
-				final String stringPosition = String.valueOf(localViewHolder.position);
+				String stringPosition = String.valueOf(localViewHolder.position);
 				NumberPickerDialogFragment.createInstance(header, subheader, stringPosition, getNumberOfRows(localViewHolder.position), MAXIMUM_NUMBER_OF_ROWS)
 						.show(getChildFragmentManager(), NumberPickerDialogFragment.TAG);
 			}
 		};
 
 	}
-	
+
 	private class DashViewHolder {
 		final View view;
 		final TextView textView;
 		final CompoundButton compoundButton;
 		final TextView numberOfRowsTextView;
 		private int position;
-		private int colorActive;
-		private DashFragmentAdapter dashFragmentAdapter;
+		private final int colorActive;
+		private final DashFragmentAdapter dashFragmentAdapter;
 
 		public DashViewHolder(DashFragmentAdapter dashFragmentAdapter, View view, Context ctx) {
 			this.view = view;
 			this.dashFragmentAdapter = dashFragmentAdapter;
-			this.numberOfRowsTextView = (TextView) view.findViewById(R.id.numberOfRowsTextView);
-			this.textView = (TextView) view.findViewById(R.id.text);
-			this.compoundButton = (CompoundButton) view.findViewById(R.id.toggle_item);
+			this.numberOfRowsTextView = view.findViewById(R.id.numberOfRowsTextView);
+			this.textView = view.findViewById(R.id.text);
+			this.compoundButton = view.findViewById(R.id.toggle_item);
 
 			TypedValue typedValue = new TypedValue();
 			Theme theme = ctx.getTheme();
@@ -273,7 +272,7 @@ public class DashboardSettingsDialogFragment extends DialogFragment
 				numberOfRowsTextView.setVisibility(View.GONE);
 			}
 			textView.setText(fragmentData.shouldShowFunction.getTitleId());
-			textView.setTextColor(dashFragmentAdapter.isChecked(position)? textColorPrimary :
+			textView.setTextColor(dashFragmentAdapter.isChecked(position) ? textColorPrimary :
 					textColorSecondary);
 			this.position = position;
 
@@ -291,10 +290,10 @@ public class DashboardSettingsDialogFragment extends DialogFragment
 			numberOfRowsTextView.setTag(this);
 			numberOfRowsTextView.setOnClickListener(dashFragmentAdapter.onNumberClickListener);
 		}
-		
+
 
 	}
-	
+
 	private boolean isNightMode() {
 		return mapActivity.getMyApplication().getDaynightHelper().isNightModeForMapControls();
 	}

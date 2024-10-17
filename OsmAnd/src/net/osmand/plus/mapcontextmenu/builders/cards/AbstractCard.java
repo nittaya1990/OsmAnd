@@ -24,22 +24,24 @@ import androidx.core.content.ContextCompat;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.plus.widgets.WebViewEx;
 
 public abstract class AbstractCard {
 
-	private MapActivity mapActivity;
-	private OsmandApplication app;
+	protected final OsmandApplication app;
+	protected final MapActivity mapActivity;
+
 	protected View view;
 
 	public abstract int getCardLayoutId();
 
-	public AbstractCard(MapActivity mapActivity) {
+	public AbstractCard(@NonNull MapActivity mapActivity) {
 		this.mapActivity = mapActivity;
 		this.app = mapActivity.getMyApplication();
 	}
 
-	public View build(Context ctx) {
+	public View build(@NonNull Context ctx) {
 		view = LayoutInflater.from(ctx).inflate(getCardLayoutId(), null);
 		update();
 		return view;
@@ -57,27 +59,27 @@ public abstract class AbstractCard {
 
 	@SuppressLint("SetJavaScriptEnabled")
 	@SuppressWarnings("deprecation")
-	protected static void openUrl(@NonNull Activity ctx,
-								  @NonNull OsmandApplication app,
-								  @Nullable String title,
-								  @NonNull String url,
-								  boolean externalLink,
-								  boolean hasImageUrl) {
+	public static void openUrl(@NonNull Activity ctx,
+	                           @NonNull OsmandApplication app,
+	                           @Nullable String title,
+	                           @NonNull String url,
+	                           boolean externalLink,
+	                           boolean hasImageUrl) {
 		if (externalLink) {
 			Intent intent = new Intent(Intent.ACTION_VIEW);
 			intent.setData(Uri.parse(url));
-			ctx.startActivity(intent);
+			AndroidUtils.startActivityIfSafe(ctx, intent);
 			return;
 		}
 
-		final Dialog dialog = new Dialog(ctx,
+		Dialog dialog = new Dialog(ctx,
 				app.getSettings().isLightContent() ?
 						R.style.OsmandLightTheme :
 						R.style.OsmandDarkTheme);
 		LinearLayout ll = new LinearLayout(ctx);
 		ll.setOrientation(LinearLayout.VERTICAL);
 
-		final Toolbar topBar = new Toolbar(ctx);
+		Toolbar topBar = new Toolbar(ctx);
 		topBar.setClickable(true);
 		Drawable back = app.getUIUtilities().getIcon(R.drawable.ic_action_remove_dark);
 		topBar.setNavigationIcon(back);
@@ -85,14 +87,9 @@ public abstract class AbstractCard {
 		topBar.setTitle(title);
 		topBar.setBackgroundColor(ContextCompat.getColor(ctx, getResIdFromAttribute(ctx, R.attr.pstsTabBackground)));
 		topBar.setTitleTextColor(ContextCompat.getColor(ctx, getResIdFromAttribute(ctx, R.attr.pstsTextColor)));
-		topBar.setNavigationOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(final View v) {
-				dialog.dismiss();
-			}
-		});
+		topBar.setNavigationOnClickListener(v -> dialog.dismiss());
 
-		final WebView wv = new WebViewEx(ctx);
+		WebView wv = new WebViewEx(ctx);
 		wv.setWebViewClient(new WebViewClient() {
 			@Override
 			public boolean shouldOverrideUrlLoading(WebView view, String url) {
@@ -128,12 +125,12 @@ public abstract class AbstractCard {
 		dialog.show();
 	}
 
-	private static int getResIdFromAttribute(Context ctx, int attr) {
+	private static int getResIdFromAttribute(@NonNull Context ctx, int attr) {
 		if (attr == 0) {
 			return 0;
 		}
-		TypedValue typedvalueattr = new TypedValue();
-		ctx.getTheme().resolveAttribute(attr, typedvalueattr, true);
-		return typedvalueattr.resourceId;
+		TypedValue value = new TypedValue();
+		ctx.getTheme().resolveAttribute(attr, value, true);
+		return value.resourceId;
 	}
 }

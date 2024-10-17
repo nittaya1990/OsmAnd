@@ -8,10 +8,15 @@ import net.osmand.aidlapi.AidlParams;
 
 public class NavigateGpxParams extends AidlParams {
 
-	private String data;
 	private Uri uri;
+	private String data;
+	private String fileName;
 	private boolean force;
 	private boolean needLocationPermission;
+	private boolean passWholeRoute;
+	private boolean snapToRoad;
+	private String snapToRoadMode;
+	private int snapToRoadThreshold;
 
 	public NavigateGpxParams(String data, boolean force, boolean needLocationPermission) {
 		this.data = data;
@@ -41,16 +46,56 @@ public class NavigateGpxParams extends AidlParams {
 		}
 	};
 
-	public String getData() {
-		return data;
-	}
-
 	public Uri getUri() {
 		return uri;
 	}
 
+	public String getData() {
+		return data;
+	}
+
+	public String getFileName() {
+		return fileName;
+	}
+
+	public void setFileName(String fileName) {
+		this.fileName = fileName;
+	}
+
 	public boolean isForce() {
 		return force;
+	}
+
+	public boolean isPassWholeRoute() {
+		return passWholeRoute;
+	}
+
+	public void setPassWholeRoute(boolean passWholeRoute) {
+		this.passWholeRoute = passWholeRoute;
+	}
+
+	public boolean isSnapToRoad() {
+		return snapToRoad;
+	}
+
+	public void setSnapToRoad(boolean snapToRoad) {
+		this.snapToRoad = snapToRoad;
+	}
+
+	public String getSnapToRoadMode() {
+		return snapToRoadMode;
+	}
+
+	public void setSnapToRoadMode(String snapToRoadMode) {
+		this.snapToRoadMode = snapToRoadMode;
+	}
+
+	public int getSnapToRoadThreshold() {
+		return snapToRoadThreshold;
+	}
+
+	public void setSnapToRoadThreshold(int snapToRoadThreshold) {
+		this.snapToRoadThreshold = snapToRoadThreshold;
 	}
 
 	public boolean isNeedLocationPermission() {
@@ -63,6 +108,11 @@ public class NavigateGpxParams extends AidlParams {
 		bundle.putParcelable("uri", uri);
 		bundle.putBoolean("force", force);
 		bundle.putBoolean("needLocationPermission", needLocationPermission);
+		bundle.putBoolean("passWholeRoute", passWholeRoute);
+		bundle.putBoolean("snapToRoad", snapToRoad);
+		bundle.putString("snapToRoadMode", snapToRoadMode);
+		bundle.putInt("snapToRoadThreshold", snapToRoadThreshold);
+		bundle.putString("fileName", fileName);
 	}
 
 	@Override
@@ -71,5 +121,10 @@ public class NavigateGpxParams extends AidlParams {
 		uri = bundle.getParcelable("uri");
 		force = bundle.getBoolean("force");
 		needLocationPermission = bundle.getBoolean("needLocationPermission");
+		passWholeRoute = bundle.getBoolean("passWholeRoute");
+		snapToRoad = bundle.getBoolean("snapToRoad");
+		snapToRoadMode = bundle.getString("snapToRoadMode");
+		snapToRoadThreshold = bundle.getInt("snapToRoadThreshold");
+		fileName = bundle.getString("fileName");
 	}
 }

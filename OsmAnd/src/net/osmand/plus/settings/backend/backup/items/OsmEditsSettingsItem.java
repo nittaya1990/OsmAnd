@@ -12,12 +12,12 @@ import net.osmand.osm.edit.Entity;
 import net.osmand.osm.edit.Node;
 import net.osmand.osm.edit.Way;
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
+import net.osmand.plus.plugins.PluginsHelper;
 import net.osmand.plus.R;
-import net.osmand.plus.osmedit.OpenstreetmapPoint;
-import net.osmand.plus.osmedit.OpenstreetmapsDbHelper;
-import net.osmand.plus.osmedit.OsmEditingPlugin;
-import net.osmand.plus.osmedit.OsmPoint;
+import net.osmand.plus.plugins.osmedit.data.OpenstreetmapPoint;
+import net.osmand.plus.plugins.osmedit.helpers.OpenstreetmapsDbHelper;
+import net.osmand.plus.plugins.osmedit.OsmEditingPlugin;
+import net.osmand.plus.plugins.osmedit.data.OsmPoint;
 import net.osmand.plus.settings.backend.backup.SettingsHelper;
 import net.osmand.plus.settings.backend.backup.SettingsItemReader;
 import net.osmand.plus.settings.backend.backup.SettingsItemType;
@@ -62,7 +62,7 @@ public class OsmEditsSettingsItem extends CollectionSettingsItem<OpenstreetmapPo
 	@Override
 	protected void init() {
 		super.init();
-		OsmEditingPlugin osmEditingPlugin = OsmandPlugin.getPlugin(OsmEditingPlugin.class);
+		OsmEditingPlugin osmEditingPlugin = PluginsHelper.getPlugin(OsmEditingPlugin.class);
 		if (osmEditingPlugin != null) {
 			existingItems = osmEditingPlugin.getDBPOI().getOpenstreetmapPoints();
 		}
@@ -76,7 +76,7 @@ public class OsmEditsSettingsItem extends CollectionSettingsItem<OpenstreetmapPo
 
 	@Override
 	public long getLocalModifiedTime() {
-		OsmEditingPlugin osmEditingPlugin = OsmandPlugin.getPlugin(OsmEditingPlugin.class);
+		OsmEditingPlugin osmEditingPlugin = PluginsHelper.getPlugin(OsmEditingPlugin.class);
 		if (osmEditingPlugin != null) {
 			return osmEditingPlugin.getDBPOI().getLastModifiedTime();
 		}
@@ -85,7 +85,7 @@ public class OsmEditsSettingsItem extends CollectionSettingsItem<OpenstreetmapPo
 
 	@Override
 	public void setLocalModifiedTime(long lastModifiedTime) {
-		OsmEditingPlugin osmEditingPlugin = OsmandPlugin.getPlugin(OsmEditingPlugin.class);
+		OsmEditingPlugin osmEditingPlugin = PluginsHelper.getPlugin(OsmEditingPlugin.class);
 		if (osmEditingPlugin != null) {
 			osmEditingPlugin.getDBPOI().setLastModifiedTime(lastModifiedTime);
 		}
@@ -97,7 +97,7 @@ public class OsmEditsSettingsItem extends CollectionSettingsItem<OpenstreetmapPo
 		if (!newItems.isEmpty() || !duplicateItems.isEmpty()) {
 			appliedItems = new ArrayList<>(newItems);
 
-			OsmEditingPlugin osmEditingPlugin = OsmandPlugin.getPlugin(OsmEditingPlugin.class);
+			OsmEditingPlugin osmEditingPlugin = PluginsHelper.getPlugin(OsmEditingPlugin.class);
 			if (osmEditingPlugin != null) {
 				OpenstreetmapsDbHelper db = osmEditingPlugin.getDBPOI();
 				for (OpenstreetmapPoint duplicate : duplicateItems) {
@@ -108,9 +108,12 @@ public class OsmEditsSettingsItem extends CollectionSettingsItem<OpenstreetmapPo
 					db.addOpenstreetmap(point);
 				}
 			}
-
-
 		}
+	}
+
+	@Override
+	protected void deleteItem(OpenstreetmapPoint item) {
+		// TODO: delete settings item
 	}
 
 	@Override

@@ -6,13 +6,13 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import net.osmand.IndexConstants;
-import net.osmand.plus.CustomOsmandPlugin;
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
+import net.osmand.plus.plugins.OsmandPlugin;
+import net.osmand.plus.plugins.PluginsHelper;
+import net.osmand.plus.plugins.custom.CustomOsmandPlugin;
 import net.osmand.plus.settings.backend.ApplicationMode;
-import net.osmand.plus.settings.backend.ApplicationMode.ApplicationModeBean;
 import net.osmand.plus.settings.backend.ApplicationMode.ApplicationModeBuilder;
-import net.osmand.plus.settings.backend.OsmandPreference;
+import net.osmand.plus.settings.backend.ApplicationModeBean;
 import net.osmand.plus.settings.backend.OsmandSettings;
 import net.osmand.plus.settings.backend.backup.OsmandSettingsItemReader;
 import net.osmand.plus.settings.backend.backup.OsmandSettingsItemWriter;
@@ -20,6 +20,7 @@ import net.osmand.plus.settings.backend.backup.SettingsHelper;
 import net.osmand.plus.settings.backend.backup.SettingsItemReader;
 import net.osmand.plus.settings.backend.backup.SettingsItemType;
 import net.osmand.plus.settings.backend.backup.SettingsItemWriter;
+import net.osmand.plus.settings.backend.preferences.OsmandPreference;
 import net.osmand.router.GeneralRouter;
 import net.osmand.util.Algorithms;
 
@@ -27,6 +28,7 @@ import org.json.JSONException;
 import org.json.JSONObject;
 
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
@@ -83,7 +85,7 @@ public class ProfileSettingsItem extends OsmandSettingsItem {
 
 	@Override
 	public long getEstimatedSize() {
-		return getSettings().getSavedModePrefsCount(appMode) * APPROXIMATE_PREFERENCE_SIZE_BYTES;
+		return (long) getSettings().getSavedModePrefsCount(appMode) * APPROXIMATE_PREFERENCE_SIZE_BYTES;
 	}
 
 	public ApplicationMode getAppMode() {
@@ -122,7 +124,7 @@ public class ProfileSettingsItem extends OsmandSettingsItem {
 	void readFromJson(@NonNull JSONObject json) throws JSONException {
 		super.readFromJson(json);
 		String appModeJson = json.getString("appMode");
-		modeBean = ApplicationMode.fromJson(appModeJson);
+		modeBean = ApplicationMode.fromJson(app, appModeJson);
 		builder = ApplicationMode.fromModeBean(app, modeBean);
 		ApplicationMode appMode = builder.getApplicationMode();
 		if (!appMode.isCustomProfile()) {
@@ -198,6 +200,12 @@ public class ProfileSettingsItem extends OsmandSettingsItem {
 		ApplicationMode.changeProfileAvailability(appMode, true, app);
 	}
 
+	@Override
+	public void delete() {
+		super.delete();
+		ApplicationMode.deleteCustomModes(Collections.singletonList(appMode), app);
+	}
+
 	public void applyAdditionalParams(@Nullable SettingsItemReader<? extends SettingsItem> reader) {
 		if (additionalPrefsJson != null) {
 			updatePluginResPrefs();
@@ -212,7 +220,7 @@ public class ProfileSettingsItem extends OsmandSettingsItem {
 		if (Algorithms.isEmpty(pluginId)) {
 			return;
 		}
-		OsmandPlugin plugin = OsmandPlugin.getPlugin(pluginId);
+		OsmandPlugin plugin = PluginsHelper.getPlugin(pluginId);
 		if (plugin instanceof CustomOsmandPlugin) {
 			CustomOsmandPlugin customPlugin = (CustomOsmandPlugin) plugin;
 			String resDirPath = IndexConstants.PLUGINS_DIR + pluginId + "/" + customPlugin.getResourceDirName();
@@ -258,7 +266,7 @@ public class ProfileSettingsItem extends OsmandSettingsItem {
 	@Nullable
 	@Override
 	public SettingsItemReader<? extends SettingsItem> getReader() {
-		return new OsmandSettingsItemReader<ProfileSettingsItem>(this, getSettings()) {
+		return new OsmandSettingsItemReader<ProfileSettingsItem>(this) {
 			@Override
 			protected void readPreferenceFromJson(@NonNull OsmandPreference<?> preference, @NonNull JSONObject json) throws JSONException {
 				if (!appModeBeanPrefsIds.contains(preference.getId())) {
@@ -267,7 +275,7 @@ public class ProfileSettingsItem extends OsmandSettingsItem {
 			}
 
 			@Override
-			public void readPreferencesFromJson(final JSONObject json) {
+			public void readPreferencesFromJson(JSONObject json) {
 				getSettings().getContext().runInUIThread(() -> {
 					OsmandSettings settings = getSettings();
 					Map<String, OsmandPreference<?>> prefs = settings.getRegisteredPreferences();
@@ -296,6 +304,7 @@ public class ProfileSettingsItem extends OsmandSettingsItem {
 							SettingsHelper.LOG.warn("No preference while importing settings: " + key);
 						}
 					}
+					settings.setLastModePreferencesEditTime(appMode, lastModifiedTime);
 				});
 			}
 		};

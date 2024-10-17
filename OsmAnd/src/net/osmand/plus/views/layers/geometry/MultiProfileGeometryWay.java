@@ -8,8 +8,8 @@ import android.graphics.PathMeasure;
 import android.graphics.PointF;
 import android.util.Pair;
 
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.Location;
 import net.osmand.data.LatLon;
 import net.osmand.data.QuadRect;
@@ -50,7 +50,7 @@ public class MultiProfileGeometryWay extends GeometryWay<MultiProfileGeometryWay
 		drawSegments(tileBox, canvas, bounds.top, bounds.left, bounds.bottom, bounds.right, null, 0);
 	}
 
-	public void updateRoute(RotatedTileBox tileBox, Map<Pair<WptPt, WptPt>, RoadSegmentData> segmentData,
+	public boolean updateRoute(RotatedTileBox tileBox, Map<Pair<WptPt, WptPt>, RoadSegmentData> segmentData,
 							List<TrkSegment> beforeSegments, List<TrkSegment> afterSegments) {
 		boolean shouldUpdateRoute = tileBox.getMapDensity() != getMapDensity() || segmentDataChanged(segmentData)
 				|| this.beforeSegments != beforeSegments || this.afterSegments != afterSegments || getLocationProvider() == null;
@@ -88,6 +88,7 @@ public class MultiProfileGeometryWay extends GeometryWay<MultiProfileGeometryWay
 
 			updateWay(locations, styleMap, tileBox);
 		}
+		return shouldUpdateRoute;
 	}
 
 	@Override
@@ -100,14 +101,14 @@ public class MultiProfileGeometryWay extends GeometryWay<MultiProfileGeometryWay
 
 	private void setStyles(List<TrkSegment> segments, List<Way> ways, List<GeometryWayStyle<?>> styles) {
 		for (TrkSegment segment : segments) {
-			List<WptPt> points = segment.points;
+			List<WptPt> points = segment.getPoints();
 			for (int i = 0; i < points.size() - 1; i++) {
 				setStylesInternal(points, i, ways, styles);
 			}
-			styles.add(new GeometryMultiProfileWayStyle(getContext(), new ArrayList<LatLon>(), 0, 0, true));
+			styles.add(new GeometryMultiProfileWayStyle(getContext(), new ArrayList<>(), 0, 0, true));
 			Way way = new Way(-1);
 			WptPt last = points.get(points.size() - 1);
-			way.addNode(new Node(last.lat, last.lon, -1));
+			way.addNode(new Node(last.getLat(), last.getLon(), -1));
 			ways.add(way);
 		}
 	}
@@ -141,38 +142,45 @@ public class MultiProfileGeometryWay extends GeometryWay<MultiProfileGeometryWay
 		List<LatLon> routePoints = new ArrayList<>();
 
 		if (roadSegmentData == null || Algorithms.isEmpty(roadSegmentData.getPoints())) {
-			routePoints.add(new LatLon(start.lat, start.lon));
-			routePoints.add(new LatLon(end.lat, end.lon));
+			routePoints.add(new LatLon(start.getLat(), start.getLon()));
+			routePoints.add(new LatLon(end.getLat(), end.getLon()));
 		} else {
 			List<WptPt> points = roadSegmentData.getPoints();
 			if (points.get(0).getLatitude() != start.getLatitude() && points.get(0).getLongitude() != start.getLongitude()) {
-				routePoints.add(new LatLon(start.lat, start.lon));
+				routePoints.add(new LatLon(start.getLat(), start.getLon()));
 			}
 			for (WptPt routePt : roadSegmentData.getPoints()) {
-				routePoints.add(new LatLon(routePt.lat, routePt.lon));
+				routePoints.add(new LatLon(routePt.getLat(), routePt.getLon()));
 			}
 			int lastIdx = routePoints.size() - 1;
 			if (routePoints.get(lastIdx).getLatitude() != end.getLatitude()
 					&& routePoints.get(lastIdx).getLongitude() != end.getLongitude()) {
-				routePoints.add(new LatLon(end.lat, end.lon));
+				routePoints.add(new LatLon(end.getLat(), end.getLon()));
 			}
 		}
 		return routePoints;
 	}
 
 	@Override
-	protected boolean shouldAddLocation(TByteArrayList simplification, double leftLon, double rightLon,
+	protected boolean shouldAddLocation(@Nullable TByteArrayList simplification, double leftLon, double rightLon,
 	                                    double bottomLat, double topLat, GeometryWayProvider provider,
 	                                    int previousVisible, int currLocationIdx) {
+		if (hasMapRenderer()) {
+			return true;
+		}
 		double currLat = provider.getLatitude(currLocationIdx);
 		double currLon = provider.getLongitude(currLocationIdx);
 
 		int nextSurvivedIdx = currLocationIdx;
-		for (int i = nextSurvivedIdx + 1; i < simplification.size(); i++) {
-			if (simplification.getQuick(i) == 1) {
-				nextSurvivedIdx = i;
-				break;
+		if (simplification != null) {
+			for (int i = nextSurvivedIdx + 1; i < simplification.size(); i++) {
+				if (simplification.getQuick(i) == 1) {
+					nextSurvivedIdx = i;
+					break;
+				}
 			}
+		} else if (provider.getSize() > nextSurvivedIdx + 1) {
+			nextSurvivedIdx++;
 		}
 
 		double nextLat = provider.getLatitude(nextSurvivedIdx);
@@ -290,6 +298,28 @@ public class MultiProfileGeometryWay extends GeometryWay<MultiProfileGeometryWay
 			return pathColor;
 		}
 
+		@Nullable
+		@Override
+		public Integer getColor() {
+			return pathColor;
+		}
+
+		@Override
+		public Integer getColor(Integer def) {
+			return pathColor;
+		}
+
+		@Nullable
+		@Override
+		public Float getWidth() {
+			return getContext().getPathPaint().getStrokeWidth();
+		}
+
+		@Override
+		public Float getWidth(Integer def) {
+			return getContext().getPathPaint().getStrokeWidth();
+		}
+
 		@Override
 		public Bitmap getPointBitmap() {
 			return getContext().getProfileIconBitmap(profileIconRes, pathBorderColor);
@@ -306,12 +336,23 @@ public class MultiProfileGeometryWay extends GeometryWay<MultiProfileGeometryWay
 
 		@Override
 		public boolean equals(Object other) {
-			return this == other;
+			if (!getContext().hasMapRenderer()) {
+				return this == other;
+			} else if (super.equals(other)) {
+				if (!(other instanceof GeometryMultiProfileWayStyle)) {
+					return false;
+				}
+				GeometryMultiProfileWayStyle o = (GeometryMultiProfileWayStyle) other;
+				return profileIconRes == o.profileIconRes
+						&& pathBorderColor == o.pathBorderColor
+						&& isGap == o.isGap;
+			}
+			return false;
 		}
 
 		@Override
 		public boolean hasPathLine() {
-			return true;
+			return !isGap;
 		}
 	}
 }

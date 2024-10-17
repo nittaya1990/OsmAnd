@@ -11,7 +11,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.wikipedia.WikipediaDialogFragment;
+import net.osmand.plus.utils.AndroidUtils;
 
 public class StartEditingTravelCard extends BaseTravelCard {
 
@@ -27,7 +27,7 @@ public class StartEditingTravelCard extends BaseTravelCard {
 	@Override
 	public void bindViewHolder(@NonNull RecyclerView.ViewHolder viewHolder) {
 		if (viewHolder instanceof StartEditingTravelVH) {
-			final StartEditingTravelVH holder = (StartEditingTravelVH) viewHolder;
+			StartEditingTravelVH holder = (StartEditingTravelVH) viewHolder;
 			holder.title.setText(R.string.start_editing_card_image_text);
 			holder.description.setText(R.string.start_editing_card_description);
 			holder.backgroundImage.setImageResource(R.drawable.img_help_wikivoyage_contribute);
@@ -35,7 +35,7 @@ public class StartEditingTravelCard extends BaseTravelCard {
 			holder.button.setOnClickListener(new View.OnClickListener() {
 				@Override
 				public void onClick(View v) {
-					WikipediaDialogFragment.showFullArticle(activity,
+					AndroidUtils.openUrl(activity,
 							Uri.parse("https://" + app.getLanguage().toLowerCase() + ".m.wikivoyage.org"), nightMode);
 				}
 			});
@@ -49,12 +49,12 @@ public class StartEditingTravelCard extends BaseTravelCard {
 		final TextView button;
 		final ImageView backgroundImage;
 
-		public StartEditingTravelVH(final View itemView) {
+		public StartEditingTravelVH(View itemView) {
 			super(itemView);
-			title = (TextView) itemView.findViewById(R.id.title);
-			description = (TextView) itemView.findViewById(R.id.description);
-			button = (TextView) itemView.findViewById(R.id.bottom_button_text);
-			backgroundImage = (ImageView) itemView.findViewById(R.id.background_image);
+			title = itemView.findViewById(R.id.title);
+			description = itemView.findViewById(R.id.description);
+			button = itemView.findViewById(R.id.bottom_button_text);
+			backgroundImage = itemView.findViewById(R.id.background_image);
 		}
 	}
 

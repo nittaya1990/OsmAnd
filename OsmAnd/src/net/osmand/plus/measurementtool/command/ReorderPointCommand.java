@@ -1,6 +1,8 @@
 package net.osmand.plus.measurementtool.command;
 
-import net.osmand.GPXUtilities.WptPt;
+import androidx.annotation.NonNull;
+
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.plus.measurementtool.MeasurementToolLayer;
 
 import java.util.List;
@@ -10,7 +12,7 @@ public class ReorderPointCommand extends MeasurementModeCommand {
 	private final int from;
 	private final int to;
 
-	public ReorderPointCommand(MeasurementToolLayer measurementLayer, int from, int to) {
+	public ReorderPointCommand(@NonNull MeasurementToolLayer measurementLayer, int from, int to) {
 		super(measurementLayer);
 		this.from = from;
 		this.to = to;
@@ -40,6 +42,7 @@ public class ReorderPointCommand extends MeasurementModeCommand {
 		refreshMap();
 	}
 
+	@NonNull
 	@Override
 	public MeasurementCommandType getType() {
 		return MeasurementCommandType.REORDER_POINT;

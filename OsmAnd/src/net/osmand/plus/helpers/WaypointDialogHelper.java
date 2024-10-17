@@ -12,27 +12,24 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
-import net.osmand.AndroidUtils;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.Location;
 import net.osmand.TspAnt;
 import net.osmand.data.FavouritePoint;
 import net.osmand.data.LatLon;
 import net.osmand.data.LocationPoint;
 import net.osmand.data.PointDescription;
-import net.osmand.plus.ColorUtilities;
-import net.osmand.plus.OsmAndFormatter;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper;
-import net.osmand.plus.TargetPointsHelper.TargetPoint;
+import net.osmand.plus.helpers.TargetPointsHelper.TargetPoint;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.MenuBottomSheetDialogFragment;
 import net.osmand.plus.base.bottomsheetmenu.BaseBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.SimpleBottomSheetItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.DividerHalfItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.TitleItem;
-import net.osmand.plus.helpers.WaypointHelper.AmenityLocationPoint;
-import net.osmand.plus.helpers.WaypointHelper.LocationPointWrapper;
 import net.osmand.plus.routepreparationmenu.AddPointBottomSheetDialog;
 import net.osmand.plus.routepreparationmenu.MapRouteInfoMenu;
 import net.osmand.plus.views.controls.StableArrayAdapter;
@@ -73,12 +70,12 @@ public class WaypointDialogHelper {
 		this.mapActivity = mapActivity;
 	}
 
-	public static void updatePointInfoView(final OsmandApplication app, final Activity activity,
-										   View localView, final LocationPointWrapper ps,
-										   final boolean mapCenter, final boolean nightMode,
-										   final boolean edit, final boolean topBar) {
+	public static void updatePointInfoView(OsmandApplication app, Activity activity,
+	                                       View localView, LocationPointWrapper ps,
+	                                       boolean mapCenter, boolean nightMode,
+	                                       boolean edit, boolean topBar) {
 		WaypointHelper wh = app.getWaypointHelper();
-		final LocationPoint point = ps.getPoint();
+		LocationPoint point = ps.getPoint();
 		TextView text = localView.findViewById(R.id.waypoint_text);
 		if (!topBar) {
 			AndroidUtils.setTextPrimaryColor(activity, text, nightMode);
@@ -184,7 +181,7 @@ public class WaypointDialogHelper {
 	}
 
 	public List<Object> getTargetPoints() {
-		final List<Object> points = new ArrayList<>();
+		List<Object> points = new ArrayList<>();
 		for (int i = 0; i < WaypointHelper.MAX; i++) {
 			List<LocationPointWrapper> tp = waypointHelper.getWaypoints(i);
 			if ((i == WaypointHelper.WAYPOINTS || i == WaypointHelper.TARGETS) && waypointHelper.isTypeVisible(i)) {
@@ -305,12 +302,12 @@ public class WaypointDialogHelper {
 		updateControls(ctx, helper);
 	}
 
-	public static void deletePoint(final OsmandApplication app, Activity ctx,
-								   final ArrayAdapter adapter,
-								   final WaypointDialogHelper helper,
-								   final Object item,
-								   final List<LocationPointWrapper> deletedPoints,
-								   final boolean needCallback) {
+	public static void deletePoint(OsmandApplication app, Activity ctx,
+	                               ArrayAdapter adapter,
+	                               WaypointDialogHelper helper,
+	                               Object item,
+	                               List<LocationPointWrapper> deletedPoints,
+	                               boolean needCallback) {
 
 		if (item instanceof LocationPointWrapper && adapter != null) {
 			LocationPointWrapper point = (LocationPointWrapper) item;
@@ -347,7 +344,7 @@ public class WaypointDialogHelper {
 		}
 		Object object = locationPoint;
 		if (locationPoint instanceof AmenityLocationPoint) {
-			object = ((AmenityLocationPoint) locationPoint).a;
+			object = ((AmenityLocationPoint) locationPoint).getAmenity();
 		}
 		app.getSettings().setMapLocationToShow(locationPoint.getLatitude(), locationPoint.getLongitude(),
 				15, locationPoint.getPointDescription(a), false, object);
@@ -355,13 +352,13 @@ public class WaypointDialogHelper {
 	}
 
 	@SuppressLint("StaticFieldLeak")
-	public static void sortAllTargets(final OsmandApplication app, final Activity activity,
-									  final WaypointDialogHelper helper) {
+	public static void sortAllTargets(OsmandApplication app, Activity activity,
+	                                  WaypointDialogHelper helper) {
 
 		new AsyncTask<Void, Void, int[]>() {
 
-			ProgressDialog dlg = null;
-			long startDialogTime = 0;
+			ProgressDialog dlg;
+			long startDialogTime;
 			List<TargetPoint> intermediates;
 
 			protected void onPreExecute() {
@@ -407,12 +404,7 @@ public class WaypointDialogHelper {
 				if (dlg != null) {
 					long t = System.currentTimeMillis();
 					if (t - startDialogTime < 500) {
-						app.runInUIThread(new Runnable() {
-							@Override
-							public void run() {
-								dlg.dismiss();
-							}
-						}, 500 - (t - startDialogTime));
+						app.runInUIThread(dlg::dismiss, 500 - (t - startDialogTime));
 					} else {
 						dlg.dismiss();
 					}
@@ -460,8 +452,8 @@ public class WaypointDialogHelper {
 		@Override
 		public void createMenuItems(Bundle savedInstanceState) {
 			items.add(new TitleItem(getString(R.string.shared_string_options)));
-			final OsmandApplication app = requiredMyApplication();
-			final TargetPointsHelper targetsHelper = app.getTargetPointsHelper();
+			OsmandApplication app = requiredMyApplication();
+			TargetPointsHelper targetsHelper = app.getTargetPointsHelper();
 			BaseBottomSheetItem sortDoorToDoorItem = new SimpleBottomSheetItem.Builder()
 					.setIcon(getContentIcon(R.drawable.ic_action_sort_door_to_door))
 					.setTitle(getString(R.string.intermediate_items_sort_by_distance))
@@ -471,7 +463,7 @@ public class WaypointDialogHelper {
 						public void onClick(View v) {
 							MapActivity mapActivity = getMapActivity();
 							if (mapActivity != null) {
-								WaypointDialogHelper.sortAllTargets(
+								sortAllTargets(
 										mapActivity.getMyApplication(),
 										mapActivity,
 										mapActivity.getDashboard().getWaypointDialogHelper()
@@ -511,7 +503,7 @@ public class WaypointDialogHelper {
 							public void onClick(View v) {
 								MapActivity mapActivity = getMapActivity();
 								if (mapActivity != null) {
-									WaypointDialogHelper.reverseAllPoints(
+									reverseAllPoints(
 											app,
 											mapActivity,
 											mapActivity.getDashboard().getWaypointDialogHelper()
@@ -526,7 +518,7 @@ public class WaypointDialogHelper {
 
 			items.add(new DividerHalfItem(getContext()));
 
-			final BaseBottomSheetItem[] addWaypointItem = new BaseBottomSheetItem[1];
+			BaseBottomSheetItem[] addWaypointItem = new BaseBottomSheetItem[1];
 			addWaypointItem[0] = new SimpleBottomSheetItem.Builder()
 					.setIcon(getContentIcon(R.drawable.ic_action_plus))
 					.setTitle(getString(R.string.add_intermediate_point))
@@ -550,7 +542,7 @@ public class WaypointDialogHelper {
 						public void onClick(View v) {
 							MapActivity mapActivity = getMapActivity();
 							if (mapActivity != null) {
-								WaypointDialogHelper.clearAllIntermediatePoints(
+								clearAllIntermediatePoints(
 										mapActivity,
 										mapActivity.getMyApplication().getTargetPointsHelper(),
 										mapActivity.getDashboard().getWaypointDialogHelper()
@@ -578,7 +570,7 @@ public class WaypointDialogHelper {
 		}
 
 		private void onWaypointItemClick() {
-			final MapActivity mapActivity = getMapActivity();
+			MapActivity mapActivity = getMapActivity();
 			if (mapActivity != null) {
 				openAddPointDialog(mapActivity);
 			}

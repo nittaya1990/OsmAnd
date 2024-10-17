@@ -1,30 +1,33 @@
 package net.osmand.plus.routing;
 
-import android.os.AsyncTask;
+import static net.osmand.plus.notifications.OsmandNotification.NotificationType.NAVIGATION;
 
 import androidx.annotation.NonNull;
 
 import net.osmand.Location;
 import net.osmand.data.LatLon;
-import net.osmand.map.WorldRegion;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
+import net.osmand.plus.onlinerouting.engine.OnlineRoutingEngine;
 import net.osmand.plus.routing.GPXRouteParams.GPXRouteParamsBuilder;
 import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.settings.backend.OsmandSettings;
 import net.osmand.router.RouteCalculationProgress;
+import net.osmand.util.Algorithms;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+import java.util.Set;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Future;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
-
-import static net.osmand.plus.notifications.OsmandNotification.NotificationType.NAVIGATION;
 
 class RouteRecalculationHelper {
 
@@ -39,13 +42,13 @@ class RouteRecalculationHelper {
 	private final Map<Future<?>, RouteRecalculationTask> tasksMap = new LinkedHashMap<>();
 	private RouteRecalculationTask lastTask;
 
-	private long lastTimeEvaluatedRoute = 0;
+	private long lastTimeEvaluatedRoute;
 	private String lastRouteCalcError;
 	private String lastRouteCalcErrorShort;
-	private long recalculateCountInInterval = 0;
-	private int evalWaitInterval = 0;
+	private long recalculateCountInInterval;
+	private int evalWaitInterval;
 
-	private RouteCalculationProgressCallback progressRoute;
+	private Set<RouteCalculationProgressListener> calculationProgressListeners = new HashSet<>();
 
 	RouteRecalculationHelper(@NonNull RoutingHelper routingHelper) {
 		this.routingHelper = routingHelper;
@@ -60,8 +63,16 @@ class RouteRecalculationHelper {
 		return lastRouteCalcErrorShort;
 	}
 
-	void setProgressBar(RouteCalculationProgressCallback progressRoute) {
-		this.progressRoute = progressRoute;
+	public void addCalculationProgressListener(@NonNull RouteCalculationProgressListener listener) {
+		Set<RouteCalculationProgressListener> listeners = new HashSet<>(this.calculationProgressListeners);
+		listeners.add(listener);
+		this.calculationProgressListeners = listeners;
+	}
+
+	public void removeCalculationProgressListener(@NonNull RouteCalculationProgressListener listener) {
+		Set<RouteCalculationProgressListener> listeners = new HashSet<>(this.calculationProgressListeners);
+		listeners.remove(listener);
+		this.calculationProgressListeners = listeners;
 	}
 
 	boolean isRouteBeingCalculated() {
@@ -79,29 +90,9 @@ class RouteRecalculationHelper {
 		evalWaitInterval = 0;
 	}
 
-	public boolean isMissingMapsSearching() {
-		synchronized (routingHelper) {
-			RouteRecalculationTask lastTask = this.lastTask;
-			if (isRouteBeingCalculated() && lastTask != null) {
-				return lastTask.isMissingMapsSearching();
-			}
-		}
-		return false;
-	}
-
-	boolean startMissingMapsOnlineSearch() {
-		synchronized (routingHelper) {
-			RouteRecalculationTask lastTask = this.lastTask;
-			if (isRouteBeingCalculated() && lastTask != null) {
-				return lastTask.startMissingMapsOnlineSearch();
-			}
-		}
-		return false;
-	}
-
 	void stopCalculationIfParamsNotChanged() {
 		synchronized (routingHelper) {
-			boolean hasPendingTasks = tasksMap.isEmpty();
+			//boolean hasPendingTasks = tasksMap.isEmpty();
 			for (Entry<Future<?>, RouteRecalculationTask> taskFuture : tasksMap.entrySet()) {
 				RouteRecalculationTask task = taskFuture.getValue();
 				if (!task.isParamsChanged()) {
@@ -109,11 +100,12 @@ class RouteRecalculationHelper {
 					task.stopCalculation();
 				}
 			}
-			if (hasPendingTasks) {
-				if (isFollowingMode()) {
-					getVoiceRouter().announceBackOnRoute();
-				}
-			}
+			// Avoid offRoute/onRoute loop, #16571
+			//if (hasPendingTasks) {
+			//	if (isFollowingMode()) {
+			//		getVoiceRouter().announceBackOnRoute();
+			//	}
+			//}
 		}
 	}
 
@@ -154,9 +146,9 @@ class RouteRecalculationHelper {
 		return routingHelper.getLastProjection();
 	}
 
-	private void setNewRoute(RouteCalculationResult prevRoute, final RouteCalculationResult res, Location start) {
+	private void setNewRoute(RouteCalculationResult prevRoute, RouteCalculationResult res, Location start) {
 		routingHelper.setRoute(res);
-		final boolean newRoute = !prevRoute.isCalculated();
+		boolean newRoute = !prevRoute.isCalculated();
 		if (isFollowingMode()) {
 			Location lastFixedLocation = getLastFixedLocation();
 			if (lastFixedLocation != null) {
@@ -169,7 +161,8 @@ class RouteRecalculationHelper {
 				int newCurrentRoute = RoutingHelperUtils.lookAheadFindMinOrthogonalDistance(start, routeNodes, res.currentRoute, 15);
 				if (newCurrentRoute + 1 < routeNodes.size()) {
 					// This check is valid for Online/GPX services (offline routing is aware of route direction)
-					wrongMovementDirection = RoutingHelperUtils.checkWrongMovementDirection(start, routeNodes.get(newCurrentRoute + 1));
+					Location prev = res.getRouteLocationByDistance(-15);
+					wrongMovementDirection = RoutingHelperUtils.checkWrongMovementDirection(start, prev, routeNodes.get(newCurrentRoute + 1));
 					// set/reset evalWaitInterval only if new route is in forward direction
 					if (wrongMovementDirection) {
 						evalWaitInterval = 3000;
@@ -182,12 +175,25 @@ class RouteRecalculationHelper {
 			}
 			// trigger voice prompt only if new route is in forward direction
 			// If route is in wrong direction after one more setLocation it will be recalculated
-			if (!wrongMovementDirection || newRoute) {
+			if (shouldAnnounceNewRoute(res) && (!wrongMovementDirection || newRoute)) {
 				getVoiceRouter().newRouteIsCalculated(newRoute);
 			}
 		}
 		app.getWaypointHelper().setNewRoute(res);
 		routingHelper.newRouteCalculated(newRoute, res);
+		if (res.initialCalculation) {
+			app.runInUIThread(() -> routingHelper.recalculateRouteDueToSettingsChange(false));
+		}
+	}
+
+	private boolean shouldAnnounceNewRoute(RouteCalculationResult res) {
+		if (res.getAppMode().getRouteService() == RouteService.ONLINE) {
+			OnlineRoutingEngine engine = app.getOnlineRoutingHelper().getEngineByKey(res.getAppMode().getRoutingProfile());
+			if (engine != null && engine.isOnlineEngineWithApproximation()) {
+				return res.initialCalculation; // announce at 1st phase (before approximation)
+			}
+		}
+		return !res.initialCalculation; // announce at final
 	}
 
 	void startRouteCalculationThread(RouteCalculationParams params, boolean paramsChanged, boolean updateProgress) {
@@ -196,17 +202,18 @@ class RouteRecalculationHelper {
 			RouteRecalculationTask newTask = new RouteRecalculationTask(this,
 					params, paramsChanged, updateProgress);
 			lastTask = newTask;
-			startProgress(params);
+			onRouteCalculationStart(params);
 			if (updateProgress) {
-				updateProgress(params);
+				updateProgressWithDelay(params);
 			}
 			Future<?> future = executor.submit(newTask);
 			tasksMap.put(future, newTask);
 		}
 	}
 
-	public void recalculateRouteInBackground(final Location start, final LatLon end, final List<LatLon> intermediates,
-											 final GPXRouteParamsBuilder gpxRoute, final RouteCalculationResult previousRoute, boolean paramsChanged, boolean onlyStartPointChanged) {
+	public void recalculateRouteInBackground(Location start, LatLon end, List<LatLon> intermediates,
+	                                         GPXRouteParamsBuilder gpxRoute, RouteCalculationResult previousRoute,
+	                                         boolean paramsChanged, boolean onlyStartPointChanged) {
 		if (start == null || end == null) {
 			return;
 		}
@@ -217,14 +224,18 @@ class RouteRecalculationHelper {
 				recalculateCountInInterval++;
 			}
 			ApplicationMode mode = getAppMode();
-			final RouteCalculationParams params = new RouteCalculationParams();
+			RouteCalculationParams params = new RouteCalculationParams();
 			params.start = start;
 			params.end = end;
 			params.intermediates = intermediates;
-			params.gpxRoute = gpxRoute == null ? null : gpxRoute.build(app);
+			if (gpxRoute != null) {
+				params.gpxRoute = gpxRoute.build(app, end);
+			} else {
+				params.gpxRoute = null;
+			}
 			params.onlyStartPointChanged = onlyStartPointChanged;
 			if (recalculateCountInInterval < RECALCULATE_THRESHOLD_COUNT_CAUSING_FULL_RECALCULATE
-					|| (gpxRoute != null && gpxRoute.isPassWholeRoute() && isDeviatedFromRoute())) {
+					|| (gpxRoute != null && isDeviatedFromRoute())) {
 				params.previousToRecalculate = previousRoute;
 			} else {
 				recalculateCountInInterval = 0;
@@ -241,69 +252,76 @@ class RouteRecalculationHelper {
 			if (getLastProjection() != null) {
 				params.currentLocation = getLastFixedLocation();
 			}
+			if (params.mode.getRouteService() == RouteService.ONLINE) {
+				OnlineRoutingEngine engine = app.getOnlineRoutingHelper().getEngineByKey(params.mode.getRoutingProfile());
+				if (engine != null) {
+					engine.updateRouteParameters(params, paramsChanged ? previousRoute : null);
+				}
+			}
 			startRouteCalculationThread(params, paramsChanged, updateProgress);
 		}
 	}
 
-	void startProgress(final RouteCalculationParams params) {
-		if (params.calculationProgressCallback != null) {
-			params.calculationProgressCallback.start();
-		} else if (progressRoute != null) {
-			progressRoute.start();
+	void updateProgressWithDelay(RouteCalculationParams params) {
+		app.runInUIThread(() -> {
+			updateProgressInUIThread(params);
+		}, 300);
+	}
+
+	private void updateProgressInUIThread(RouteCalculationParams params) {
+		Collection<RouteCalculationProgressListener> listeners = params.calculationProgressListener != null
+				? Collections.singletonList(params.calculationProgressListener)
+				: calculationProgressListeners;
+		boolean isRouteBeingCalculated = !Algorithms.isEmpty(listeners);
+		for (RouteCalculationProgressListener listener : listeners) {
+			isRouteBeingCalculated &= onRouteCalculationUpdate(listener, params);
+		}
+		if (isRouteBeingCalculated) {
+			updateProgressWithDelay(params);
 		}
 	}
 
-	void updateProgress(final RouteCalculationParams params) {
-		final RouteCalculationProgressCallback progressRoute;
-		if (params.calculationProgressCallback != null) {
-			progressRoute = params.calculationProgressCallback;
+	private void onRouteCalculationStart(@NonNull RouteCalculationParams params) {
+		if (params.calculationProgressListener != null) {
+			params.calculationProgressListener.onCalculationStart();
 		} else {
-			progressRoute = this.progressRoute;
+			for (RouteCalculationProgressListener listener : calculationProgressListeners) {
+				listener.onCalculationStart();
+			}
 		}
-		if (progressRoute != null) {
-			app.runInUIThread(() -> {
-				RouteCalculationProgress calculationProgress = params.calculationProgress;
-				if (isRouteBeingCalculated()) {
-					boolean routeCalculationStarted = calculationProgress.routeCalculationStartTime != 0;
-					if (lastTask != null && lastTask.params == params) {
-						progressRoute.updateProgress((int) calculationProgress.getLinearProgress());
-						if (calculationProgress.requestPrivateAccessRouting) {
-							progressRoute.requestPrivateAccessRouting();
-						}
-						if (routeCalculationStarted) {
-							if (lastTask.missingMaps != null) {
-								progressRoute.updateMissingMaps(lastTask.missingMaps, true);
-							} else if (System.currentTimeMillis() > calculationProgress.routeCalculationStartTime + SUGGEST_MAPS_ONLINE_SEARCH_WAITING_TIME) {
-								progressRoute.updateMissingMaps(null, true);
-							} else if (calculationProgress.missingMaps != null) {
-								progressRoute.updateMissingMaps(calculationProgress.missingMaps, false);
-							}
-						}
-						updateProgress(params);
-					}
-				} else {
-					if (calculationProgress.requestPrivateAccessRouting) {
-						progressRoute.requestPrivateAccessRouting();
-					}
-					progressRoute.finish();
+	}
+
+	private boolean onRouteCalculationUpdate(@NonNull RouteCalculationProgressListener progressRoute,
+	                                         @NonNull RouteCalculationParams params) {
+		RouteCalculationProgress calculationProgress = params.calculationProgress;
+		if (isRouteBeingCalculated()) {
+			if (lastTask != null && lastTask.params == params) {
+				progressRoute.onUpdateCalculationProgress((int) calculationProgress.getLinearProgress());
+				if (calculationProgress.requestPrivateAccessRouting) {
+					progressRoute.onRequestPrivateAccessRouting();
 				}
-			}, 300);
-		}
-	}
-
-	void finishProgress(RouteCalculationParams params) {
-		final RouteCalculationProgressCallback progressRoute;
-		if (params.calculationProgressCallback != null) {
-			progressRoute = params.calculationProgressCallback;
+				return true;
+			}
 		} else {
-			progressRoute = this.progressRoute;
+			if (calculationProgress.requestPrivateAccessRouting) {
+				progressRoute.onRequestPrivateAccessRouting();
+			}
+			progressRoute.onCalculationFinish();
 		}
-		if (progressRoute != null) {
-			progressRoute.finish();
+		return false;
+	}
+
+	private void onRouteCalculationFinish(@NonNull RouteCalculationParams params) {
+		if (params.calculationProgressListener != null) {
+			params.calculationProgressListener.onCalculationFinish();
+		} else {
+			for (RouteCalculationProgressListener listener : calculationProgressListeners) {
+				listener.onCalculationFinish();
+			}
 		}
 	}
 
-	private static class RouteRecalculationTask implements Runnable {
+	private class RouteRecalculationTask implements Runnable {
 
 		private final RouteRecalculationHelper routingThreadHelper;
 		private final RoutingHelper routingHelper;
@@ -311,12 +329,9 @@ class RouteRecalculationHelper {
 		private final boolean paramsChanged;
 		private final boolean updateProgress;
 
-		private MissingMapsOnlineSearchTask missingMapsOnlineSearchTask;
-		private List<WorldRegion> missingMaps;
-
 		String routeCalcError;
 		String routeCalcErrorShort;
-		int evalWaitInterval = 0;
+		int evalWaitInterval;
 
 		public RouteRecalculationTask(@NonNull RouteRecalculationHelper routingThreadHelper,
 									  @NonNull RouteCalculationParams params, boolean paramsChanged,
@@ -335,43 +350,31 @@ class RouteRecalculationHelper {
 			return paramsChanged;
 		}
 
-		public boolean isMissingMapsSearching() {
-			return missingMapsOnlineSearchTask != null && missingMaps == null;
-		}
-
 		public void stopCalculation() {
 			params.calculationProgress.isCancelled = true;
-		}
-
-		public boolean startMissingMapsOnlineSearch() {
-			if (missingMapsOnlineSearchTask == null) {
-				missingMapsOnlineSearchTask = new MissingMapsOnlineSearchTask(params, missingMaps -> {
-					RouteRecalculationTask.this.missingMaps = missingMaps;
-				});
-				missingMapsOnlineSearchTask.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-				return true;
-			}
-			return false;
 		}
 
 		private OsmandSettings getSettings() {
 			return routingHelper.getSettings();
 		}
 
-		private void showMessage(final String msg) {
-			final OsmandApplication app = routingHelper.getApplication();
+		private void showMessage(String msg) {
+			OsmandApplication app = routingHelper.getApplication();
 			app.runInUIThread(() -> app.showToastMessage(msg));
 		}
 
 		@Override
 		public void run() {
+			if (!updateProgress) {
+				updateProgressWithDelay(params);
+			}
 			RouteProvider provider = routingHelper.getProvider();
 			OsmandSettings settings = getSettings();
 			RouteCalculationResult res = provider.calculateRouteImpl(params);
 			if (params.calculationProgress.isCancelled) {
 				return;
 			}
-			final boolean onlineSourceWithoutInternet = !res.isCalculated() &&
+			boolean onlineSourceWithoutInternet = !res.isCalculated() &&
 					params.mode.getRouteService().isOnline() && !settings.isInternetConnectionAvailable();
 			if (onlineSourceWithoutInternet && settings.GPX_ROUTE_CALC_OSMAND_PARTS.get()) {
 				if (params.previousToRecalculate != null && params.previousToRecalculate.isCalculated()) {
@@ -402,16 +405,12 @@ class RouteRecalculationHelper {
 						routeCalcError = app.getString(R.string.empty_route_calculated);
 						routeCalcErrorShort = app.getString(R.string.empty_route_calculated);
 					}
+					app.getSettings().IGNORE_MISSING_MAPS = false; // reset on routing error
 					showMessage(routeCalcError);
 				}
 			}
 			if (!updateProgress) {
-				routingHelper.getApplication().runInUIThread(new Runnable() {
-					@Override
-					public void run() {
-						routingThreadHelper.finishProgress(params);
-					}
-				});
+				app.runInUIThread(() -> routingThreadHelper.onRouteCalculationFinish(params));
 			}
 			app.getNotificationHelper().refreshNotification(NAVIGATION);
 		}
@@ -420,7 +419,7 @@ class RouteRecalculationHelper {
 	private class RouteRecalculationExecutor extends ThreadPoolExecutor {
 
 		public RouteRecalculationExecutor() {
-			super(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<Runnable>());
+			super(1, 1, 0L, TimeUnit.MILLISECONDS, new LinkedBlockingQueue<>());
 		}
 
 		protected void afterExecute(Runnable r, Throwable t) {

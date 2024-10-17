@@ -1,5 +1,7 @@
 package net.osmand.plus.quickaction.actions;
 
+import static net.osmand.plus.quickaction.QuickActionIds.SHOW_HIDE_TRANSPORT_LINES_ACTION_ID;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -16,9 +18,9 @@ import net.osmand.plus.transport.TransportLinesMenu;
 
 public class ShowHideTransportLinesAction extends QuickAction {
 
-	public static final QuickActionType TYPE = new QuickActionType(31,
+	public static final QuickActionType TYPE = new QuickActionType(SHOW_HIDE_TRANSPORT_LINES_ACTION_ID,
 			"transport.showhide", ShowHideTransportLinesAction.class)
-			.nameActionRes(R.string.quick_action_show_hide_title)
+			.nameActionRes(R.string.quick_action_verb_show_hide)
 			.nameRes(R.string.poi_filter_public_transport)
 			.iconRes(R.drawable.ic_action_transport_bus).nonEditable()
 			.category(QuickActionType.CONFIGURE_MAP);
@@ -32,9 +34,11 @@ public class ShowHideTransportLinesAction extends QuickAction {
 	}
 
 	@Override
-	public void execute(@NonNull final MapActivity mapActivity) {
-		boolean enabled = TransportLinesMenu.isShowLines(mapActivity.getMyApplication());
-		TransportLinesMenu.toggleTransportLines(mapActivity, !enabled, null);
+	public void execute(@NonNull MapActivity mapActivity) {
+		OsmandApplication app = mapActivity.getMyApplication();
+		TransportLinesMenu transportLinesMenu = new TransportLinesMenu(app);
+		boolean selected = transportLinesMenu.isShowAnyTransport();
+		transportLinesMenu.toggleTransportLines(mapActivity, !selected);
 	}
 
 	@Override
@@ -50,14 +54,15 @@ public class ShowHideTransportLinesAction extends QuickAction {
 	}
 
 	@Override
-	public String getActionText(OsmandApplication application) {
-		String nameRes = application.getString(getNameRes());
-		String actionName = isActionWithSlash(application) ? application.getString(R.string.shared_string_hide) : application.getString(R.string.shared_string_show);
-		return application.getString(R.string.ltr_or_rtl_combine_via_dash, actionName, nameRes);
+	public String getActionText(@NonNull OsmandApplication app) {
+		String nameRes = app.getString(getNameRes());
+		String actionName = isActionWithSlash(app) ? app.getString(R.string.shared_string_hide) : app.getString(R.string.shared_string_show);
+		return app.getString(R.string.ltr_or_rtl_combine_via_dash, actionName, nameRes);
 	}
 
 	@Override
-	public boolean isActionWithSlash(OsmandApplication application) {
-		return TransportLinesMenu.isShowLines(application);
+	public boolean isActionWithSlash(@NonNull OsmandApplication app) {
+		TransportLinesMenu menu = new TransportLinesMenu(app);
+		return menu.isShowAnyTransport();
 	}
 }

@@ -1,7 +1,12 @@
 package net.osmand.plus.voice;
 
 import android.content.Context;
+import android.media.AudioDeviceInfo;
 import android.media.AudioManager;
+import android.os.Build;
+
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
@@ -21,9 +26,6 @@ import java.io.File;
 import java.io.FileReader;
 import java.util.List;
 
-import androidx.annotation.NonNull;
-import androidx.annotation.Nullable;
-
 public abstract class CommandPlayer {
 
 	private static final Log log = PlatformUtil.getLog(CommandPlayer.class);
@@ -38,7 +40,7 @@ public abstract class CommandPlayer {
 	public static final String A_RIGHT_SL = "right_sl";
 	public static final String A_RIGHT_KEEP = "right_keep";
 
-	private static boolean bluetoothScoRunning = false;
+	private static boolean bluetoothScoRunning;
 	// Only for debugging
 	private static String bluetoothScoStatus = "-";
 
@@ -49,20 +51,20 @@ public abstract class CommandPlayer {
 	protected final ScriptableObject jsScope;
 	protected final VoiceRouter voiceRouter;
 
-	private AudioFocusHelper mAudioFocusHelper;
+	private AudioFocusHelper focusHelper;
 
 	protected final File voiceProviderDir;
 	protected final String language;
 	protected int streamType;
 
+	@NonNull
 	public static CommandPlayer createCommandPlayer(@NonNull OsmandApplication app,
 	                                                @NonNull ApplicationMode appMode,
 	                                                @NonNull String voiceProvider) throws CommandPlayerException {
 
 		File voicesDir = app.getAppPath(IndexConstants.VOICE_INDEX_DIR);
 		File voiceProviderDir = new File(voicesDir, voiceProvider);
-		File ttsFile = getTtsFileFromDir(voiceProviderDir);
-		if (!ttsFile.exists()) {
+		if (!voiceProviderDir.exists()) {
 			throw new CommandPlayerException(app.getString(R.string.voice_data_unavailable));
 		}
 
@@ -75,20 +77,21 @@ public abstract class CommandPlayer {
 		throw new CommandPlayerException(app.getString(R.string.voice_data_not_supported));
 	}
 
-	protected CommandPlayer(OsmandApplication app,
-	                        ApplicationMode applicationMode,
-	                        VoiceRouter voiceRouter,
-	                        File voiceProviderDir) throws CommandPlayerException {
+	protected CommandPlayer(@NonNull OsmandApplication app,
+	                        @NonNull ApplicationMode applicationMode,
+	                        @NonNull VoiceRouter voiceRouter,
+	                        @NonNull File voiceProviderDir) throws CommandPlayerException {
 		this.app = app;
 		this.settings = app.getSettings();
 		this.applicationMode = applicationMode;
 		this.voiceRouter = voiceRouter;
-		this.streamType = settings.AUDIO_MANAGER_STREAM.getModeValue(applicationMode);
+		this.streamType = settings.AUDIO_MANAGER_STREAM.getModeValue(app.getRoutingHelper().getAppMode());
 		this.voiceProviderDir = voiceProviderDir;
 		this.language = defineVoiceProviderLanguage();
-		jsScope = initializeJsScope();
+		this.jsScope = initializeJsScope();
 	}
 
+	@NonNull
 	private String defineVoiceProviderLanguage() {
 		return voiceProviderDir.getName()
 				.replace(IndexConstants.VOICE_PROVIDER_SUFFIX, "")
@@ -96,6 +99,7 @@ public abstract class CommandPlayer {
 				.replace("-casual", "");
 	}
 
+	@NonNull
 	private ScriptableObject initializeJsScope() {
 		org.mozilla.javascript.Context context = org.mozilla.javascript.Context.enter();
 		context.setOptimizationLevel(-1);
@@ -113,31 +117,31 @@ public abstract class CommandPlayer {
 		return jsScope;
 	}
 
-	private static File getTtsFileFromDir(@NonNull File voiceProviderDir) {
-		String ttsFileName = voiceProviderDir.getName()
-				.replace("-tts", "_" + IndexConstants.TTSVOICE_INDEX_EXT_JS);
-		return new File(voiceProviderDir, ttsFileName);
-	}
-
+	@NonNull
 	public abstract CommandBuilder newCommandBuilder();
 
 	public abstract boolean supportsStructuredStreetNames();
 
-	public abstract List<String> playCommands(CommandBuilder builder);
+	@NonNull
+	public abstract List<String> playCommands(@NonNull CommandBuilder builder);
 
 	public abstract void stop();
 
+	@NonNull
+	public abstract File getTtsFileFromDir(@NonNull File voiceProviderDir);
+
+	@NonNull
 	public String getLanguage() {
 		return language;
 	}
 
+	@NonNull
 	public String getCurrentVoice() {
 		return voiceProviderDir.getName();
 	}
 
 	public void clear() {
 		abandonAudioFocus();
-		app = null;
 	}
 
 	public void updateAudioStream(int streamType) {
@@ -146,10 +150,12 @@ public abstract class CommandPlayer {
 
 	protected synchronized void requestAudioFocus() {
 		log.debug("requestAudioFocus");
-		mAudioFocusHelper = createAudioFocusHelper();
-		if (mAudioFocusHelper != null && app != null) {
-			boolean audioFocusGranted = mAudioFocusHelper.requestAudFocus(app, applicationMode, streamType);
-			if (audioFocusGranted && settings.AUDIO_MANAGER_STREAM.getModeValue(applicationMode) == 0) {
+		streamType = app.getSettings().AUDIO_MANAGER_STREAM.getModeValue(app.getRoutingHelper().getAppMode());
+		updateAudioStream(streamType);
+		focusHelper = createAudioFocusHelper();
+		if (focusHelper != null && app != null) {
+			boolean audioFocusGranted = focusHelper.requestAudFocus(app);
+			if (audioFocusGranted && streamType == 0) {
 				startBluetoothSco();
 			}
 		}
@@ -164,33 +170,43 @@ public abstract class CommandPlayer {
 			return null;
 		}
 	}
-	
+
 	protected synchronized void abandonAudioFocus() {
 		log.debug("abandonAudioFocus");
-		if ((app != null && settings.AUDIO_MANAGER_STREAM.getModeValue(applicationMode) == 0)
-				|| bluetoothScoRunning) {
+		if (streamType == 0 || bluetoothScoRunning) {
 			stopBluetoothSco();
 		}
-		if (app != null && mAudioFocusHelper != null) {
-			mAudioFocusHelper.abandonAudFocus(app, applicationMode, streamType);
+		if (app != null && focusHelper != null) {
+			focusHelper.abandonAudFocus(app);
 		}
-		mAudioFocusHelper = null;
+		focusHelper = null;
 	}
 
 	// Hardy, 2016-07-03: Establish a low quality BT SCO (Synchronous Connection-Oriented) link to interrupt e.g. a car stereo FM radio
+	// Hardy, 2024-07-23: Adjust for API Level 34 deprecation of startBluetoothSco(), stopBluetoothSco()
 	private synchronized void startBluetoothSco() {
 		try {
-			AudioManager mAudioManager = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
-			if (mAudioManager == null || !mAudioManager.isBluetoothScoAvailableOffCall()) {
+			AudioManager manager = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+			if (manager == null || !manager.isBluetoothScoAvailableOffCall()) {
 				bluetoothScoRunning = false;
 				bluetoothScoStatus = "Reported not available.";
 				return;
 			}
 
-			mAudioManager.setMode(AudioManager.MODE_NORMAL);
-			mAudioManager.startBluetoothSco();
-			mAudioManager.setBluetoothScoOn(true);
-			mAudioManager.setMode(AudioManager.MODE_IN_COMMUNICATION);
+			manager.setMode(AudioManager.MODE_NORMAL);
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+				List<AudioDeviceInfo> devices = manager.getAvailableCommunicationDevices();
+				for (AudioDeviceInfo device : devices) {
+					if (device.getType() == AudioDeviceInfo.TYPE_BLUETOOTH_SCO) {
+						manager.setCommunicationDevice(device);
+						break;
+					}
+				}
+			} else {
+				manager.startBluetoothSco();
+			}
+			manager.setBluetoothScoOn(true);
+			manager.setMode(AudioManager.MODE_IN_COMMUNICATION);
 			bluetoothScoRunning = true;
 			bluetoothScoStatus = "Available, initialized OK.";
 		} catch (Exception e) {
@@ -201,11 +217,15 @@ public abstract class CommandPlayer {
 	}
 
 	private synchronized void stopBluetoothSco() {
-		AudioManager mAudioManager = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
-		if (mAudioManager != null) {
-			mAudioManager.setBluetoothScoOn(false);
-			mAudioManager.stopBluetoothSco();
-			mAudioManager.setMode(AudioManager.MODE_NORMAL);
+		AudioManager manager = (AudioManager) app.getSystemService(Context.AUDIO_SERVICE);
+		if (manager != null) {
+			manager.setBluetoothScoOn(false);
+			if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
+				manager.clearCommunicationDevice();
+			} else {
+				manager.stopBluetoothSco();
+			}
+			manager.setMode(AudioManager.MODE_NORMAL);
 			bluetoothScoRunning = false;
 		}
 	}
@@ -214,6 +234,7 @@ public abstract class CommandPlayer {
 		return bluetoothScoRunning;
 	}
 
+	@NonNull
 	public static String getBluetoothScoStatus() {
 		return bluetoothScoStatus;
 	}

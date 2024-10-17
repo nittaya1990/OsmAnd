@@ -99,19 +99,17 @@ public class CollatorStringMatcher implements StringMatcher {
 //		}
 //		return true;
 		
-		if (base.length() <= part.length())
+		if (base.length() <= part.length()) {
 			return collator.equals(base, part);
-		
+		}
 		for (int pos = 0; pos <= base.length() - part.length() + 1; pos++) {
-			String temp = base.substring(pos, base.length());
-			
+			String temp = base.substring(pos, Math.min(pos + part.length() * 2, base.length()));
 			for (int length = temp.length(); length >= 0; length--) {
-				String temp2 = temp.substring(0,  length);
+				String temp2 = temp.substring(0, length);
 				if (collator.equals(temp2, part)) 
 					return true;
 			}
 		}
-		
 		return false;
 	}
 
@@ -135,7 +133,7 @@ public class CollatorStringMatcher implements StringMatcher {
 	 */
 	public static boolean cstartsWith(Collator collator, String fullTextP, String theStart, 
 			boolean checkBeginning, boolean checkSpaces, boolean equals) {
-		// FUTURE: This is not effective code, it runs on each comparision
+		// FUTURE: This is not effective code, it runs on each comparison
 		// It would be more efficient to normalize all strings in file and normalize search string before collator  
 		theStart = alignChars(theStart);
 		String searchIn = simplifyStringAndAlignChars(fullTextP);

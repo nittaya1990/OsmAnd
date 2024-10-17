@@ -7,12 +7,16 @@ import android.graphics.Color;
 import android.graphics.drawable.Drawable;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.appcompat.content.res.AppCompatResources;
 import androidx.core.graphics.drawable.DrawableCompat;
 
 import net.osmand.PlatformUtil;
+import net.osmand.data.Amenity;
+import net.osmand.osm.PoiType;
 import net.osmand.plus.R;
 import net.osmand.plus.R.drawable;
+import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
 
@@ -32,25 +36,30 @@ public class RenderingIcons {
 	private static final Map<String, Bitmap> iconsBmp = new LinkedHashMap<>();
 	private static final Map<String, Drawable> iconsDrawable = new LinkedHashMap<>();
 
-	private static Bitmap cacheBmp = null;
+	private static Bitmap cacheBmp;
+	private static final String defaultPoiIconName = "craft_default";
 
-	public static boolean containsSmallIcon(String s){
+	public static boolean containsSmallIcon(String s) {
 		return smallIcons.containsKey(s);
 	}
-	
+
 	public static boolean containsBigIcon(String s) {
 		return bigIcons.containsKey(s);
 	}
 
-	public static synchronized Bitmap getBitmapFromVectorDrawable(Context context, int drawableId) {
+	public static synchronized Bitmap getBitmapFromVectorDrawable(@NonNull Context context, int drawableId) {
+		return getBitmapFromVectorDrawable(context, drawableId, 1f);
+	}
+
+	public static synchronized Bitmap getBitmapFromVectorDrawable(@NonNull Context context, int drawableId, float scale) {
 		Drawable drawable = AppCompatResources.getDrawable(context, drawableId);
 		if (drawable == null) {
 			return null;
 		}
-		if (cacheBmp == null || cacheBmp.getWidth() != drawable.getIntrinsicWidth()
-				|| cacheBmp.getHeight() != drawable.getIntrinsicHeight()) {
-			cacheBmp = Bitmap.createBitmap(drawable.getIntrinsicWidth(),
-					drawable.getIntrinsicHeight(), Bitmap.Config.ARGB_8888);
+		int width = (int) (drawable.getIntrinsicWidth() * scale);
+		int height = (int) (drawable.getIntrinsicHeight() * scale);
+		if (cacheBmp == null || cacheBmp.getWidth() != width || cacheBmp.getHeight() != height) {
+			cacheBmp = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
 		}
 		cacheBmp.eraseColor(Color.TRANSPARENT);
 		Canvas canvas = new Canvas(cacheBmp);
@@ -59,7 +68,7 @@ public class RenderingIcons {
 		return cacheBmp;
 	}
 
-	private static synchronized byte[] getPngFromVectorDrawable(Context context, int drawableId) {
+	private static synchronized byte[] getPngFromVectorDrawable(@NonNull Context context, int drawableId) {
 		Bitmap bmp = getBitmapFromVectorDrawable(context, drawableId);
 		if (bmp == null) {
 			return null;
@@ -68,29 +77,29 @@ public class RenderingIcons {
 		bmp.compress(Bitmap.CompressFormat.PNG, 100, baos);
 		return baos.toByteArray();
 	}
-	
+
 	public static byte[] getIconRawData(Context ctx, String s) {
 		Integer resId = shaderIcons.get(s);
 		if (resId == null) {
-			 resId = smallIcons.get(s);
+			resId = smallIcons.get(s);
 		}
 		if (resId == null) {
 			return null;
 		}
 		try {
-			final InputStream inputStream = ctx.getResources().openRawResource(resId);
-			final ByteArrayOutputStream proxyOutputStream = new ByteArrayOutputStream(1024);
-            final byte[] ioBuffer = new byte[1024];
-            int bytesRead;
-            while ((bytesRead = inputStream.read(ioBuffer)) >= 0) {
+			InputStream inputStream = ctx.getResources().openRawResource(resId);
+			ByteArrayOutputStream proxyOutputStream = new ByteArrayOutputStream(1024);
+			byte[] ioBuffer = new byte[1024];
+			int bytesRead;
+			while ((bytesRead = inputStream.read(ioBuffer)) >= 0) {
 				proxyOutputStream.write(ioBuffer, 0, bytesRead);
 			}
 			inputStream.close();
-			final byte[] bitmapData = proxyOutputStream.toByteArray();
+			byte[] bitmapData = proxyOutputStream.toByteArray();
 			if (isVectorData(bitmapData)) {
 				return getPngFromVectorDrawable(ctx, resId);
 			}
-            return bitmapData;
+			return bitmapData;
 		} catch (Throwable e) {
 			log.error("Failed to get byte stream from icon", e);
 			return null;
@@ -107,14 +116,54 @@ public class RenderingIcons {
 				&& bitmapData[2] == 8 && bitmapData[3] == 0;
 	}
 
+	@Nullable
+	public static String getIconNameForAmenity(@NonNull Amenity amenity) {
+		String subType = amenity.getSubType();
+		String[] subtypes = subType.split(";");//multivalued
+		PoiType poiType = amenity.getType().getPoiTypeByKeyName(subtypes[0]);
+		return poiType != null ? getIconNameForPoiType(poiType) : null;
+	}
+
+	@Nullable
+	public static String getIconNameForPoiType(@NonNull PoiType poiType) {
+		if (containsSmallIcon(poiType.getIconKeyName())) {
+			return poiType.getIconKeyName();
+		} else if (containsSmallIcon(poiType.getOsmTag() + "_" + poiType.getOsmValue())) {
+			return poiType.getOsmTag() + "_" + poiType.getOsmValue();
+		}
+
+		String iconName = null;
+		if (poiType.getParentType() != null) {
+			iconName = poiType.getParentType().getIconKeyName();
+		} else if (poiType.getFilter() != null) {
+			iconName = poiType.getFilter().getIconKeyName();
+		} else if (poiType.getCategory() != null) {
+			iconName = poiType.getCategory().getIconKeyName();
+		}
+		if (containsSmallIcon(iconName)) {
+			return iconName;
+		}
+		return defaultPoiIconName;
+	}
+
+	@Nullable
+	public static String getBigIconNameForAmenity(@NonNull Amenity amenity) {
+		PoiType poiType = amenity.getType().getPoiTypeByKeyName(amenity.getSubType());
+		if (poiType == null) {
+			return null;
+		} else if (containsBigIcon(poiType.getIconKeyName())) {
+			return poiType.getIconKeyName();
+		} else if (containsBigIcon(poiType.getOsmTag() + "_" + poiType.getOsmValue())) {
+			return poiType.getOsmTag() + "_" + poiType.getOsmValue();
+		}
+		return null;
+	}
+
 	public static int getBigIconResourceId(String s) {
 		Integer i = bigIcons.get(s);
-		if (i == null) {
-			return 0;
-		}
-		return i;
+		return i == null ? 0 : i;
 	}
-	
+
 	public static Drawable getBigIcon(Context ctx, String s) {
 		Integer resId = bigIcons.get(s);
 		if (resId != null) {
@@ -170,6 +219,7 @@ public class RenderingIcons {
 		return d;
 	}
 
+	@Nullable
 	public static String getBigIconName(@NonNull Integer iconId) {
 		for (String key : bigIcons.keySet()) {
 			if (iconId.equals(bigIcons.get(key))) {
@@ -179,11 +229,7 @@ public class RenderingIcons {
 		return null;
 	}
 
-	public static int getBigIconId(String iconName) {
-		return getResId("mx_" + iconName);
-	}
-
-	public static Integer getResId(String id) {
+	public static Integer getResId(@NonNull String id) {
 		if (id.startsWith("mx_")) {
 			return bigIcons.get(id.substring(3));
 		} else if (id.startsWith("h_")) {
@@ -203,7 +249,7 @@ public class RenderingIcons {
 			try {
 				if (f.getName().startsWith("h_")) {
 					shaderIcons.put(f.getName().substring(2), f.getInt(null));
-				} else if( f.getName().startsWith("mm_")) {
+				} else if (f.getName().startsWith("mm_")) {
 					smallIcons.put(f.getName().substring(3), f.getInt(null));
 				} else if (f.getName().startsWith("mx_")) {
 					bigIcons.put(f.getName().substring(3), f.getInt(null));
@@ -212,5 +258,11 @@ public class RenderingIcons {
 				log.error(e);
 			}
 		}
+	}
+
+	public static int getPreselectedIconId(@NonNull Amenity amenity) {
+		String gpxIconId = amenity.getGpxIcon();
+		String preselectedIconName = Algorithms.isEmpty(gpxIconId) ? getIconNameForAmenity(amenity) : gpxIconId;
+		return Algorithms.isEmpty(preselectedIconName) ? 0 : getBigIconResourceId(preselectedIconName);
 	}
 }

@@ -8,10 +8,10 @@ import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 
-import net.osmand.AndroidUtils;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.activities.MapActivity.ShowQuickSearchMode;
+import net.osmand.plus.search.ShowQuickSearchMode;
 import net.osmand.plus.dashboard.tools.DashFragmentData;
 
 public class DashSearchFragment extends DashBaseFragment {
@@ -28,7 +28,7 @@ public class DashSearchFragment extends DashBaseFragment {
 	public View initView(LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
 		View view = getActivity().getLayoutInflater().inflate(R.layout.dash_search_fragment, container, false);
 
-		TextView searchFor = (TextView) view.findViewById(R.id.search_for);
+		TextView searchFor = view.findViewById(R.id.search_for);
 		AndroidUtils.setCompoundDrawablesWithIntrinsicBounds(searchFor,
 				getMyApplication().getUIUtilities().getThemedIcon(R.drawable.ic_action_search_dark), null, null, null);
 		searchFor.setCompoundDrawablePadding(AndroidUtils.dpToPx(getActivity(), 16f));
@@ -36,7 +36,7 @@ public class DashSearchFragment extends DashBaseFragment {
 		view.findViewById(R.id.search_card).setOnClickListener(new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
-				((MapActivity) getActivity()).showQuickSearch(ShowQuickSearchMode.NEW, false);
+				((MapActivity) getActivity()).getFragmentsHelper().showQuickSearch(ShowQuickSearchMode.NEW, false);
 				closeDashboard();
 			}
 		});

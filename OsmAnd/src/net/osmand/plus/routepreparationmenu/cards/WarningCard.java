@@ -16,6 +16,7 @@ import androidx.annotation.NonNull;
 
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
+import net.osmand.plus.widgets.style.CustomClickableSpan;
 import net.osmand.util.Algorithms;
 
 public abstract class WarningCard extends MapBaseCard {
@@ -57,9 +58,9 @@ public abstract class WarningCard extends MapBaseCard {
 
 	@Override
 	protected void updateContent() {
-		ImageView icon = (ImageView) view.findViewById(R.id.warning_img);
-		TextView warningTitle = (TextView) view.findViewById(R.id.warning_title);
-		TextView warningLink = (TextView) view.findViewById(R.id.warning_link);
+		ImageView icon = view.findViewById(R.id.warning_img);
+		TextView warningTitle = view.findViewById(R.id.warning_title);
+		TextView warningLink = view.findViewById(R.id.warning_link);
 
 		if (imageDrawable != null) {
 			icon.setImageDrawable(imageDrawable);
@@ -72,21 +73,20 @@ public abstract class WarningCard extends MapBaseCard {
 		if (!Algorithms.isEmpty(linkText)) {
 			String text = linkText;
 			SpannableString spannable = new SpannableString(text);
-			ClickableSpan clickableSpan = new ClickableSpan() {
-				@Override
-				public void updateDrawState(@NonNull TextPaint ds) {
-					ds.setColor(getActiveColor());
-					ds.setUnderlineText(false);
-				}
-
+			ClickableSpan clickableSpan = new CustomClickableSpan() {
 				@Override
 				public void onClick(@NonNull View widget) {
-					CardListener listener = getListener();
-					if (listener != null) {
-						listener.onCardButtonPressed(WarningCard.this, 0);
+					if (getListener() != null) {
+						notifyButtonPressed(0);
 					} else {
 						onLinkClicked();
 					}
+				}
+
+				@Override
+				public void updateDrawState(@NonNull TextPaint ds) {
+					super.updateDrawState(ds);
+					ds.setColor(getActiveColor());
 				}
 			};
 			int startLinkIndex = this.startLinkIndex;

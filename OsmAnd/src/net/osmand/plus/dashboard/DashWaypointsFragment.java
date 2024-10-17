@@ -15,9 +15,9 @@ import net.osmand.data.LatLon;
 import net.osmand.data.PointDescription;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper;
-import net.osmand.plus.TargetPointsHelper.TargetPoint;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.helpers.TargetPointsHelper;
+import net.osmand.plus.helpers.TargetPointsHelper.TargetPoint;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.dashboard.tools.DashFragmentData;
 import net.osmand.plus.dialogs.DirectionsDialogs;
@@ -70,7 +70,7 @@ public class DashWaypointsFragment extends DashLocationFragment {
 			return;
 		}
 
-		final TargetPointsHelper helper = app.getTargetPointsHelper();
+		TargetPointsHelper helper = app.getTargetPointsHelper();
 		if (helper.getPointToNavigate() == null) {
 			AndroidUiHelper.updateVisibility(mainView.findViewById(R.id.main_fav), false);
 			return;
@@ -100,7 +100,7 @@ public class DashWaypointsFragment extends DashLocationFragment {
 				: Collections.singletonList(helper.getPointToNavigate());
 		List<DashLocationView> distances = new ArrayList<>();
 
-		for (final TargetPoint point : targetPoints) {
+		for (TargetPoint point : targetPoints) {
 			LayoutInflater inflater = getActivity().getLayoutInflater();
 			View view = inflater.inflate(R.layout.favorites_list_item, null, false);
 			TextView name = view.findViewById(R.id.favourite_label);
@@ -128,7 +128,7 @@ public class DashWaypointsFragment extends DashLocationFragment {
 			name.setText(PointDescription.getSimpleName(point, getActivity()));
 			ImageButton options = view.findViewById(R.id.options);
 			options.setVisibility(View.VISIBLE);
-			final boolean optionsVisible = (SHOW_ALL && app.getTargetPointsHelper().getIntermediatePoints().size() > 0);
+			boolean optionsVisible = (SHOW_ALL && app.getTargetPointsHelper().getIntermediatePoints().size() > 0);
 			
 			options.setImageDrawable(app.getUIUtilities().
 					getThemedIcon(optionsVisible ? R.drawable.ic_overflow_menu_white :
@@ -160,12 +160,12 @@ public class DashWaypointsFragment extends DashLocationFragment {
 		this.distances = distances;
 	}
 	
-	protected void deletePointConfirm(final TargetPoint point, View view) {
-		final OsmandApplication app = getMyApplication();
+	protected void deletePointConfirm(TargetPoint point, View view) {
+		OsmandApplication app = getMyApplication();
 		if (app == null) {
 			return;
 		}
-		final boolean target = point == app.getTargetPointsHelper().getPointToNavigate();
+		boolean target = point == app.getTargetPointsHelper().getPointToNavigate();
 		AlertDialog.Builder builder = new AlertDialog.Builder(view.getContext());
 		// Stop the navigation
 		builder.setTitle(getString(R.string.delete_target_point));
@@ -178,22 +178,22 @@ public class DashWaypointsFragment extends DashLocationFragment {
 		builder.show();		
 	}
 
-	private void selectTargetModel(final TargetPoint point, final View view) {
-		final OsmandApplication app = getMyApplication();
+	private void selectTargetModel(TargetPoint point, View view) {
+		OsmandApplication app = getMyApplication();
 		if (app == null) {
 			return;
 		}
-		final UiUtilities iconsCache = app.getUIUtilities();
-		final PopupMenu optionsMenu = new PopupMenu(requireActivity(), view);
+		UiUtilities iconsCache = app.getUIUtilities();
+		PopupMenu optionsMenu = new PopupMenu(requireActivity(), view);
 		DirectionsDialogs.setupPopUpMenuIcon(optionsMenu);
 		MenuItem item; 
-		final boolean target = point == app.getTargetPointsHelper().getPointToNavigate();
+		boolean target = point == app.getTargetPointsHelper().getPointToNavigate();
 
 		if (SHOW_ALL && app.getTargetPointsHelper().getIntermediatePoints().size() > 0) {
-			final List<TargetPoint> allTargets = app.getTargetPointsHelper().getIntermediatePointsWithTarget();
+			List<TargetPoint> allTargets = app.getTargetPointsHelper().getIntermediatePointsWithTarget();
 
 			if (point.index > 0 || target) {
-				final int ind = target ? allTargets.size() - 1 : point.index;
+				int ind = target ? allTargets.size() - 1 : point.index;
 				item = optionsMenu.getMenu().add(R.string.waypoint_visit_before)
 						.setIcon(iconsCache.getThemedIcon(R.drawable.ic_action_up_dark));
 				item.setOnMenuItemClickListener(menuItem -> {

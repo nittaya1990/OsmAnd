@@ -10,7 +10,7 @@ import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.ItemTouchHelper;
 import androidx.recyclerview.widget.RecyclerView;
 
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
@@ -21,8 +21,8 @@ public class MapMarkersItemTouchHelperCallback extends ItemTouchHelper.Callback 
 	private MapActivity mapActivity;
 	private boolean swipeEnabled = true;
 
-	private Paint backgroundPaint = new Paint();
-	private Paint textPaint = new Paint();
+	private final Paint backgroundPaint = new Paint();
+	private final Paint textPaint = new Paint();
 
 	private float marginSides;
 	private boolean iconHidden;

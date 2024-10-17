@@ -1,5 +1,9 @@
 package net.osmand.plus.base;
 
+import static net.osmand.aidlapi.OsmAndCustomizationConstants.BACK_TO_LOC_HUD_ID;
+import static net.osmand.aidlapi.OsmAndCustomizationConstants.ZOOM_IN_HUD_ID;
+import static net.osmand.aidlapi.OsmAndCustomizationConstants.ZOOM_OUT_HUD_ID;
+
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -11,28 +15,22 @@ import androidx.annotation.Nullable;
 import net.osmand.plus.LockableScrollView;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.views.MapLayers;
 import net.osmand.plus.base.ContextMenuFragment.ContextMenuFragmentListener;
 import net.osmand.plus.helpers.AndroidUiHelper;
-import net.osmand.plus.views.OsmandMapTileView;
+import net.osmand.plus.views.MapLayers;
 import net.osmand.plus.views.layers.MapControlsLayer;
 import net.osmand.plus.views.layers.MapInfoLayer;
 import net.osmand.plus.views.mapwidgets.widgets.RulerWidget;
 
-import java.util.Arrays;
 import java.util.Collections;
-
-import static net.osmand.aidlapi.OsmAndCustomizationConstants.BACK_TO_LOC_HUD_ID;
-import static net.osmand.aidlapi.OsmAndCustomizationConstants.ZOOM_IN_HUD_ID;
-import static net.osmand.aidlapi.OsmAndCustomizationConstants.ZOOM_OUT_HUD_ID;
 
 public abstract class ContextMenuScrollFragment extends ContextMenuFragment implements ContextMenuFragmentListener {
 
 	public static final String TAG = ContextMenuScrollFragment.class.getSimpleName();
 
-	private static final String ZOOM_IN_BUTTON_ID = ZOOM_IN_HUD_ID + TAG;
-	private static final String ZOOM_OUT_BUTTON_ID = ZOOM_OUT_HUD_ID + TAG;
-	private static final String BACK_TO_LOC_BUTTON_ID = BACK_TO_LOC_HUD_ID + TAG;
+	protected static final String ZOOM_IN_BUTTON_ID = ZOOM_IN_HUD_ID + TAG;
+	protected static final String ZOOM_OUT_BUTTON_ID = ZOOM_OUT_HUD_ID + TAG;
+	protected static final String BACK_TO_LOC_BUTTON_ID = BACK_TO_LOC_HUD_ID + TAG;
 
 	@Nullable
 	private View mapBottomHudButtons;
@@ -100,10 +98,12 @@ public abstract class ContextMenuScrollFragment extends ContextMenuFragment impl
 			MapLayers mapLayers = mapActivity.getMapLayers();
 
 			MapControlsLayer mapControlsLayer = mapLayers.getMapControlsLayer();
-			mapControlsLayer.removeHudButtons(Arrays.asList(ZOOM_IN_BUTTON_ID, ZOOM_OUT_BUTTON_ID, BACK_TO_LOC_BUTTON_ID));
+			mapControlsLayer.clearCustomMapButtons();
 
-			MapInfoLayer mapInfoLayer = mapLayers.getMapInfoLayer();
-			mapInfoLayer.removeRulerWidgets(Collections.singletonList(rulerWidget));
+			if (rulerWidget != null) {
+				MapInfoLayer mapInfoLayer = mapLayers.getMapInfoLayer();
+				mapInfoLayer.removeRulerWidgets(Collections.singletonList(rulerWidget));
+			}
 		}
 	}
 
@@ -113,22 +113,23 @@ public abstract class ContextMenuScrollFragment extends ContextMenuFragment impl
 	}
 
 	protected void setupControlButtons(@NonNull View view) {
-		MapActivity mapActivity = requireMapActivity();
-		View zoomInButtonView = view.findViewById(R.id.map_zoom_in_button);
-		View zoomOutButtonView = view.findViewById(R.id.map_zoom_out_button);
-		View myLocButtonView = view.findViewById(R.id.map_my_location_button);
+		MapActivity activity = requireMapActivity();
+		MapLayers mapLayers = activity.getMapLayers();
+		MapControlsLayer layer = mapLayers.getMapControlsLayer();
 
-		MapLayers mapLayers = mapActivity.getMapLayers();
-
-		OsmandMapTileView mapTileView = mapActivity.getMapView();
-		View.OnLongClickListener longClickListener = MapControlsLayer.getOnClickMagnifierListener(mapTileView);
-
-		MapControlsLayer mapControlsLayer = mapLayers.getMapControlsLayer();
-		mapControlsLayer.setupZoomInButton(zoomInButtonView, longClickListener, ZOOM_IN_BUTTON_ID);
-		mapControlsLayer.setupZoomOutButton(zoomOutButtonView, longClickListener, ZOOM_OUT_BUTTON_ID);
-		mapControlsLayer.setupBackToLocationButton(myLocButtonView, false, BACK_TO_LOC_BUTTON_ID);
+		layer.addCustomMapButton(view.findViewById(R.id.map_zoom_in_button));
+		layer.addCustomMapButton(view.findViewById(R.id.map_zoom_out_button));
+		layer.addCustomMapButton(view.findViewById(R.id.map_my_location_button));
 
 		setupMapRulerWidget(view, mapLayers);
+	}
+
+	protected boolean alwaysShowButtons(){
+		return true;
+	}
+
+	public String getButtonId(String defaultId) {
+		return defaultId + this.getClass().getName();
 	}
 
 	protected void setupMapRulerWidget(@NonNull View view, @NonNull MapLayers mapLayers) {

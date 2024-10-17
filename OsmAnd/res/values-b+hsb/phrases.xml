@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8" standalone="no"?>
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="poi_shop">wobchod</string>
     <string name="poi_shop_food">žiwidłowy wobchod a superwiki</string>
@@ -10,13 +10,13 @@
     <string name="poi_sport">Sport</string>
     <string name="poi_tourism">Turizm</string>
     <string name="poi_sightseeing">Widźenja hódne</string>
-    <string name="poi_accomodation">Nóclěh</string>
+    <string name="poi_accomodation">nóclěh</string>
     <string name="poi_entertainment">Zabawa</string>
     <string name="poi_club">Klub</string>
     <string name="poi_cafe_and_restaurant">Kofejownja a hosćenc</string>
     <string name="poi_filling_station">tankownja</string>
     <string name="poi_personal_transport">wosobowy transport</string>
-    <string name="poi_water_transport">Transport na wodźe</string>
+    <string name="poi_water_transport">transport na wodźe</string>
     <string name="poi_water_supply">zastaranje z wodu</string>
     <string name="poi_power">energija</string>
     <string name="poi_administrative">Zarjadnistwo</string>
@@ -82,7 +82,6 @@
     <string name="poi_doityourself">Wobchod za twaršćizny</string>
     <string name="poi_doors">Durje</string>
     <string name="poi_erotic">Seks-wobchod</string>
-    
     <string name="poi_fishing">Wudźerske potrjeby</string>
     <string name="poi_florist">Kwětkarnja</string>
     <string name="poi_frame">Wobrazowe ramiki</string>
@@ -133,7 +132,7 @@
     <string name="poi_payment_toll_type">wašnje zapłaćenja</string>
     <string name="poi_traffic_signals_sound">Zwuk</string>
     <string name="poi_subway_station_filter">zastanišćo metra</string>
-    <string name="poi_pump">Klumpa</string>
+    <string name="poi_pump">klumpa</string>
     <string name="poi_city_capital">Stolica</string>
     <string name="poi_religion_type">Nabožina</string>
     <string name="poi_denomination">Konfesija</string>
@@ -400,10 +399,10 @@
     <string name="poi_boat_jetski_rental_no">jetski: ně</string>
     <string name="poi_boat_sailboat_rental_yes">płachtaki: haj</string>
     <string name="poi_boat_sailboat_rental_no">płachtaki: ně</string>
-    <string name="poi_boat_kayak_rental_rental_yes">kajaki: haj</string>
-    <string name="poi_boat_kayak_rental_rental_no">kajaki: ně</string>
-    <string name="poi_boat_canoe_rental_rental_yes">Kanu: haj</string>
-    <string name="poi_boat_canoe_rental_rental_no">Kanu: ně</string>
+    <string name="poi_boat_kayak_rental_yes">kajaki: haj</string>
+    <string name="poi_boat_kayak_rental_no">kajaki: ně</string>
+    <string name="poi_boat_canoe_rental_yes">Kanu: haj</string>
+    <string name="poi_boat_canoe_rental_no">Kanu: ně</string>
     <string name="poi_fuel_type">družina ćěriwa</string>
     <string name="poi_fuel_avia_type">družina ćěriwa (avia)</string>
     <string name="poi_clothes_type">typ</string>
@@ -414,7 +413,7 @@
     <string name="poi_bicycle_parking_type">typ</string>
     <string name="poi_telescope_type">typ</string>
     <string name="poi_animal_training_type">typ</string>
-    <string name="poi_diplomatic_filter">typ</string>
+    <string name="poi_diplomatic_filter">diplomatiska institucija</string>
     <string name="poi_archaeological_site_type">typ</string>
     <string name="poi_information_type">typ</string>
     <string name="poi_resort_type">typ</string>
@@ -831,7 +830,7 @@
     <string name="poi_animal_keeping_type_open_stable">typ: wotewrjena hródź</string>
     <string name="poi_nightclub">nócny klub</string>
     <string name="poi_stripclub">stripowy klub</string>
-    <string name="poi_playground">hrajkanišco</string>
+    <string name="poi_playground">hrajkanišćo</string>
     <string name="poi_bench">ławka</string>
     <string name="poi_park">park</string>
     <string name="poi_cafe">kofejownja</string>
@@ -900,7 +899,7 @@
     <string name="poi_operator">wobhospodar</string>
     <string name="poi_fee_yes">haj</string>
     <string name="poi_fee_no">ně</string>
-    <string name="poi_drinking_water_yes">haj</string>
+    <string name="poi_drinking_water_yes">haj;pitna woda</string>
     <string name="poi_drinking_water_no">ně</string>
     <string name="poi_seasonal_yes">haj</string>
     <string name="poi_seasonal_no">ně</string>
@@ -1264,16 +1263,16 @@
     <string name="poi_historic_period_roman_republic">historiska perioda: romska republika</string>
     <string name="poi_historic_period_alexander_the_great">historiska perioda: Aleksander Wulki</string>
     <string name="poi_historic_period_christian_egypt">historiska perioda: křesćanska Egyptowska</string>
-    <string name="poi_health_specialty_dermatology_yes">dermatologija</string>
-    <string name="poi_health_specialty_urology_yes">urologija</string>
-    <string name="poi_health_specialty_radiology_yes">radiologija</string>
-    <string name="poi_health_specialty_psychiatry_yes">psychiatrija</string>
-    <string name="poi_health_specialty_neurology_yes">neurologija</string>
-    <string name="poi_health_specialty_cardiology_yes">kardiologija</string>
-    <string name="poi_health_specialty_physiotherapy_yes">fyzioterapija</string>
-    <string name="poi_health_specialty_tropical_medicine_yes">tropiska medicina</string>
-    <string name="poi_health_specialty_speech_therapy_yes">logopedija</string>
-    <string name="poi_health_specialty_homeopathy_yes">homeopatija</string>
+    <string name="poi_healthcare_speciality_dermatology">dermatologija</string>
+    <string name="poi_healthcare_speciality_urology">urologija</string>
+    <string name="poi_healthcare_speciality_radiology">radiologija</string>
+    <string name="poi_healthcare_speciality_psychiatry">psychiatrija</string>
+    <string name="poi_healthcare_speciality_neurology">neurologija</string>
+    <string name="poi_healthcare_speciality_cardiology">kardiologija</string>
+    <string name="poi_healthcare_speciality_physiotherapy">fyzioterapija</string>
+    <string name="poi_healthcare_speciality_tropical_medicine">tropiska medicina</string>
+    <string name="poi_healthcare_speciality_speech_therapy">logopedija</string>
+    <string name="poi_healthcare_speciality_homeopathy">homeopatija</string>
     <string name="poi_microwave_oven_yes">mikrožołma: haj</string>
     <string name="poi_microwave_oven_no">mikrožołma: ně</string>
     <string name="poi_badminton">badminton</string>
@@ -1470,7 +1469,6 @@
     <string name="poi_convenience">wobchodźik</string>
     <string name="poi_pasta">pasta</string>
     <string name="poi_sports">sportowe wuhotowanje</string>
-    
     <string name="poi_swimming_pool_shop">tekstilije</string>
     <string name="poi_games">hrajki</string>
     <string name="poi_lighthouse">swětłownja</string>
@@ -1483,7 +1481,7 @@
     <string name="poi_rest_area">pozastarnja</string>
     <string name="poi_water_well">studnja</string>
     <string name="poi_wastewater_plant">wodočisćernja</string>
-    <string name="poi_water_tower">wodarnja</string>
+    <string name="poi_water_tower">wodowa wěža</string>
     <string name="poi_weir">spušćadło</string>
     <string name="poi_dam">nasyp</string>
     <string name="poi_watermill">młyn</string>
@@ -1872,11 +1870,9 @@
     <string name="poi_payment_fuel_type">tankowanske karty</string>
     <string name="poi_fire_hydrant_position">městno</string>
     <string name="poi_water_source">wodowa žórła</string>
-    <string name="poi_car_yes">awto: haj</string>
     <string name="poi_car_no">awto: ně</string>
     <string name="poi_scooter_yes">motorske: haj</string>
     <string name="poi_scooter_no">motorske: ně</string>
-    <string name="poi_truck_yes">LKW: haj</string>
     <string name="poi_truck_no">LKW: ně</string>
     <string name="poi_amperage">prudosylnosć</string>
     <string name="poi_map_type_topo">typ karty: topografiska</string>
@@ -1930,7 +1926,7 @@
     <string name="poi_railway_yard">nakładne dwórnišćo</string>
     <string name="poi_healthcare_rehabilitation">rehabilitacija</string>
     <string name="poi_company">firma</string>
-    <string name="poi_health_specialty_physiatry_yes">medicina a rehapilitacija</string>
+    <string name="poi_healthcare_speciality_physiatry">medicina a rehapilitacija</string>
     <string name="poi_counselling_type_marriage_yes">poradźowanje (kwas): haj</string>
     <string name="poi_counselling_type_marriage_no">poradźowanje (kwas): ně</string>
     <string name="poi_counselling_type_nutrition_yes">poradźowanje (zežiwjenje): haj</string>
@@ -1998,4 +1994,21 @@
     <string name="poi_cash_withdrawal_bank_card">wotzběhnjenje pjenjez</string>
     <string name="poi_bath_type">typ</string>
     <string name="poi_bath_open_air">pod hołym njebjom</string>
+    <string name="poi_aerialway_heating">tepjenje</string>
+    <string name="poi_water_characteristic_mud">błóto</string>
+    <string name="poi_playground_structure">Struktura</string>
+    <string name="poi_playground_slide">suwadło</string>
+    <string name="poi_playground_climbingframe">krosno</string>
+    <string name="poi_playground_bridge">móst</string>
+    <string name="poi_playground_seesaw">kiwkawa</string>
+    <string name="poi_playground_water">woda</string>
+    <string name="poi_playground_climbingwall">krosnowanska sćěna</string>
+    <string name="poi_water_characteristic_sulfuric">syrik</string>
+    <string name="poi_wine_region">winowa kónčina</string>
+    <string name="poi_playground_swing">čumpjel</string>
+    <string name="poi_playground_trampoline">trampolin</string>
+    <string name="poi_water_filter">woda;pitna woda</string>
+    <string name="poi_water_works">wodarnja</string>
+    <string name="poi_playground_sandpit">pěskowy kašćik</string>
+    <string name="poi_playground_map">karta</string>
 </resources>

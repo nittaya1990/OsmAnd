@@ -10,10 +10,11 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentManager;
 
-import net.osmand.AndroidUtils;
+import net.osmand.plus.activities.MapActivity;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.PlatformUtil;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.settings.backend.backup.FileSettingsHelper;
 import net.osmand.plus.settings.backend.backup.ImportFileTask;
 import net.osmand.plus.settings.backend.backup.items.SettingsItem;
@@ -107,6 +108,10 @@ public class FileImportSettingsFragment extends ImportSettingsFragment {
 			FragmentManager fm = getFragmentManager();
 			if (fm != null && file != null) {
 				ImportCompleteFragment.showInstance(fm, items, file.getName(), needRestart);
+			}
+			MapActivity mapActivity = getMapActivity();
+			if (mapActivity != null) {
+				mapActivity.getFragmentsHelper().disableFirstUsageFragment();
 			}
 		}
 	}

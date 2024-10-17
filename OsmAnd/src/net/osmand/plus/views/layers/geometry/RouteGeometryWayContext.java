@@ -3,14 +3,16 @@ package net.osmand.plus.views.layers.geometry;
 import android.content.Context;
 import android.graphics.Paint;
 
-import net.osmand.plus.R;
-import net.osmand.plus.routing.ColoringType;
-
 import androidx.annotation.NonNull;
+
+import net.osmand.plus.R;
+import net.osmand.plus.card.color.palette.gradient.PaletteGradientColor;
+import net.osmand.plus.card.color.palette.gradient.PaletteGradientColor;
+import net.osmand.shared.routing.ColoringType;
 
 public class RouteGeometryWayContext extends MultiColoringGeometryWayContext {
 
-	public RouteGeometryWayContext(Context ctx, float density) {
+	public RouteGeometryWayContext(@NonNull Context ctx, float density) {
 		super(ctx, density);
 	}
 
@@ -22,14 +24,14 @@ public class RouteGeometryWayContext extends MultiColoringGeometryWayContext {
 
 	@NonNull
 	@Override
-	public Paint getDefaultPaint() {
-		return getAttrs().paint;
+	protected ColoringType getDefaultColoringType() {
+		return ColoringType.DEFAULT;
 	}
 
 	@NonNull
 	@Override
-	protected ColoringType getDefaultColoringType() {
-		return ColoringType.DEFAULT;
+	protected String getDefaultGradientPalette() {
+		return PaletteGradientColor.DEFAULT_NAME;
 	}
 
 	@Override

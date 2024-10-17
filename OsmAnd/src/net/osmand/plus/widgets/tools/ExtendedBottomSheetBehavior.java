@@ -542,7 +542,7 @@ public class ExtendedBottomSheetBehavior<V extends View> extends CoordinatorLayo
 	 * @param state One of {@link #STATE_COLLAPSED}, {@link #STATE_EXPANDED}, or
 	 *              {@link #STATE_HIDDEN}.
 	 */
-	public final void setState(final @State int state) {
+	public final void setState(@State int state) {
 		if (state == mState) {
 			return;
 		}
@@ -554,19 +554,14 @@ public class ExtendedBottomSheetBehavior<V extends View> extends CoordinatorLayo
 			}
 			return;
 		}
-		final V child = mViewRef.get();
+		V child = mViewRef.get();
 		if (child == null) {
 			return;
 		}
 		// Start the animation; wait until a pending layout if there is one.
 		ViewParent parent = child.getParent();
 		if (parent != null && parent.isLayoutRequested() && ViewCompat.isAttachedToWindow(child)) {
-			child.post(new Runnable() {
-				@Override
-				public void run() {
-					startSettlingAnimation(child, state);
-				}
-			});
+			child.post(() -> startSettlingAnimation(child, state));
 		} else {
 			startSettlingAnimation(child, state);
 		}
@@ -610,7 +605,7 @@ public class ExtendedBottomSheetBehavior<V extends View> extends CoordinatorLayo
 			// It should not hide, but collapse.
 			return false;
 		}
-		final float newTop = child.getTop() + yvel * HIDE_FRICTION;
+		float newTop = child.getTop() + yvel * HIDE_FRICTION;
 		return Math.abs(newTop - mMaxOffset) / (float) mPeekHeight > HIDE_THRESHOLD;
 	}
 

@@ -1,5 +1,8 @@
 package net.osmand.plus.routepreparationmenu;
 
+import static android.graphics.Typeface.DEFAULT;
+import static net.osmand.plus.mapcontextmenu.other.TrackDetailsMenu.ChartPointLayer.ROUTE;
+
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Typeface;
@@ -27,39 +30,30 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
-import net.osmand.AndroidUtils;
-import net.osmand.GPXUtilities.GPXFile;
-import net.osmand.GPXUtilities.GPXTrackAnalysis;
-import net.osmand.GPXUtilities.TrkSegment;
-import net.osmand.GPXUtilities.WptPt;
 import net.osmand.Location;
 import net.osmand.data.LatLon;
 import net.osmand.data.PointDescription;
 import net.osmand.data.QuadRect;
 import net.osmand.data.TransportRoute;
 import net.osmand.data.TransportStop;
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.GeocodingLookupService;
-import net.osmand.plus.GpxSelectionHelper.GpxDisplayItem;
-import net.osmand.plus.OsmAndFormatter;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.TargetPointsHelper;
-import net.osmand.plus.TargetPointsHelper.TargetPoint;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.ContextMenuFragment;
-import net.osmand.plus.helpers.FontCache;
-import net.osmand.plus.helpers.GpxUiHelper;
-import net.osmand.plus.helpers.GpxUiHelper.GPXDataSetType;
-import net.osmand.plus.helpers.GpxUiHelper.OrderedLineDataSet;
+import net.osmand.plus.charts.GPXDataSetType;
+import net.osmand.plus.charts.OrderedLineDataSet;
+import net.osmand.plus.helpers.TargetPointsHelper;
+import net.osmand.plus.helpers.TargetPointsHelper.TargetPoint;
 import net.osmand.plus.mapcontextmenu.CollapsableView;
 import net.osmand.plus.mapcontextmenu.other.TrackDetailsMenu;
-import net.osmand.plus.mapcontextmenu.other.TrackDetailsMenu.ChartPointLayer;
-import net.osmand.plus.measurementtool.graph.BaseGraphAdapter;
-import net.osmand.plus.measurementtool.graph.CommonGraphAdapter;
-import net.osmand.plus.measurementtool.graph.GraphAdapterHelper;
-import net.osmand.plus.measurementtool.graph.GraphAdapterHelper.RefreshMapCallback;
+import net.osmand.plus.measurementtool.MeasurementToolFragment;
+import net.osmand.plus.measurementtool.graph.BaseChartAdapter;
+import net.osmand.plus.measurementtool.graph.ChartAdapterHelper;
+import net.osmand.plus.measurementtool.graph.ChartAdapterHelper.RefreshMapCallback;
+import net.osmand.plus.measurementtool.graph.CommonChartAdapter;
 import net.osmand.plus.render.MapRenderRepositories;
+import net.osmand.plus.routepreparationmenu.cards.AttachTrackToRoadsBannerCard;
 import net.osmand.plus.routepreparationmenu.cards.BaseCard;
 import net.osmand.plus.routepreparationmenu.cards.BaseCard.CardListener;
 import net.osmand.plus.routepreparationmenu.cards.PublicTransportCard;
@@ -72,7 +66,13 @@ import net.osmand.plus.routing.RouteDirectionInfo;
 import net.osmand.plus.routing.RoutingHelper;
 import net.osmand.plus.routing.TransportRoutingHelper;
 import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.track.helpers.GpxDisplayItem;
+import net.osmand.plus.track.helpers.GpxUiHelper;
 import net.osmand.plus.transport.TransportStopRoute;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.FontCache;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.plus.widgets.TextViewEx;
 import net.osmand.plus.widgets.style.CustomTypefaceSpan;
 import net.osmand.render.RenderingRuleSearchRequest;
@@ -82,6 +82,10 @@ import net.osmand.router.RouteStatisticsHelper;
 import net.osmand.router.RouteStatisticsHelper.RouteStatistics;
 import net.osmand.router.TransportRoutePlanner.TransportRouteResultSegment;
 import net.osmand.router.TransportRouteResult;
+import net.osmand.shared.gpx.GpxFile;
+import net.osmand.shared.gpx.GpxTrackAnalysis;
+import net.osmand.shared.gpx.primitives.TrkSegment;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.util.Algorithms;
 
 import java.lang.ref.WeakReference;
@@ -99,18 +103,15 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	private int pageMarginPx;
 	private int toolbarHeightPx;
 
-	private GPXFile gpx;
-	@Nullable
-	private OrderedLineDataSet slopeDataSet;
+	private GpxFile gpxFile;
 	@Nullable
 	private OrderedLineDataSet elevationDataSet;
 	private GpxDisplayItem gpxItem;
-	private List<BaseCard> menuCards = new ArrayList<>();
+	private final List<BaseCard> menuCards = new ArrayList<>();
 	@Nullable
 	private PublicTransportCard transportCard;
 	private RouteDetailsFragmentListener routeDetailsListener;
-	private RouteStatisticCard statisticCard;
-	private List<RouteInfoCard> routeInfoCards = new ArrayList<>();
+	private final List<RouteInfoCard> routeInfoCards = new ArrayList<>();
 	private RouteDetailsMenu routeDetailsMenu;
 	private RefreshMapCallback refreshMapCallback;
 
@@ -173,7 +174,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		View view = super.onCreateView(inflater, container, savedInstanceState);
 		if (view != null) {
 			if (isPortrait()) {
-				view.findViewById(getBottomScrollViewId()).setBackgroundDrawable(null);
+				view.findViewById(getBottomScrollViewId()).setBackground(null);
 				LinearLayout cardsContainer = getCardsContainer();
 				FrameLayout.LayoutParams layoutParams = (FrameLayout.LayoutParams) cardsContainer.getLayoutParams();
 				AndroidUtils.setMargins(layoutParams, pageMarginPx, 0, pageMarginPx, 0);
@@ -253,7 +254,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 			}
 			if (getCurrentMenuState() == MenuState.HEADER_ONLY) {
 				topShadow.setVisibility(View.INVISIBLE);
-				bottomContainer.setBackgroundDrawable(null);
+				bottomContainer.setBackground(null);
 				AndroidUtils.setBackground(mainView.getContext(), cardsContainer, isNightMode(), R.drawable.travel_card_bg_light, R.drawable.travel_card_bg_dark);
 			} else {
 				topShadow.setVisibility(View.VISIBLE);
@@ -306,24 +307,18 @@ public class RouteDetailsFragment extends ContextMenuFragment
 			return;
 		}
 		OsmandApplication app = mapActivity.getMyApplication();
-		statisticCard = new RouteStatisticCard(mapActivity, gpx, new OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				openDetails();
-			}
-		});
+		RouteStatisticCard statisticCard = new RouteStatisticCard(mapActivity, gpxFile, v -> openDetails());
 		statisticCard.setTransparentBackground(true);
 		statisticCard.setListener(this);
 		menuCards.add(statisticCard);
 		cardsContainer.addView(statisticCard.build(mapActivity));
 		buildRowDivider(cardsContainer, false);
-		slopeDataSet = statisticCard.getSlopeDataSet();
 		elevationDataSet = statisticCard.getElevationDataSet();
 
 		List<RouteSegmentResult> route = app.getRoutingHelper().getRoute().getOriginalRoute();
 		if (route != null) {
 			List<RouteStatistics> routeStatistics = calculateRouteStatistics(app, route, isNightMode());
-			GPXTrackAnalysis analysis = gpx.getAnalysis(0);
+			GpxTrackAnalysis analysis = gpxFile.getAnalysis(0);
 
 			for (RouteStatistics statistic : routeStatistics) {
 				RouteInfoCard routeClassCard = new RouteInfoCard(mapActivity, statistic, analysis);
@@ -337,17 +332,17 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		}
 		routeDetailsMenu.setMapActivity(mapActivity);
 
-		CommonGraphAdapter mainGraphAdapter = statisticCard.getGraphAdapter();
+		CommonChartAdapter mainGraphAdapter = statisticCard.getGraphAdapter();
 		if (mainGraphAdapter != null) {
-			GraphAdapterHelper.bindGraphAdapters(mainGraphAdapter, getRouteInfoCardsGraphAdapters(), getMainView());
-			refreshMapCallback = GraphAdapterHelper.bindToMap(mainGraphAdapter, mapActivity, routeDetailsMenu);
+			ChartAdapterHelper.bindGraphAdapters(mainGraphAdapter, getRouteInfoCardsGraphAdapters(), getMainView());
+			refreshMapCallback = ChartAdapterHelper.bindToMap(mainGraphAdapter, mapActivity, routeDetailsMenu);
 		}
 	}
 
-	private List<BaseGraphAdapter> getRouteInfoCardsGraphAdapters() {
-		List<BaseGraphAdapter> adapters = new ArrayList<>();
+	private List<BaseChartAdapter> getRouteInfoCardsGraphAdapters() {
+		List<BaseChartAdapter> adapters = new ArrayList<>();
 		for (RouteInfoCard card : routeInfoCards) {
-			BaseGraphAdapter adapter = card.getGraphAdapter();
+			BaseChartAdapter adapter = card.getGraphAdapter();
 			if (adapter != null) {
 				adapters.add(adapter);
 			}
@@ -374,7 +369,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		super.calculateLayout(view, initLayout);
 		if (!initLayout && getCurrentMenuState() != MenuState.FULL_SCREEN) {
 			if (refreshMapCallback != null) {
-				refreshMapCallback.refreshMap(false, false);
+				refreshMapCallback.refreshMap(false, false, true);
 			}
 		}
 	}
@@ -395,7 +390,6 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	@SuppressLint("ClickableViewAccessibility")
 	private void addRouteCard(LinearLayout cardsContainer,
 	                          RouteInfoCard routeInfoCard) {
-		OsmandApplication app = requireMyApplication();
 		menuCards.add(routeInfoCard);
 		routeInfoCard.setListener(this);
 		cardsContainer.addView(routeInfoCard.build(app));
@@ -404,16 +398,14 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	}
 
 	public Drawable getCollapseIcon(boolean collapsed) {
-		OsmandApplication app = requireMyApplication();
-		return app.getUIUtilities().getIcon(collapsed ? R.drawable.ic_action_arrow_down : R.drawable.ic_action_arrow_up, R.color.description_font_and_bottom_sheet_icons);
+		return app.getUIUtilities().getIcon(collapsed ? R.drawable.ic_action_arrow_down : R.drawable.ic_action_arrow_up, R.color.icon_color_default_light);
 	}
 
-	private void buildSegmentItem(View view, final TransportRouteResultSegment segment,
-								  final TransportRouteResultSegment nextSegment, int[] startTime, double walkSpeed, double boardingTime) {
-		OsmandApplication app = requireMyApplication();
+	private void buildSegmentItem(View view, TransportRouteResultSegment segment,
+								  TransportRouteResultSegment nextSegment, int[] startTime, double walkSpeed, double boardingTime) {
 		TransportRoute transportRoute = segment.route;
 		List<TransportStop> stops = segment.getTravelStops();
-		final TransportStop startStop = stops.get(0);
+		TransportStop startStop = stops.get(0);
 		TransportStopRoute transportStopRoute = TransportStopRoute.getTransportStopRoute(transportRoute, startStop);
 
 		FrameLayout baseContainer = new FrameLayout(view.getContext());
@@ -434,7 +426,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		int drawableResId = transportStopRoute.type == null ? R.drawable.ic_action_bus_dark : transportStopRoute.type.getResourceId();
 		Drawable icon = getContentIcon(drawableResId);
 
-		Typeface typeface = FontCache.getRobotoMedium(app);
+		Typeface typeface = FontCache.getMediumFont();
 		startTime[0] += (int) boardingTime;
 		String timeText = OsmAndFormatter.getFormattedDurationShortMinutes(startTime[0]);
 
@@ -483,7 +475,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 				spannable.setSpan(new ForegroundColorSpan(getSecondaryColor()), startIndex, startIndex + 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 			}
 			startIndex = spannable.length();
-			spannable.append(String.valueOf(stops.size())).append(" ").append(getString(R.string.transport_stops));
+			spannable.append(String.valueOf(stops.size() - 1)).append(" ").append(getString(R.string.transport_stops));
 			spannable.setSpan(new CustomTypefaceSpan(typeface), startIndex, spannable.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 		}
 		if (spannable.length() > 0) {
@@ -491,14 +483,14 @@ public class RouteDetailsFragment extends ContextMenuFragment
 			spannable.append(" • ");
 			spannable.setSpan(new ForegroundColorSpan(getSecondaryColor()), startIndex, startIndex + 2, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 		}
-		spannable.append(OsmAndFormatter.getFormattedDistance((float) segment.getTravelDist(), app));
+		spannable.append(OsmAndFormatter.getFormattedDistance((float) segment.getTravelDist(), app, OsmAndFormatter.OsmAndFormatterParams.USE_LOWER_BOUNDS));
 		spannable.setSpan(new CustomTypefaceSpan(typeface), startIndex, spannable.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 
 		String type = getString(transportStopRoute.getTypeStrRes()).toLowerCase();
 		SpannableString textType = new SpannableString(getString(R.string.by_transport_type, type));
 		buildCollapsableRow(stopsContainer, spannable, textType, true, collapsableView, null);
 
-		final TransportStop endStop = stops.get(stops.size() - 1);
+		TransportStop endStop = stops.get(stops.size() - 1);
 		int depTime = segment.depTime + arrivalTime;
 		if (depTime <= 0) {
 			depTime = startTime[0] + arrivalTime;
@@ -539,7 +531,8 @@ public class RouteDetailsFragment extends ContextMenuFragment
 				spannable.append(OsmAndFormatter.getFormattedDuration(walkTime, app)).append(" ");
 				spannable.setSpan(new CustomTypefaceSpan(typeface), startIndex, spannable.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 				startIndex = spannable.length();
-				spannable.append(getString(R.string.shared_string_walk)).append(", ").append(OsmAndFormatter.getFormattedDistance((float) walkDist, app));
+				spannable.append(getString(R.string.shared_string_walk)).append(", ").append(OsmAndFormatter.getFormattedDistance((float) walkDist, app,
+						OsmAndFormatter.OsmAndFormatterParams.USE_LOWER_BOUNDS));
 				spannable.setSpan(new ForegroundColorSpan(getSecondaryColor()), startIndex, spannable.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 
 				buildRowDivider(view, true);
@@ -572,7 +565,6 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	}
 
 	private void buildTransportRouteRow(@NonNull ViewGroup parent, TransportRouteResult routeResult, boolean showDivider) {
-		OsmandApplication app = requireMyApplication();
 		TargetPointsHelper targetPointsHelper = app.getTargetPointsHelper();
 		TargetPoint startPoint = targetPointsHelper.getPointToStart();
 		TargetPoint endPoint = targetPointsHelper.getPointToNavigate();
@@ -581,7 +573,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		for (int i = 0; i < segments.size(); i++) {
 			boolean first = i == 0;
 			boolean last = i == segments.size() - 1;
-			final TransportRouteResultSegment segment = segments.get(i);
+			TransportRouteResultSegment segment = segments.get(i);
 			if (first) {
 				buildStartItem(parent, startPoint, startTime, segment, routeResult.getWalkSpeed());
 			}
@@ -595,9 +587,8 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		}
 	}
 
-	private void buildStartItem(@NonNull View view, final TargetPoint start, int[] startTime,
-								final TransportRouteResultSegment segment, double walkSpeed) {
-		OsmandApplication app = requireMyApplication();
+	private void buildStartItem(@NonNull View view, TargetPoint start, int[] startTime,
+								TransportRouteResultSegment segment, double walkSpeed) {
 		FrameLayout baseItemView = new FrameLayout(view.getContext());
 
 		LinearLayout imagesContainer = (LinearLayout) createImagesContainer(view.getContext());
@@ -638,9 +629,9 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		title.setSpan(new ForegroundColorSpan(getSecondaryColor()), 0, title.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 		int startIndex = title.length();
 		title.append(" ").append(OsmAndFormatter.getFormattedDuration(walkTime, app));
-		title.setSpan(new CustomTypefaceSpan(FontCache.getRobotoMedium(app)), startIndex, title.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
+		title.setSpan(new CustomTypefaceSpan(FontCache.getMediumFont()), startIndex, title.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 		startIndex = title.length();
-		title.append(", ").append(OsmAndFormatter.getFormattedDistance((float) walkDist, app));
+		title.append(", ").append(OsmAndFormatter.getFormattedDistance((float) walkDist, app, OsmAndFormatter.OsmAndFormatterParams.USE_LOWER_BOUNDS));
 		title.setSpan(new ForegroundColorSpan(getSecondaryColor()), startIndex, title.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 
 		buildWalkRow(infoContainer, title, imagesContainer, new OnClickListener() {
@@ -655,12 +646,9 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	}
 
 	public void showRouteOnMap() {
-		OsmandApplication app = requireMyApplication();
 		if (transportCard == null) {
 			RouteCalculationResult route = app.getRoutingHelper().getRoute();
-			if (route != null) {
-				showRouteOnMap(route);
-			}
+			showRouteOnMap(route);
 		} else {
 			TransportRouteResult route = app.getTransportRoutingHelper().getCurrentRouteResult();
 			if (route != null) {
@@ -678,7 +666,6 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	}
 
 	public void showWalkingRouteOnMap(@Nullable TransportRouteResultSegment startSegment, @Nullable TransportRouteResultSegment endSegment) {
-		OsmandApplication app = requireMyApplication();
 		RouteCalculationResult walkingRouteSegment = app.getTransportRoutingHelper().getWalkingRouteSegment(startSegment, endSegment);
 		if (walkingRouteSegment != null) {
 			showRouteOnMap(walkingRouteSegment);
@@ -694,7 +681,6 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	}
 
 	public void showRouteOnMap(@NonNull TransportRouteResult result) {
-		OsmandApplication app = requireMyApplication();
 		QuadRect rect = app.getTransportRoutingHelper().getTransportRouteRect(result);
 		if (rect != null) {
 			openMenuHeaderOnly();
@@ -703,7 +689,6 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	}
 
 	private void addWalkRouteIcon(LinearLayout container) {
-		OsmandApplication app = requireMyApplication();
 		ImageView walkLineImage = new ImageView(container.getContext());
 		walkLineImage.setImageDrawable(app.getUIUtilities().getIcon(R.drawable.walk_route_item_light));
 		LinearLayout.LayoutParams walkImageLayoutParams = new LinearLayout.LayoutParams(dpToPx(10), dpToPx(14));
@@ -712,10 +697,9 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		container.addView(walkLineImage);
 	}
 
-	private void buildDestinationItem(@NonNull View view, final TargetPoint destination, int[] startTime,
-									  final TransportRouteResultSegment segment, double walkSpeed) {
-		OsmandApplication app = requireMyApplication();
-		Typeface typeface = FontCache.getRobotoMedium(app);
+	private void buildDestinationItem(@NonNull View view, TargetPoint destination, int[] startTime,
+									  TransportRouteResultSegment segment, double walkSpeed) {
+		Typeface typeface = FontCache.getMediumFont();
 		FrameLayout baseItemView = new FrameLayout(view.getContext());
 
 		LinearLayout imagesContainer = (LinearLayout) createImagesContainer(view.getContext());
@@ -737,15 +721,10 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		spannable.append("~").append(OsmAndFormatter.getFormattedDuration(walkTime, app));
 		spannable.setSpan(new CustomTypefaceSpan(typeface), startIndex, spannable.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 		startIndex = spannable.length();
-		spannable.append(", ").append(OsmAndFormatter.getFormattedDistance((float) walkDist, app));
+		spannable.append(", ").append(OsmAndFormatter.getFormattedDistance((float) walkDist, app, OsmAndFormatter.OsmAndFormatterParams.USE_LOWER_BOUNDS));
 		spannable.setSpan(new ForegroundColorSpan(getSecondaryColor()), startIndex, spannable.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 
-		buildWalkRow(infoContainer, spannable, imagesContainer, new OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				showWalkingRouteOnMap(segment, null);
-			}
-		});
+		buildWalkRow(infoContainer, spannable, imagesContainer, v -> showWalkingRouteOnMap(segment, null));
 		buildRowDivider(infoContainer, true);
 		addWalkRouteIcon(imagesContainer);
 
@@ -759,36 +738,28 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		secondaryText.setSpan(new CustomTypefaceSpan(typeface), 0, secondaryText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 		secondaryText.setSpan(new ForegroundColorSpan(getMainFontColor()), 0, secondaryText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
 
-		buildDestinationRow(infoContainer, timeStr, title, secondaryText, destination.point, imagesContainer, new OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				showLocationOnMap(destination.point);
-			}
-		});
+		buildDestinationRow(infoContainer, timeStr, title, secondaryText, destination.point, imagesContainer, v -> showLocationOnMap(destination.point));
 
 		((ViewGroup) view).addView(baseItemView);
 	}
 
 	@ColorInt
 	private int getActiveColor() {
-		OsmandApplication app = requireMyApplication();
 		return ContextCompat.getColor(app, ColorUtilities.getActiveColorId(isNightMode()));
 	}
 
 	@ColorInt
 	protected int getMainFontColor() {
-		OsmandApplication app = requireMyApplication();
 		return ColorUtilities.getPrimaryTextColor(app, isNightMode());
 	}
 
 	@ColorInt
 	protected int getSecondaryColor() {
-		OsmandApplication app = requireMyApplication();
-		return ContextCompat.getColor(app, R.color.description_font_and_bottom_sheet_icons);
+		return ContextCompat.getColor(app, R.color.icon_color_default_light);
 	}
 
-	public void buildCollapsableRow(@NonNull View view, final Spannable title, Spannable secondaryText, boolean collapsable,
-									final CollapsableView collapsableView, OnClickListener onClickListener) {
+	public void buildCollapsableRow(@NonNull View view, Spannable title, Spannable secondaryText, boolean collapsable,
+									CollapsableView collapsableView, OnClickListener onClickListener) {
 		FrameLayout baseItemView = new FrameLayout(view.getContext());
 		FrameLayout.LayoutParams baseViewLayoutParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 		baseItemView.setLayoutParams(baseViewLayoutParams);
@@ -800,12 +771,9 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		baseView.setBackgroundResource(AndroidUtils.resolveAttribute(view.getContext(), android.R.attr.selectableItemBackground));
 		baseItemView.addView(baseView);
 
-		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, new OnLongClickListener() {
-			@Override
-			public boolean onLongClick(View v) {
-				copyToClipboard(title.toString(), v.getContext());
-				return true;
-			}
+		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, v -> {
+			copyToClipboard(title.toString(), v.getContext());
+			return true;
 		});
 		baseView.addView(ll);
 
@@ -818,7 +786,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 
 		buildTitleView(title, llText);
 
-		final ImageView iconViewCollapse = new ImageView(view.getContext());
+		ImageView iconViewCollapse = new ImageView(view.getContext());
 		if (collapsable && collapsableView != null) {
 			// Icon
 			LinearLayout llIconCollapse = new LinearLayout(view.getContext());
@@ -834,22 +802,19 @@ public class RouteDetailsFragment extends ContextMenuFragment
 			iconViewCollapse.setScaleType(ImageView.ScaleType.CENTER_INSIDE);
 			iconViewCollapse.setImageDrawable(getCollapseIcon(collapsableView.getContentView().getVisibility() == View.GONE));
 			llIconCollapse.addView(iconViewCollapse);
-			ll.setOnClickListener(new OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					LinearLayout contentView = (LinearLayout) collapsableView.getContentView();
-					if (contentView.getVisibility() == View.VISIBLE) {
-						contentView.setVisibility(View.GONE);
-						iconViewCollapse.setImageDrawable(getCollapseIcon(true));
-						collapsableView.setCollapsed(true);
-						contentView.getChildAt(contentView.getChildCount() - 1).setVisibility(View.VISIBLE);
-					} else {
-						contentView.setVisibility(View.VISIBLE);
-						iconViewCollapse.setImageDrawable(getCollapseIcon(false));
-						collapsableView.setCollapsed(false);
-					}
-					doAfterMenuStateChange(0, 0);
+			ll.setOnClickListener(v -> {
+				LinearLayout contentView = (LinearLayout) collapsableView.getContentView();
+				if (contentView.getVisibility() == View.VISIBLE) {
+					contentView.setVisibility(View.GONE);
+					iconViewCollapse.setImageDrawable(getCollapseIcon(true));
+					collapsableView.setCollapsed(true);
+					contentView.getChildAt(contentView.getChildCount() - 1).setVisibility(View.VISIBLE);
+				} else {
+					contentView.setVisibility(View.VISIBLE);
+					iconViewCollapse.setImageDrawable(getCollapseIcon(false));
+					collapsableView.setCollapsed(false);
 				}
+				doAfterMenuStateChange(0, 0);
 			});
 			if (collapsableView.isCollapsed()) {
 				collapsableView.getContentView().setVisibility(View.GONE);
@@ -865,7 +830,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		((LinearLayout) view).addView(baseItemView);
 	}
 
-	public void buildStartStopRow(@NonNull View view, Drawable icon, String timeText, final Spannable title,
+	public void buildStartStopRow(@NonNull View view, Drawable icon, String timeText, Spannable title,
 								  Spannable secondaryText, OnClickListener onClickListener) {
 		MapActivity mapActivity = getMapActivity();
 		if (mapActivity == null) {
@@ -883,12 +848,9 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		baseView.setBackgroundResource(AndroidUtils.resolveAttribute(view.getContext(), android.R.attr.selectableItemBackground));
 		baseItemView.addView(baseView);
 
-		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, new OnLongClickListener() {
-			@Override
-			public boolean onLongClick(View v) {
-				copyToClipboard(title.toString(), v.getContext());
-				return true;
-			}
+		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, v -> {
+			copyToClipboard(title.toString(), v.getContext());
+			return true;
 		});
 		baseView.addView(ll);
 
@@ -944,7 +906,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		}
 		OsmandApplication app = mapActivity.getMyApplication();
 
-		final String routeDescription = transportStopRoute.getDescription(app);
+		String routeDescription = transportStopRoute.getDescription(app);
 		FrameLayout baseItemView = new FrameLayout(view.getContext());
 		FrameLayout.LayoutParams baseViewLayoutParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 		baseItemView.setLayoutParams(baseViewLayoutParams);
@@ -956,12 +918,9 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		baseView.setBackgroundResource(AndroidUtils.resolveAttribute(view.getContext(), android.R.attr.selectableItemBackground));
 		baseItemView.addView(baseView);
 
-		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 36, new OnLongClickListener() {
-			@Override
-			public boolean onLongClick(View v) {
-				copyToClipboard(routeDescription, v.getContext());
-				return true;
-			}
+		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 36, v -> {
+			copyToClipboard(routeDescription, v.getContext());
+			return true;
 		});
 		baseView.addView(ll);
 
@@ -981,8 +940,8 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		((LinearLayout) view).addView(baseItemView);
 	}
 
-	public void buildEndStopRow(@NonNull View view, Drawable icon, String timeText, final Spannable title, Spannable secondaryText, OnClickListener onClickListener) {
-		OsmandApplication app = requireMyApplication();
+	public void buildEndStopRow(@NonNull View view, Drawable icon, String timeText, Spannable title, Spannable secondaryText, OnClickListener onClickListener) {
+		
 		FrameLayout baseItemView = new FrameLayout(view.getContext());
 		FrameLayout.LayoutParams baseViewLayoutParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 		baseItemView.setLayoutParams(baseViewLayoutParams);
@@ -994,12 +953,9 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		baseView.setBackgroundResource(AndroidUtils.resolveAttribute(view.getContext(), android.R.attr.selectableItemBackground));
 		baseItemView.addView(baseView);
 
-		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, new OnLongClickListener() {
-			@Override
-			public boolean onLongClick(View v) {
-				copyToClipboard(title.toString(), v.getContext());
-				return true;
-			}
+		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, v -> {
+			copyToClipboard(title.toString(), v.getContext());
+			return true;
 		});
 		baseView.addView(ll);
 
@@ -1049,8 +1005,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 
 
 	protected void updateDestinationStreetName(LatLon latLon) {
-		OsmandApplication app = requireMyApplication();
-		final WeakReference<RouteDetailsFragment> fragmentRef = new WeakReference<>(RouteDetailsFragment.this);
+		WeakReference<RouteDetailsFragment> fragmentRef = new WeakReference<>(this);
 		GeocodingLookupService.AddressLookupRequest addressLookupRequest = new GeocodingLookupService.AddressLookupRequest(latLon, new GeocodingLookupService.OnAddressLookupResult() {
 			@Override
 			public void geocodingDone(String address) {
@@ -1066,7 +1021,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		app.getGeocodingLookupService().lookupAddress(addressLookupRequest);
 	}
 
-	public void buildWalkRow(@NonNull View view, final Spannable title, LinearLayout imagesContainer, OnClickListener onClickListener) {
+	public void buildWalkRow(@NonNull View view, Spannable title, LinearLayout imagesContainer, OnClickListener onClickListener) {
 		FrameLayout baseItemView = new FrameLayout(view.getContext());
 		FrameLayout.LayoutParams baseViewLayoutParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 		baseItemView.setLayoutParams(baseViewLayoutParams);
@@ -1078,12 +1033,9 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		baseView.setBackgroundResource(AndroidUtils.resolveAttribute(view.getContext(), android.R.attr.selectableItemBackground));
 		baseItemView.addView(baseView);
 
-		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, new OnLongClickListener() {
-			@Override
-			public boolean onLongClick(View v) {
-				copyToClipboard(title.toString(), v.getContext());
-				return true;
-			}
+		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, v -> {
+			copyToClipboard(title.toString(), v.getContext());
+			return true;
 		});
 		baseView.addView(ll);
 
@@ -1113,8 +1065,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		((LinearLayout) view).addView(baseItemView);
 	}
 
-	public void buildStartRow(@NonNull View view, Drawable icon, String timeText, final Spannable title, LinearLayout imagesContainer, OnClickListener onClickListener) {
-		OsmandApplication app = requireMyApplication();
+	public void buildStartRow(@NonNull View view, Drawable icon, String timeText, Spannable title, LinearLayout imagesContainer, OnClickListener onClickListener) {
 		FrameLayout baseItemView = new FrameLayout(view.getContext());
 		FrameLayout.LayoutParams baseViewLayoutParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 		baseItemView.setLayoutParams(baseViewLayoutParams);
@@ -1126,12 +1077,9 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		baseView.setBackgroundResource(AndroidUtils.resolveAttribute(view.getContext(), android.R.attr.selectableItemBackground));
 		baseItemView.addView(baseView);
 
-		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, new OnLongClickListener() {
-			@Override
-			public boolean onLongClick(View v) {
-				copyToClipboard(title.toString(), v.getContext());
-				return true;
-			}
+		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, v -> {
+			copyToClipboard(title.toString(), v.getContext());
+			return true;
 		});
 		baseView.addView(ll);
 
@@ -1176,9 +1124,8 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		((LinearLayout) view).addView(baseItemView);
 	}
 
-	public void buildDestinationRow(@NonNull View view, String timeText, final Spannable title, Spannable secondaryText,
+	public void buildDestinationRow(@NonNull View view, String timeText, Spannable title, Spannable secondaryText,
 									LatLon location, LinearLayout imagesContainer, OnClickListener onClickListener) {
-		OsmandApplication app = requireMyApplication();
 		FrameLayout baseItemView = new FrameLayout(view.getContext());
 		FrameLayout.LayoutParams baseViewLayoutParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
 		baseItemView.setLayoutParams(baseViewLayoutParams);
@@ -1190,12 +1137,9 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		baseView.setBackgroundResource(AndroidUtils.resolveAttribute(view.getContext(), android.R.attr.selectableItemBackground));
 		baseItemView.addView(baseView);
 
-		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, new OnLongClickListener() {
-			@Override
-			public boolean onLongClick(View v) {
-				copyToClipboard(title.toString(), v.getContext());
-				return true;
-			}
+		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 48, v -> {
+			copyToClipboard(title.toString(), v.getContext());
+			return true;
 		});
 		baseView.addView(ll);
 
@@ -1250,7 +1194,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		((LinearLayout) view).addView(baseItemView);
 	}
 
-	private void buildIntermediateRow(@NonNull View view, Drawable icon, final Spannable title, OnClickListener onClickListener) {
+	private void buildIntermediateRow(@NonNull View view, Drawable icon, Spannable title, OnClickListener onClickListener) {
 
 		FrameLayout baseItemView = new FrameLayout(view.getContext());
 		FrameLayout.LayoutParams baseViewLayoutParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT);
@@ -1263,12 +1207,9 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		baseView.setBackgroundResource(AndroidUtils.resolveAttribute(view.getContext(), android.R.attr.selectableItemBackground));
 		baseItemView.addView(baseView);
 
-		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 36, new OnLongClickListener() {
-			@Override
-			public boolean onLongClick(View v) {
-				copyToClipboard(title.toString(), v.getContext());
-				return true;
-			}
+		LinearLayout ll = buildHorizontalContainerView(view.getContext(), 36, v -> {
+			copyToClipboard(title.toString(), v.getContext());
+			return true;
 		});
 		baseView.addView(ll);
 
@@ -1299,37 +1240,31 @@ public class RouteDetailsFragment extends ContextMenuFragment
 		((LinearLayout) view).addView(baseItemView);
 	}
 
-	private CollapsableView getCollapsableTransportStopRoutesView(@NonNull Context context, TransportStopRoute transportStopRoute, final List<TransportStop> stops) {
-		LinearLayout view = (LinearLayout) buildCollapsableContentView(context, false);
+	private CollapsableView getCollapsableTransportStopRoutesView(@NonNull Context context, TransportStopRoute transportStopRoute, List<TransportStop> stops) {
+		LinearLayout view = buildCollapsableContentView(context);
 		int drawableResId = transportStopRoute.type == null ? R.drawable.ic_action_bus_dark : transportStopRoute.type.getResourceId();
 		Drawable icon = getContentIcon(drawableResId);
 		for (int i = 0; i < stops.size(); i++) {
-			final TransportStop stop = stops.get(i);
-			buildIntermediateRow(view, icon, new SpannableString(stop.getName(getPreferredMapLang(), isTransliterateNames())), new OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					showLocationOnMap(stop.getLocation());
-				}
-			});
+			TransportStop stop = stops.get(i);
+			buildIntermediateRow(view, icon, new SpannableString(stop.getName(getPreferredMapLang(), isTransliterateNames())), v -> showLocationOnMap(stop.getLocation()));
 		}
 		return new CollapsableView(view, null, true);
 	}
 
-	protected LinearLayout buildCollapsableContentView(@NonNull Context context, boolean collapsed) {
-		final LinearLayout view = new LinearLayout(context);
+	protected LinearLayout buildCollapsableContentView(@NonNull Context context) {
+		LinearLayout view = new LinearLayout(context);
 		view.setOrientation(LinearLayout.VERTICAL);
-		view.setVisibility(collapsed ? View.GONE : View.VISIBLE);
+		view.setVisibility(View.VISIBLE);
 		LinearLayout.LayoutParams llParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 		view.setLayoutParams(llParams);
 		return view;
 	}
 
 	private void buildTitleView(Spannable title, LinearLayout container) {
-		OsmandApplication app = requireMyApplication();
 		TextViewEx titleView = new TextViewEx(container.getContext());
 		FrameLayout.LayoutParams titleParams = new FrameLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 		titleParams.gravity = Gravity.CENTER_VERTICAL | Gravity.START;
-		titleView.setTypeface(FontCache.getRobotoRegular(container.getContext()));
+		titleView.setTypeface(DEFAULT);
 		titleView.setLayoutParams(titleParams);
 		titleView.setTextSize(16);
 		titleView.setTextColor(getMainFontColor());
@@ -1339,12 +1274,11 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	}
 
 	private void buildDescriptionView(Spannable description, LinearLayout container, int paddingTop, int paddingBottom) {
-		OsmandApplication app = requireMyApplication();
 		TextViewEx textViewDescription = new TextViewEx(container.getContext());
 		LinearLayout.LayoutParams descriptionParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
 		AndroidUtils.setMargins(descriptionParams, 0, dpToPx(paddingTop), 0, dpToPx(paddingBottom));
 		textViewDescription.setLayoutParams(descriptionParams);
-		textViewDescription.setTypeface(FontCache.getRobotoRegular(container.getContext()));
+		textViewDescription.setTypeface(DEFAULT);
 		textViewDescription.setTextSize(14);
 		textViewDescription.setTextColor(getSecondaryColor());
 		textViewDescription.setText(description);
@@ -1381,8 +1315,8 @@ public class RouteDetailsFragment extends ContextMenuFragment
 			String routeRef = transportStopRoute.route.getAdjustedRouteRef(true);
 			int bgColor = transportStopRoute.getColor(app, isNightMode());
 
-			TextView transportStopRouteTextView = (TextView) convertView.findViewById(R.id.transport_stop_route_text);
-			ImageView transportStopRouteImageView = (ImageView) convertView.findViewById(R.id.transport_stop_route_icon);
+			TextView transportStopRouteTextView = convertView.findViewById(R.id.transport_stop_route_text);
+			ImageView transportStopRouteImageView = convertView.findViewById(R.id.transport_stop_route_icon);
 
 			int drawableResId = transportStopRoute.type == null ? R.drawable.ic_action_bus_dark : transportStopRoute.type.getResourceId();
 			transportStopRouteImageView.setImageDrawable(app.getUIUtilities().getPaintedIcon(drawableResId, ColorUtilities.getContrastColor(mapActivity, bgColor, true)));
@@ -1411,7 +1345,6 @@ public class RouteDetailsFragment extends ContextMenuFragment
 
 	private double getWalkTime(@Nullable TransportRouteResultSegment segment,
 							   @Nullable TransportRouteResultSegment nextSegment, double walkDistPT, double walkSpeedPT) {
-		OsmandApplication app = requireMyApplication();
 		RouteCalculationResult walkingRouteSegment = app.getTransportRoutingHelper().getWalkingRouteSegment(segment, nextSegment);
 		if (walkingRouteSegment != null) {
 			return walkingRouteSegment.getRoutingTime();
@@ -1421,7 +1354,6 @@ public class RouteDetailsFragment extends ContextMenuFragment
 
 	private double getWalkDistance(@Nullable TransportRouteResultSegment segment,
 								   @Nullable TransportRouteResultSegment nextSegment, double walkDistPT) {
-		OsmandApplication app = requireMyApplication();
 		RouteCalculationResult walkingRouteSegment = app.getTransportRoutingHelper().getWalkingRouteSegment(segment, nextSegment);
 		if (walkingRouteSegment != null) {
 			return walkingRouteSegment.getWholeDistance();
@@ -1430,7 +1362,6 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	}
 
 	public void buildRowDivider(@NonNull View view, boolean needMargin) {
-		OsmandApplication app = requireMyApplication();
 		View horizontalLine = new View(view.getContext());
 		LinearLayout.LayoutParams llHorLineParams = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, dpToPx(1f));
 		llHorLineParams.gravity = Gravity.BOTTOM | Gravity.START;
@@ -1443,9 +1374,8 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	}
 
 	private void makeGpx() {
-		OsmandApplication app = requireMyApplication();
-		gpx = GpxUiHelper.makeGpxFromRoute(app.getRoutingHelper().getRoute(), app);
-		gpxItem = GpxUiHelper.makeGpxDisplayItem(app, gpx, ChartPointLayer.ROUTE);
+		gpxFile = GpxUiHelper.makeGpxFromRoute(app.getRoutingHelper().getRoute(), app);
+		gpxItem = GpxUiHelper.makeGpxDisplayItem(app, gpxFile, ROUTE, null);
 	}
 
 	void openDetails() {
@@ -1454,23 +1384,23 @@ public class RouteDetailsFragment extends ContextMenuFragment
 			WptPt wpt = null;
 			gpxItem.chartTypes = new GPXDataSetType[]{GPXDataSetType.ALTITUDE, GPXDataSetType.SLOPE};
 			if (gpxItem.chartHighlightPos != -1) {
-				TrkSegment segment = gpx.tracks.get(0).segments.get(0);
+				TrkSegment segment = gpxFile.getTracks().get(0).getSegments().get(0);
 				if (segment != null) {
 					float distance = gpxItem.chartHighlightPos * elevationDataSet.getDivX();
-					for (WptPt p : segment.points) {
-						if (p.distance >= distance) {
+					for (WptPt p : segment.getPoints()) {
+						if (p.getDistance() >= distance) {
 							wpt = p;
 							break;
 						}
 					}
 					if (wpt != null) {
-						location = new LatLon(wpt.lat, wpt.lon);
+						location = new LatLon(wpt.getLat(), wpt.getLon());
 					}
 				}
 			}
 
 			if (location == null) {
-				location = new LatLon(gpxItem.locationStart.lat, gpxItem.locationStart.lon);
+				location = new LatLon(gpxItem.locationStart.getLat(), gpxItem.locationStart.getLon());
 			}
 			if (wpt != null) {
 				gpxItem.locationOnMap = wpt;
@@ -1563,6 +1493,10 @@ public class RouteDetailsFragment extends ContextMenuFragment
 					}
 					break;
 			}
+		} else if (card instanceof AttachTrackToRoadsBannerCard) {
+			if (MeasurementToolFragment.showSnapToRoadsDialog(requireMapActivity(), true)) {
+				dismiss();
+			}
 		}
 	}
 
@@ -1591,7 +1525,7 @@ public class RouteDetailsFragment extends ContextMenuFragment
 	}
 
 	public static String getTimeDescription(OsmandApplication app, RouteDirectionInfo model) {
-		final int timeInSeconds = model.getExpectedTime();
+		int timeInSeconds = model.getExpectedTime();
 		return Algorithms.formatDuration(timeInSeconds, app.accessibilityEnabled());
 	}
 }

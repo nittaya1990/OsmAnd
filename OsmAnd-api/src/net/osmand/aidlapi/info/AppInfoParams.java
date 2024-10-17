@@ -6,6 +6,9 @@ import android.os.Parcel;
 import net.osmand.aidlapi.AidlParams;
 import net.osmand.aidlapi.map.ALatLon;
 
+import java.util.ArrayList;
+import java.util.List;
+
 public class AppInfoParams extends AidlParams {
 
 	private ALatLon lastKnownLocation;
@@ -13,12 +16,18 @@ public class AppInfoParams extends AidlParams {
 	private ALatLon destinationLocation;
 
 	private Bundle turnInfo;
+	private Bundle versionsInfo;
 	private int leftTime;
 	private int leftDistance;
 	private long arrivalTime;
 	private boolean mapVisible;
 
-	public AppInfoParams(ALatLon lastKnownLocation, ALatLon mapLocation, Bundle turnInfo, int leftTime, int leftDistance, long arrivalTime, boolean mapVisible) {
+	private String osmAndVersion;
+	private String releaseDate;
+	private ArrayList<String> routingData = new ArrayList<>();
+
+	public AppInfoParams(ALatLon lastKnownLocation, ALatLon mapLocation, Bundle turnInfo,
+	                     int leftTime, int leftDistance, long arrivalTime, boolean mapVisible) {
 		this.lastKnownLocation = lastKnownLocation;
 		this.mapLocation = mapLocation;
 		this.leftTime = leftTime;
@@ -80,6 +89,36 @@ public class AppInfoParams extends AidlParams {
 		return turnInfo;
 	}
 
+	public Bundle getVersionsInfo() {
+		return versionsInfo;
+	}
+
+	public void setVersionsInfo(Bundle versionsInfo) {
+		this.versionsInfo = versionsInfo;
+	}
+
+	public String getOsmAndVersion() {
+		return osmAndVersion;
+	}
+
+	public void setOsmAndVersion(String osmAndVersion) {
+		this.osmAndVersion = osmAndVersion;
+	}
+
+	public String getReleaseDate() {
+		return releaseDate;
+	}
+
+	public void setReleaseDate(String releaseDate) {
+		this.releaseDate = releaseDate;
+	}
+
+	public void setRoutingData(List<String> routingData) {
+		if (routingData != null) {
+			this.routingData.addAll(routingData);
+		}
+	}
+
 	@Override
 	public void writeToBundle(Bundle bundle) {
 		bundle.putParcelable("lastKnownLocation", lastKnownLocation);
@@ -89,7 +128,11 @@ public class AppInfoParams extends AidlParams {
 		bundle.putLong("arrivalTime", arrivalTime);
 		bundle.putInt("leftDistance", leftDistance);
 		bundle.putBundle("turnInfo", turnInfo);
+		bundle.putBundle("versionsInfo", versionsInfo);
 		bundle.putBoolean("mapVisible", mapVisible);
+		bundle.putString("osmAndVersion", osmAndVersion);
+		bundle.putString("releaseDate", releaseDate);
+		bundle.putStringArrayList("routingData", routingData);
 	}
 
 	@Override
@@ -101,6 +144,10 @@ public class AppInfoParams extends AidlParams {
 		arrivalTime = bundle.getLong("arrivalTime");
 		leftDistance = bundle.getInt("leftDistance");
 		turnInfo = bundle.getBundle("turnInfo");
+		versionsInfo = bundle.getBundle("versionsInfo");
 		mapVisible = bundle.getBoolean("mapVisible");
+		osmAndVersion = bundle.getString("osmAndVersion");
+		releaseDate = bundle.getString("releaseDate");
+		routingData = bundle.getStringArrayList("routingData");
 	}
 }

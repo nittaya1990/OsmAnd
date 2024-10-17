@@ -10,7 +10,7 @@ import net.osmand.map.ITileSource;
 import net.osmand.map.TileSourceManager;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.SQLiteTileSource;
+import net.osmand.plus.resources.SQLiteTileSource;
 import net.osmand.plus.settings.backend.backup.SettingsHelper;
 import net.osmand.plus.settings.backend.backup.SettingsItemReader;
 import net.osmand.plus.settings.backend.backup.SettingsItemType;
@@ -126,6 +126,11 @@ public class MapSourcesSettingsItem extends CollectionSettingsItem<ITileSource> 
 		}
 	}
 
+	@Override
+	protected void deleteItem(ITileSource item) {
+		// TODO: delete settings item
+	}
+
 	@NonNull
 	@Override
 	public ITileSource renameItem(@NonNull ITileSource item) {
@@ -134,10 +139,8 @@ public class MapSourcesSettingsItem extends CollectionSettingsItem<ITileSource> 
 			number++;
 			if (item instanceof SQLiteTileSource) {
 				SQLiteTileSource oldItem = (SQLiteTileSource) item;
-				SQLiteTileSource renamedItem = new SQLiteTileSource(
-						oldItem,
-						oldItem.getName() + "_" + number,
-						app);
+				String newName = oldItem.getName() + "_" + number;
+				SQLiteTileSource renamedItem = new SQLiteTileSource(oldItem, newName, app);
 				if (!isDuplicate(renamedItem)) {
 					return renamedItem;
 				}

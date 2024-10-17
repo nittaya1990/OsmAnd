@@ -2,28 +2,6 @@ package net.osmand;
 
 import static net.osmand.IndexConstants.GPX_FILE_EXT;
 import static net.osmand.IndexConstants.GPX_GZ_FILE_EXT;
-import static net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
-import static net.osmand.router.RoutePlannerFrontEnd.GpxRouteApproximation;
-
-import net.osmand.binary.BinaryMapIndexReader;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
-import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
-import net.osmand.binary.RouteDataObject;
-import net.osmand.data.LatLon;
-import net.osmand.data.MapObject;
-import net.osmand.data.QuadRect;
-import net.osmand.render.RenderingRuleSearchRequest;
-import net.osmand.render.RenderingRulesStorage;
-import net.osmand.router.NativeTransportRoutingResult;
-import net.osmand.router.RouteCalculationProgress;
-import net.osmand.router.RouteResultPreparation;
-import net.osmand.router.RouteSegmentResult;
-import net.osmand.router.RoutingContext;
-import net.osmand.router.TransportRoutingConfiguration;
-import net.osmand.util.Algorithms;
-import net.osmand.util.MapUtils;
-
-import org.apache.commons.logging.Log;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -38,8 +16,36 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.TreeMap;
+
+import org.apache.commons.logging.Log;
+
+import com.google.gson.JsonObject;
 
 import gnu.trove.list.array.TIntArrayList;
+import net.osmand.binary.BinaryMapIndexReader;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteRegion;
+import net.osmand.binary.BinaryMapRouteReaderAdapter.RouteSubregion;
+import net.osmand.binary.ObfConstants;
+import net.osmand.binary.RouteDataObject;
+import net.osmand.data.LatLon;
+import net.osmand.data.MapObject;
+import net.osmand.data.QuadRect;
+import net.osmand.render.RenderingRuleSearchRequest;
+import net.osmand.render.RenderingRulesStorage;
+import net.osmand.router.GeneralRouter;
+import net.osmand.router.GpxRouteApproximation;
+import net.osmand.router.HHRouteDataStructure.HHRoutingConfig;
+import net.osmand.router.HHRoutePlanner;
+import net.osmand.router.NativeTransportRoutingResult;
+import net.osmand.router.RouteCalculationProgress;
+import net.osmand.router.RoutePlannerFrontEnd.GpxPoint;
+import net.osmand.router.RouteResultPreparation;
+import net.osmand.router.RouteSegmentResult;
+import net.osmand.router.RoutingContext;
+import net.osmand.router.TransportRoutingConfiguration;
+import net.osmand.util.Algorithms;
+import net.osmand.util.MapUtils;
 
 public class NativeLibrary {
 
@@ -48,11 +54,23 @@ public class NativeLibrary {
 	}
 
 	public static class RenderingGenerationResult {
+		public ByteBuffer bitmapBuffer;
+		private JsonObject info;
 		public RenderingGenerationResult(ByteBuffer bitmap) {
-			bitmapBuffer = bitmap;
+			this.bitmapBuffer = bitmap;
 		}
-
-		public final ByteBuffer bitmapBuffer;
+		public RenderingGenerationResult(ByteBuffer bitmap, JsonObject info) {
+			this.bitmapBuffer = bitmap;
+			this.info = info;
+		}
+		
+		public JsonObject getInfo() {
+			return info;
+		}
+		
+		public void setInfo(JsonObject info) {
+			this.info = info;
+		}
 	}
 
 	public static class NativeSearchResult {
@@ -63,6 +81,7 @@ public class NativeLibrary {
 			this.nativeHandler = nativeHandler;
 		}
 
+		@SuppressWarnings("deprecation")
 		@Override
 		protected void finalize() throws Throwable {
 			deleteNativeResult();
@@ -88,6 +107,7 @@ public class NativeLibrary {
 			this.objects = objects;
 		}
 
+		@SuppressWarnings("deprecation")
 		@Override
 		protected void finalize() throws Throwable {
 			deleteNativeResult();
@@ -124,6 +144,7 @@ public class NativeLibrary {
 		public double lat;
 		public double lon;
 		public double cumDist;
+		public int targetInd;
 		public List<RouteSegmentResult> routeToTarget;
 
 		NativeGpxPointApproximation(GpxPoint gpxPoint) {
@@ -132,11 +153,12 @@ public class NativeLibrary {
 			cumDist = gpxPoint.cumDist;
 		}
 
-		public NativeGpxPointApproximation(int ind, double lat, double lon, double cumDist) {
+		public NativeGpxPointApproximation(int ind, double lat, double lon, double cumDist, int targetInd) {
 			this.ind = ind;
 			this.lat = lat;
 			this.lon = lon;
 			this.cumDist = cumDist;
+			this.targetInd = targetInd;
 			routeToTarget = new ArrayList<>();
 		}
 
@@ -154,6 +176,7 @@ public class NativeLibrary {
 				fixStraightLineRegion();
 			}
 
+			point.targetInd = targetInd;
 			point.routeToTarget = new ArrayList<>(routeToTarget);
 			return point;
 		}
@@ -162,12 +185,13 @@ public class NativeLibrary {
 			RouteRegion reg = new RouteRegion();
 			reg.initRouteEncodingRule(0, "highway", RouteResultPreparation.UNMATCHED_HIGHWAY_TYPE);
 			for (int i = 0; i < routeToTarget.size(); i++) {
-				RouteDataObject rdo = new RouteDataObject(reg);
-				rdo.pointsX = routeToTarget.get(i).getObject().pointsX;
-				rdo.pointsY = routeToTarget.get(i).getObject().pointsY;
-				rdo.types = routeToTarget.get(i).getObject().getTypes();
-				rdo.id = -1;
-				routeToTarget.get(i).setObject(rdo);
+				RouteDataObject newRdo = new RouteDataObject(reg);
+				RouteDataObject rdo = routeToTarget.get(i).getObject();
+				newRdo.pointsX = rdo.pointsX;
+				newRdo.pointsY = rdo.pointsY;
+				newRdo.types = rdo.getTypes();
+				newRdo.id = -1;
+				routeToTarget.get(i).setObject(newRdo);
 			}
 		}
 	}
@@ -227,40 +251,88 @@ public class NativeLibrary {
 		return nativeTransportRouting(new int[]{sx31, sy31, ex31, ey31}, cfg, progress);
 	}
 
-	public RouteSegmentResult[] runNativeRouting(RoutingContext c, RouteRegion[] regions, boolean basemap) {
-//		config.router.printRules(System.out);
-		return nativeRouting(c, c.config.initialDirection == null ? -360 : c.config.initialDirection.floatValue(),
+	public RouteSegmentResult[] runNativeRouting(RoutingContext c, HHRoutingConfig hhRoutingConfig, RouteRegion[] regions, boolean basemap) {
+		// if hhRoutingConfig == null - process old routing
+		if (hhRoutingConfig != null) {
+			setHHNativeFilterAndParameters(c);
+		}
+		final float CPP_NO_DIRECTION = -2 * (float) Math.PI;
+		return nativeRouting(c, hhRoutingConfig, c.config.initialDirection == null ?
+				CPP_NO_DIRECTION : c.config.initialDirection.floatValue(),
 				regions, basemap);
 	}
 
-	public GpxRouteApproximation runNativeSearchGpxRoute(GpxRouteApproximation gCtx, List<GpxPoint> gpxPoints) {
-		RouteRegion[] regions = gCtx.ctx.reverseMap.keySet().toArray(new RouteRegion[0]);
-		for (RouteRegion region : regions) {
-			BinaryMapIndexReader reader = gCtx.ctx.reverseMap.get(region);
-			if (reader != null) {
-				try {
-					reader.initRouteRegion(region);
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
-			}
-		}
+	private void setHHNativeFilterAndParameters(RoutingContext ctx) {
+		GeneralRouter gr = (GeneralRouter) ctx.getRouter();
 
-		int listSize = gpxPoints.size();
-		NativeGpxPointApproximation[] nativePoints = new NativeGpxPointApproximation[listSize];
-		for (int i = 0; i < listSize; i++) {
+		TreeMap<String, String> tags = HHRoutePlanner.getFilteredTags(gr);
+		String[] tm = new String[tags.size() * 2];
+		int index = 0;
+		for (Map.Entry<String, String> entry : tags.entrySet()) {
+			tm[index] = entry.getKey();
+			tm[index + 1] = entry.getValue();
+			index += 2;
+		}
+		gr.hhNativeFilter = tm;
+
+		int i = 0;
+		gr.hhNativeParameterValues = new String[gr.getParameterValues().size() * 2];
+		for (Map.Entry<String, String> entry : gr.getParameterValues().entrySet()) {
+			gr.hhNativeParameterValues[i++] = entry.getKey();
+			gr.hhNativeParameterValues[i++] = entry.getValue();
+		}
+	}
+
+	public GpxRouteApproximation runNativeSearchGpxRoute(GpxRouteApproximation gCtx, List<GpxPoint> gpxPoints, boolean useGeo) {
+		RouteRegion[] regions = gCtx.ctx.reverseMap.keySet().toArray(new RouteRegion[0]);
+		int pointsSize = gpxPoints.size();
+		NativeGpxPointApproximation[] nativePoints = new NativeGpxPointApproximation[pointsSize];
+		for (int i = 0; i < pointsSize; i++) {
 			nativePoints[i] = new NativeGpxPointApproximation(gpxPoints.get(i));
 		}
-		NativeGpxRouteApproximationResult nativeResult = nativeSearchGpxRoute(gCtx.ctx, nativePoints, regions);
+		NativeGpxRouteApproximationResult nativeResult = nativeSearchGpxRoute(gCtx.ctx, nativePoints, regions, useGeo);
 		for (NativeGpxPointApproximation point : nativeResult.finalPoints) {
 			gCtx.finalPoints.add(point.convertToGpxPoint());
 		}
-		gCtx.result.addAll(nativeResult.result);
+		List<RouteSegmentResult> results = nativeResult.result;
+		for (RouteSegmentResult rsr : results) {
+			initRouteRegion(gCtx, rsr);
+		}
+		gCtx.fullRoute.addAll(results);
 		return gCtx;
 	}
 
+	private void initRouteRegion(GpxRouteApproximation gCtx, RouteSegmentResult rsr) {
+		RouteRegion region = rsr.getObject().region;
+		if (region == null) {
+			// gCtx.finalPoints is fixed by fixStraightLineRegion
+			// gCtx.result null region(s) should be fixed here
+			RouteRegion reg = new RouteRegion();
+			reg.initRouteEncodingRule(0, "highway", RouteResultPreparation.UNMATCHED_HIGHWAY_TYPE);
+			RouteDataObject newRdo = new RouteDataObject(reg);
+			RouteDataObject rdo = rsr.getObject();
+			newRdo.pointsX = rdo.pointsX;
+			newRdo.pointsY = rdo.pointsY;
+			newRdo.types = rdo.getTypes();
+			newRdo.id = -1;
+			rsr.setObject(newRdo);
+			return;
+		}
+		BinaryMapIndexReader reader = gCtx.ctx.reverseMap.get(region);
+		if (reader != null) {
+			try {
+				reader.initRouteRegion(region);
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
 	public NativeRouteSearchResult loadRouteRegion(RouteSubregion sub, boolean loadObjects) {
-		NativeRouteSearchResult lr = loadRoutingData(sub.routeReg, sub.routeReg.getName(), sub.routeReg.getFilePointer(), sub, loadObjects);
+		if (sub.routeReg.getFilePointer() > Integer.MAX_VALUE) {
+			throw new IllegalStateException("C++ doesn't support files > 2 GB");
+		}
+		NativeRouteSearchResult lr = loadRoutingData(sub.routeReg, sub.routeReg.getName(), (int) sub.routeReg.getFilePointer(), sub, loadObjects);
 		if (lr != null && lr.nativeHandler != 0) {
 			lr.region = sub;
 		}
@@ -274,7 +346,7 @@ public class NativeLibrary {
 	/**/
 	protected static native NativeGpxRouteApproximationResult nativeSearchGpxRoute(RoutingContext c,
 	                                                                               NativeGpxPointApproximation[] gpxPoints,
-	                                                                               RouteRegion[] regions);
+	                                                                               RouteRegion[] regions, boolean useGeo);
 
 	protected static native NativeRouteSearchResult loadRoutingData(RouteRegion reg, String regName, int regfp, RouteSubregion subreg,
 	                                                                boolean loadObjects);
@@ -287,7 +359,7 @@ public class NativeLibrary {
 
 	protected static native RouteDataObject[] getRouteDataObjects(RouteRegion reg, long rs, int x31, int y31);
 
-	protected static native RouteSegmentResult[] nativeRouting(RoutingContext c,  float initDirection, RouteRegion[] regions, boolean basemap);
+	protected static native RouteSegmentResult[] nativeRouting(RoutingContext c, HHRoutingConfig hhRoutingConfig,  float initDirection, RouteRegion[] regions, boolean basemap);
 
 	protected static native NativeTransportRoutingResult[] nativeTransportRouting(int[] coordinates, TransportRoutingConfiguration cfg,
 																				  RouteCalculationProgress progress);
@@ -322,6 +394,14 @@ public class NativeLibrary {
 	public RenderedObject[] searchRenderedObjectsFromContext(RenderingContext context, int x, int y, boolean notvisible) {
 		return searchRenderedObjects(context, x, y, notvisible);
 	}
+
+	public boolean needRequestPrivateAccessRouting(RoutingContext ctx, int[] x31Coordinates, int[] y31Coordinates){
+		return nativeNeedRequestPrivateAccessRouting(ctx, x31Coordinates, y31Coordinates);
+	}
+	protected static native boolean nativeNeedRequestPrivateAccessRouting(RoutingContext ctx, int[] x31Coordinates, int[] y31Coordinates);
+
+	protected static native ByteBuffer getGeotiffTile(
+		String tilePath, String outColorFilename, String midColorFilename, int type, int size, int zoom, int x, int y);
 
 	/**/
 	// Empty native impl
@@ -376,6 +456,7 @@ public class NativeLibrary {
 		// look for a pre-installed library
 		if (path != null && path.length() > 0) {
 			try {
+				System.out.printf("Loading native library %s...\n ", path + "/" + System.mapLibraryName(libBaseName));
 				System.load(path + "/" + System.mapLibraryName(libBaseName));
 				return true;
 			} catch (UnsatisfiedLinkError e) {
@@ -456,7 +537,7 @@ public class NativeLibrary {
 				boolean hasNumber = Character.isDigit(nm.charAt(0)) && Character.isDigit(nm.charAt(1));
 				if (hasNumber) {
 					// numeric fonts 05_NotoSans .. 65_NotoSansNastaliqUrdu
-					return Integer.parseInt(nm.substring(0,1));
+					return Integer.parseInt(nm.substring(0,2));
 				} else if (nm.contains("NotoSans".toLowerCase())) {
 					// downloaded fonts (e.g. NotoSans-Japanese.otf)
 					return 100;
@@ -477,16 +558,13 @@ public class NativeLibrary {
 			initFontType(f.getAbsolutePath(), name.substring(0, name.length() - 4), name.toLowerCase().contains("bold"),
 					name.toLowerCase().contains("italic"));
 		}
-		
 	}
-	
-
 
 	public static class RenderedObject extends MapObject {
-		private Map<String, String> tags = new LinkedHashMap<>();
+		private final Map<String, String> tags = new LinkedHashMap<>();
 		private QuadRect bbox = new QuadRect();
-		private TIntArrayList x = new TIntArrayList();
-		private TIntArrayList y = new TIntArrayList();
+		private final TIntArrayList x = new TIntArrayList();
+		private final TIntArrayList y = new TIntArrayList();
 		private String iconRes;
 		private int order;
 		private boolean visible;
@@ -494,6 +572,7 @@ public class NativeLibrary {
 		private LatLon labelLatLon;
 		private int labelX = 0;
 		private int labelY = 0;
+		private boolean isPolygon;
 
 		public Map<String, String> getTags() {
 			return tags;
@@ -592,6 +671,14 @@ public class NativeLibrary {
 			this.labelY = labelY;
 		}
 
+		public void markAsPolygon(boolean isPolygon) {
+			this.isPolygon = isPolygon;
+		}
+
+		public boolean isPolygon() {
+			return isPolygon;
+		}
+
 		public List<String> getOriginalNames() {
 			List<String> names = new ArrayList<>();
 			if (!Algorithms.isEmpty(name)) {
@@ -623,6 +710,46 @@ public class NativeLibrary {
 				}
 			}
 			return null;
+		}
+
+		@Override
+		public String toString() {
+			String s = getClass().getSimpleName() + " " + name;
+			String link = ObfConstants.getOsmUrlForId(this);
+			String tags = ObfConstants.getPrintTags(this);
+			s += s.contains(link) ? "" : " " + link;
+			s += s.contains(tags) ? "" : " " + tags;
+			return s;
+		}
+
+		public List<LatLon> getPolygon() {
+			List<LatLon> res = new ArrayList<>();
+			for (int i = 0; i < this.x.size(); i++) {
+				int x = this.x.get(i);
+				int y = this.y.get(i);
+				LatLon l = new LatLon(MapUtils.get31LatitudeY(y), MapUtils.get31LongitudeX(x));
+				res.add(l);
+			}
+			return res;
+		}
+
+		public QuadRect getRectLatLon() {
+			if (x.size() == 0) {
+				return null;
+			}
+			int left = x.get(0);
+			int right = left;
+			int top = y.get(0);
+			int bottom = top;
+			for (int i = 0; i < x.size(); i++) {
+				int x = this.x.get(i);
+				int y = this.y.get(i);
+				left = Math.min(left, x);
+				right = Math.max(right, x);
+				top = Math.min(top, y);
+				bottom = Math.max(bottom, y);
+			}
+			return new QuadRect(MapUtils.get31LongitudeX(left), MapUtils.get31LatitudeY(top), MapUtils.get31LongitudeX(right), MapUtils.get31LatitudeY(bottom));
 		}
 	}
 }

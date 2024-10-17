@@ -14,7 +14,7 @@ import java.util.List;
 public class LocationParser {
 
 	public static class ParsedOpenLocationCode {
-		private String text;
+		private final String text;
 		private String code;
 		private boolean full;
 		private String placeName;
@@ -104,6 +104,7 @@ public class LocationParser {
 		if (!valid) {
 			return null;
 		}
+		locPhrase = prepareLatLonWithDecimalCommas(locPhrase);
 		List<Double> d = new ArrayList<>();
 		List<Object> all = new ArrayList<>();
 		List<String> strings = new ArrayList<>();
@@ -127,7 +128,7 @@ public class LocationParser {
 			if (Character.isLetter(ch)) {
 				try {
 					String east = combined.substring(0, combined.length() / 2);
-					String north = combined.substring(combined.length() / 2, combined.length());
+					String north = combined.substring(combined.length() / 2);
 					UTMPoint upoint = new UTMPoint(Double.parseDouble(north), Double.parseDouble(east), d.get(0)
 							.intValue(), ch);
 					LatLonPoint ll = upoint.toLatLonPoint();
@@ -257,6 +258,33 @@ public class LocationParser {
 		return null;
 	}
 
+	private static String prepareLatLonWithDecimalCommas(String ll) {
+		final int DIGITS_BEFORE_COMMA = 1, DIGITS_AFTER_COMMA = 3; // see testCommaLatLonSearch
+		for (int i = DIGITS_BEFORE_COMMA, first = -1; i < ll.length() - DIGITS_AFTER_COMMA; i++) {
+			if (ll.charAt(i) == ',') {
+				int before = 0, after = 0;
+				for (int j = i - 1; j >= i - DIGITS_BEFORE_COMMA; j--) {
+					if (Character.isDigit(ll.charAt(j))) {
+						before++;
+					}
+				}
+				for (int j = i + 1; j <= i + DIGITS_AFTER_COMMA && before >= DIGITS_BEFORE_COMMA; j++) {
+					if (Character.isDigit(ll.charAt(j))) {
+						after++;
+					}
+				}
+				if (before >= DIGITS_BEFORE_COMMA && after >= DIGITS_AFTER_COMMA) {
+					if (first != -1) {
+						return ll.substring(0, first) + "." + ll.substring(first + 1, i) + "." + ll.substring(i + 1);
+					} else {
+						first = i; // first suitable comma found
+					}
+				}
+			}
+		}
+		return ll;
+	}
+
 	private static LatLon validateAndCreateLatLon(double lat, double lon) {
 		if (Math.abs(lat) <= 90 && Math.abs(lon) <= 180) {
 			return new LatLon(lat, lon);
@@ -279,14 +307,14 @@ public class LocationParser {
 		Double prevDouble = null;
 		for (int i = begin; i <= end; i++) {
 			Object o = i == end ? "" : all.get(i);
-			if(o.equals("S") || o.equals("W") || o.equals(-0.0))  {
+			if (o.equals("S") || o.equals("s") || o.equals("W") || o.equals("w") || o.equals(-0.0)) {
 				neg = !neg;
 			}
 			if (prevDouble != null) {
 				if (o.equals("°")) {
 					type = 0;
 				} else if (o.equals("′") /*o.equals("'")*/) {
-					// ' can be used as delimeter ignore it
+					// ' can be used as delimiter ignore it
 					type = 1;
 				} else if (o.equals("\"") || o.equals("″")) {
 					type = 2;
@@ -318,13 +346,18 @@ public class LocationParser {
 	}
 
 	public static void splitObjects(String s, List<Double> d, List<Object> all, List<String> strings) {
+		splitObjects(s, d, all, strings, new boolean[]{false});
+	}
+
+	public static void splitObjects(String s, List<Double> d, List<Object> all, List<String> strings, boolean[] partial) {
 		boolean digit = false;
 		int word = -1;
+		int firstNumeralIdx = -1;
 		for (int i = 0; i <= s.length(); i++) {
 			char ch = i == s.length() ? ' ' : s.charAt(i);
 			boolean dg = Character.isDigit(ch);
 			boolean nonwh = ch != ',' && ch != ' ' && ch != ';';
-			if (ch == '.' || dg || ch == '-' ) {
+			if (ch == '.' || dg || ch == '-') {
 				if (!digit) {
 					if (word != -1) {
 						all.add(s.substring(word, i));
@@ -333,19 +366,22 @@ public class LocationParser {
 					digit = true;
 					word = i;
 				} else {
-					if(word == -1) {
+					if (word == -1) {
 						word = i;
 					}
 					// if digit
 					// continue
 				}
 			} else {
-				if (digit){
+				if (digit) {
 					if (word != -1) {
 						try {
 							double dl = Double.parseDouble(s.substring(word, i));
 							d.add(dl);
 							all.add(dl);
+							if (firstNumeralIdx == -1) {
+								firstNumeralIdx = all.size() - 1;
+							}
 							strings.add(s.substring(word, i));
 							digit = false;
 							word = -1;
@@ -354,15 +390,15 @@ public class LocationParser {
 					}
 				}
 				if (nonwh) {
-					if(!Character.isLetter(ch)) {
-						if(word != -1) {
+					if (!Character.isLetter(ch)) {
+						if (word != -1) {
 							all.add(s.substring(word, i));
 							strings.add(s.substring(word, i));
 						}
 						all.add(s.substring(i, i + 1));
-						strings.add(s.substring(i, i +1));
+						strings.add(s.substring(i, i + 1));
 						word = -1;
-					} else if(word == -1) {
+					} else if (word == -1) {
 						word = i;
 					}
 				} else {
@@ -372,6 +408,14 @@ public class LocationParser {
 					}
 					word = -1;
 				}
+			}
+		}
+
+		partial[0] = false;
+		if (firstNumeralIdx != -1) {
+			int nextTokenIdx = firstNumeralIdx + 1;
+			if (all.size() <= nextTokenIdx) {
+				partial[0] = true;
 			}
 		}
 	}

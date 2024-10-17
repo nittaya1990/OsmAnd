@@ -1,6 +1,5 @@
 package net.osmand.plus.chooseplan;
 
-import android.annotation.TargetApi;
 import android.app.Activity;
 import android.app.Dialog;
 import android.graphics.drawable.Drawable;
@@ -25,46 +24,52 @@ import androidx.core.widget.NestedScrollView;
 import com.google.android.material.appbar.AppBarLayout;
 import com.google.android.material.appbar.AppBarLayout.OnOffsetChangedListener;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ColorUtilities;
-import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.BaseOsmAndDialogFragment;
 import net.osmand.plus.inapp.InAppPurchaseHelper;
 import net.osmand.plus.inapp.InAppPurchaseHelper.InAppPurchaseListener;
 import net.osmand.plus.inapp.InAppPurchaseHelper.InAppPurchaseTaskType;
+import net.osmand.plus.inapp.InAppPurchaseUtils;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.UiUtilities;
 
 public abstract class BasePurchaseDialogFragment extends BaseOsmAndDialogFragment
 		implements InAppPurchaseListener, OnOffsetChangedListener, OnScrollChangedListener {
 
 	public static final String SCROLL_POSITION = "scroll_position";
 
-	protected OsmandApplication app;
 	protected InAppPurchaseHelper purchaseHelper;
 
 	protected View mainView;
 	protected AppBarLayout appBar;
 	protected NestedScrollView scrollView;
-	protected LayoutInflater themedInflater;
-
-	protected boolean nightMode;
-	protected boolean usedOnMap;
 
 	private int lastScrollY;
 	private int lastKnownToolbarOffset;
 
 	public enum ButtonBackground {
+
 		ROUNDED(R.drawable.rectangle_rounded),
 		ROUNDED_SMALL(R.drawable.rectangle_rounded_small),
 		ROUNDED_LARGE(R.drawable.rectangle_rounded_large);
+
+		public final int drawableId;
 
 		ButtonBackground(int drawableId) {
 			this.drawableId = drawableId;
 		}
 
-		public int drawableId;
+		public int getRippleId(boolean nightMode) {
+			if (this == ROUNDED) {
+				return nightMode ? R.drawable.ripple_solid_dark_6dp : R.drawable.ripple_solid_light_6dp;
+			} else if (this == ROUNDED_SMALL) {
+				return nightMode ? R.drawable.ripple_solid_dark_3dp : R.drawable.ripple_solid_light_3dp;
+			} else {
+				return nightMode ? R.drawable.ripple_solid_dark_9dp : R.drawable.ripple_solid_light_9dp;
+			}
+		}
 	}
 
 	@ColorRes
@@ -75,22 +80,24 @@ public abstract class BasePurchaseDialogFragment extends BaseOsmAndDialogFragmen
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		app = getMyApplication();
 		purchaseHelper = app.getInAppPurchaseHelper();
-		usedOnMap = getMapActivity() != null;
-		nightMode = isNightMode(usedOnMap);
-		themedInflater = UiUtilities.getInflater(getMyActivity(), nightMode);
+	}
+
+	@Override
+	protected boolean isUsedOnMap() {
+		return getMapActivity() != null;
 	}
 
 	@NonNull
 	@Override
 	public Dialog onCreateDialog(Bundle savedInstanceState) {
+		updateNightMode();
 		Activity ctx = requireActivity();
 		int themeId = nightMode ? R.style.OsmandDarkTheme_DarkActionbar : R.style.OsmandLightTheme_DarkActionbar_LightStatusBar;
 		Dialog dialog = new Dialog(ctx, themeId);
 		Window window = dialog.getWindow();
 		if (window != null) {
-			if (!getSettings().DO_NOT_USE_ANIMATIONS.get()) {
+			if (!settings.DO_NOT_USE_ANIMATIONS.get()) {
 				window.getAttributes().windowAnimations = R.style.Animations_Alpha;
 			}
 			window.setStatusBarColor(ContextCompat.getColor(ctx, getStatusBarColorId()));
@@ -101,6 +108,7 @@ public abstract class BasePurchaseDialogFragment extends BaseOsmAndDialogFragmen
 	@Nullable
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+		updateNightMode();
 		mainView = themedInflater.inflate(getLayoutId(), container, false);
 		appBar = mainView.findViewById(R.id.appbar);
 		scrollView = mainView.findViewById(R.id.scroll_view);
@@ -121,6 +129,10 @@ public abstract class BasePurchaseDialogFragment extends BaseOsmAndDialogFragmen
 				scrollView.scrollTo(0, lastScrollY);
 			}
 		}
+	}
+
+	protected void updateContent(boolean progress) {
+
 	}
 
 	@Override
@@ -151,8 +163,6 @@ public abstract class BasePurchaseDialogFragment extends BaseOsmAndDialogFragmen
 	}
 
 	protected abstract int getLayoutId();
-
-	protected abstract void updateContent(boolean progress);
 
 	protected abstract void updateToolbar(int verticalOffset);
 
@@ -187,8 +197,7 @@ public abstract class BasePurchaseDialogFragment extends BaseOsmAndDialogFragmen
 
 	@Override
 	public void onGetItems() {
-		OsmandApplication app = getMyApplication();
-		if (app != null && InAppPurchaseHelper.isSubscribedToAny(app)) {
+		if (isAdded() && InAppPurchaseUtils.isSubscribedToAny(app)) {
 			updateContent(false);
 		}
 	}
@@ -238,36 +247,33 @@ public abstract class BasePurchaseDialogFragment extends BaseOsmAndDialogFragmen
 	}
 
 	protected void setupRoundedBackground(@NonNull View view, @NonNull Drawable normal,
-										  @ColorInt int color, ButtonBackground background) {
-		Drawable selected = createRoundedDrawable(ColorUtilities.getColorWithAlpha(color, 0.5f), background);
-		setupRoundedBackground(view, normal, selected);
-	}
-
-	protected void setupRoundedBackground(@NonNull View view, @NonNull Drawable normal, @NonNull Drawable selected) {
-		Drawable background;
+	                                      @ColorInt int color, ButtonBackground background) {
+		Drawable drawable;
 		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-			background = UiUtilities.getLayeredIcon(normal, getRippleDrawable());
+			Drawable selected = AppCompatResources.getDrawable(app, background.getRippleId(nightMode));
+			drawable = UiUtilities.getLayeredIcon(normal, selected);
 		} else {
-			background = AndroidUtils.createPressedStateListDrawable(normal, selected);
+			Drawable selected = createRoundedDrawable(ColorUtilities.getColorWithAlpha(color, 0.5f), background);
+			drawable = AndroidUtils.createPressedStateListDrawable(normal, selected);
 		}
-		AndroidUtils.setBackground(view, background);
+		AndroidUtils.setBackground(view, drawable);
 	}
 
 	protected Drawable getActiveStrokeDrawable() {
 		return app.getUIUtilities().getIcon(nightMode ? R.drawable.btn_background_stroked_active_dark : R.drawable.btn_background_stroked_active_light);
 	}
 
-	@TargetApi(Build.VERSION_CODES.LOLLIPOP)
-	protected Drawable getRippleDrawable() {
-		return AppCompatResources.getDrawable(app, nightMode ? R.drawable.purchase_button_ripple_dark : R.drawable.purchase_button_ripple_light);
-	}
-
 	protected Drawable createRoundedDrawable(@ColorInt int color, ButtonBackground background) {
 		return UiUtilities.createTintedDrawable(app, background.drawableId, color);
 	}
 
-	@ColorInt
-	protected int getColor(@ColorRes int colorId) {
-		return ContextCompat.getColor(app, colorId);
+	@NonNull
+	protected Drawable getCheckmark() {
+		return getIcon(nightMode ? R.drawable.ic_action_checkmark_colored_night : R.drawable.ic_action_checkmark_colored_day);
+	}
+
+	@NonNull
+	protected Drawable getEmptyCheckmark() {
+		return getIcon(nightMode ? R.drawable.ic_action_radio_button_night : R.drawable.ic_action_radio_button_day);
 	}
 }

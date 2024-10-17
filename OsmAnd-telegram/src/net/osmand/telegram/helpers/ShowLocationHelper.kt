@@ -4,12 +4,12 @@ import android.content.Intent
 import android.graphics.Color
 import android.os.AsyncTask
 import android.text.TextUtils
-import net.osmand.GPXUtilities
 import net.osmand.PlatformUtil
 import net.osmand.aidl.gpx.AGpxFile
 import net.osmand.aidl.map.ALatLon
 import net.osmand.aidl.maplayer.point.AMapPoint
 import net.osmand.aidl.mapmarker.AMapMarker
+import net.osmand.gpx.GPXFile
 import net.osmand.telegram.R
 import net.osmand.telegram.TelegramApplication
 import net.osmand.telegram.helpers.OsmandAidlHelper.ContextMenuButtonsListener
@@ -20,7 +20,9 @@ import net.osmand.telegram.utils.OsmandFormatter
 import net.osmand.telegram.utils.OsmandLocationUtils
 import net.osmand.telegram.utils.OsmandLocationUtils.MessageOsmAndBotLocation
 import net.osmand.telegram.utils.OsmandLocationUtils.MessageUserLocation
-import org.drinkless.td.libcore.telegram.TdApi
+import net.osmand.util.Algorithms
+import org.drinkless.tdlib.TdApi
+import org.drinkless.tdlib.TdApi.User
 import java.io.File
 import java.util.*
 import java.util.concurrent.ConcurrentHashMap
@@ -313,15 +315,9 @@ class ShowLocationHelper(private val app: TelegramApplication) {
 		val content = message.content
 		val senderId = OsmandLocationUtils.getSenderMessageId(message)
 		if ((content is TdApi.MessageLocation || (content is MessageUserLocation && content.isValid()))) {
-			val user = telegramHelper.getUser(senderId)
+			val user:User? = telegramHelper.getUser(senderId)
 			if (user != null) {
-				name = "${user.firstName} ${user.lastName}".trim()
-				if (name.isEmpty()) {
-					name = user.username
-				}
-				if (name.isEmpty()) {
-					name = user.phoneNumber
-				}
+				name = user.getName();
 			}
 			if (name.isEmpty()) {
 				name = senderId.toString()
@@ -397,7 +393,7 @@ class ShowLocationHelper(private val app: TelegramApplication) {
 		}
 	}
 
-	private fun checkAlreadyImportedGpx(importedGpxFiles: List<AGpxFile>?, gpxFile: GPXUtilities.GPXFile): Boolean {
+	private fun checkAlreadyImportedGpx(importedGpxFiles: List<AGpxFile>?, gpxFile: GPXFile): Boolean {
 		if (importedGpxFiles != null && importedGpxFiles.isNotEmpty()) {
 			val name = "${gpxFile.metadata.name}.gpx"
 			val aGpxFile = importedGpxFiles.firstOrNull { it.fileName == name }
@@ -421,7 +417,7 @@ class ShowLocationHelper(private val app: TelegramApplication) {
 		return false
 	}
 
-	private fun getLiveGpxFiles(): List<GPXUtilities.GPXFile> {
+	private fun getLiveGpxFiles(): List<GPXFile> {
 		val currentTime = System.currentTimeMillis()
 		val start = currentTime - app.settings.locHistoryTime * 1000
 		val locationMessages = mutableListOf<LocationMessages.LocationMessage>()

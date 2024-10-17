@@ -7,24 +7,25 @@ import android.view.View;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.appcompat.widget.SwitchCompat;
 import androidx.core.content.ContextCompat;
 import androidx.preference.Preference;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ColorUtilities;
-import net.osmand.plus.OsmAndFormatter;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.settings.backend.ApplicationMode;
 import net.osmand.plus.settings.preferences.EditTextPreferenceEx;
 import net.osmand.plus.settings.preferences.ListPreferenceEx;
 import net.osmand.util.Algorithms;
 
-import static net.osmand.plus.UiUtilities.CompoundButtonType.TOOLBAR;
-import static net.osmand.plus.monitoring.OsmandMonitoringPlugin.MAX_INTERVAL_TO_SEND_MINUTES;
-import static net.osmand.plus.monitoring.OsmandMonitoringPlugin.MINUTES;
-import static net.osmand.plus.monitoring.OsmandMonitoringPlugin.SECONDS;
+import static net.osmand.plus.utils.UiUtilities.CompoundButtonType.TOOLBAR;
+import static net.osmand.plus.plugins.monitoring.OsmandMonitoringPlugin.MAX_INTERVAL_TO_SEND_MINUTES;
+import static net.osmand.plus.plugins.monitoring.OsmandMonitoringPlugin.MINUTES;
+import static net.osmand.plus.plugins.monitoring.OsmandMonitoringPlugin.SECONDS;
 
 public class LiveMonitoringFragment extends BaseSettingsFragment {
 
@@ -40,7 +41,7 @@ public class LiveMonitoringFragment extends BaseSettingsFragment {
 	}
 
 	@Override
-	protected void createToolbar(LayoutInflater inflater, View view) {
+	protected void createToolbar(@NonNull LayoutInflater inflater, @NonNull View view) {
 		super.createToolbar(inflater, view);
 
 		view.findViewById(R.id.toolbar_switch_container).setOnClickListener(new View.OnClickListener() {
@@ -53,7 +54,7 @@ public class LiveMonitoringFragment extends BaseSettingsFragment {
 				enableDisablePreferences(checked);
 			}
 		});
-		TextView title = (TextView) view.findViewById(R.id.switchButtonText);
+		TextView title = view.findViewById(R.id.switchButtonText);
 		title.setTextColor(ContextCompat.getColor(app, ColorUtilities.getActiveColorId(isNightMode())));
 	}
 
@@ -89,11 +90,11 @@ public class LiveMonitoringFragment extends BaseSettingsFragment {
 
 		AndroidUtils.setBackground(switchContainer, new ColorDrawable(color));
 
-		SwitchCompat switchView = (SwitchCompat) selectableView.findViewById(R.id.switchWidget);
+		SwitchCompat switchView = selectableView.findViewById(R.id.switchWidget);
 		switchView.setChecked(checked);
 		UiUtilities.setupCompoundButton(switchView, isNightMode(), TOOLBAR);
 
-		TextView title = (TextView) selectableView.findViewById(R.id.switchButtonText);
+		TextView title = selectableView.findViewById(R.id.switchButtonText);
 		title.setText(checked ? R.string.shared_string_enabled : R.string.shared_string_disabled);
 		title.setTextColor(ColorUtilities.getActiveTabTextColor(app, isNightMode()));
 
@@ -110,7 +111,7 @@ public class LiveMonitoringFragment extends BaseSettingsFragment {
 			summary = getString(R.string.shared_string_disabled);
 		}
 
-		EditTextPreferenceEx liveMonitoringUrl = (EditTextPreferenceEx) findPreference(settings.LIVE_MONITORING_URL.getId());
+		EditTextPreferenceEx liveMonitoringUrl = findPreference(settings.LIVE_MONITORING_URL.getId());
 		liveMonitoringUrl.setSummary(summary);
 		liveMonitoringUrl.setDescription(R.string.live_monitoring_adress_descr);
 		liveMonitoringUrl.setIcon(getPersistentPrefIcon(R.drawable.ic_world_globe_dark));
@@ -131,7 +132,7 @@ public class LiveMonitoringFragment extends BaseSettingsFragment {
 			k++;
 		}
 
-		ListPreferenceEx liveMonitoringInterval = (ListPreferenceEx) findPreference(settings.LIVE_MONITORING_INTERVAL.getId());
+		ListPreferenceEx liveMonitoringInterval = findPreference(settings.LIVE_MONITORING_INTERVAL.getId());
 		liveMonitoringInterval.setEntries(entries);
 		liveMonitoringInterval.setEntryValues(entryValues);
 		liveMonitoringInterval.setIcon(getPersistentPrefIcon(R.drawable.ic_action_time_span));

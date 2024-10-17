@@ -1,5 +1,7 @@
 package net.osmand.plus.quickaction.actions;
 
+import static net.osmand.plus.quickaction.QuickActionIds.SWITCH_PROFILE_ACTION_ID;
+
 import android.content.Context;
 import android.text.TextUtils;
 import android.view.View;
@@ -21,6 +23,8 @@ import net.osmand.plus.quickaction.QuickAction;
 import net.osmand.plus.quickaction.QuickActionType;
 import net.osmand.plus.quickaction.SwitchableAction;
 import net.osmand.plus.settings.backend.ApplicationMode;
+import net.osmand.plus.views.MapLayers;
+import net.osmand.plus.views.controls.maphudbuttons.QuickActionButton;
 
 import java.lang.reflect.Type;
 import java.util.ArrayList;
@@ -29,13 +33,14 @@ import java.util.List;
 
 public class SwitchProfileAction extends SwitchableAction<String> {
 
-	private final static String KEY_PROFILES = "profiles";
+	private static final String KEY_PROFILES = "profiles";
 
-	public static final QuickActionType TYPE = new QuickActionType(32,
+	public static final QuickActionType TYPE = new QuickActionType(SWITCH_PROFILE_ACTION_ID,
 			"profile.change", SwitchProfileAction.class)
-			.nameRes(R.string.change_application_profile)
+			.nameRes(R.string.app_profile)
 			.iconRes(R.drawable.ic_action_manage_profiles)
-			.category(QuickActionType.NAVIGATION);
+			.category(QuickActionType.SETTINGS)
+			.nameActionRes(R.string.shared_string_change);
 
 	public SwitchProfileAction() {
 		super(TYPE);
@@ -95,7 +100,7 @@ public class SwitchProfileAction extends SwitchableAction<String> {
 
 		boolean showDialog = Boolean.parseBoolean(getParams().get(KEY_DIALOG));
 		if (showDialog) {
-			showChooseDialog(mapActivity.getSupportFragmentManager());
+			showChooseDialog(mapActivity);
 			return;
 		}
 		String nextProfile = getNextSelectedItem(mapActivity.getMyApplication());
@@ -103,12 +108,17 @@ public class SwitchProfileAction extends SwitchableAction<String> {
 	}
 
 	@Override
-	public void executeWithParams(@NonNull MapActivity mapActivity, final String params) {
+	public void executeWithParams(@NonNull MapActivity mapActivity, String params) {
 		ApplicationMode appMode = getModeForKey(params);
 		if (appMode != null) {
 			OsmandApplication app = mapActivity.getMyApplication();
 			app.getSettings().setApplicationMode(appMode);
-			app.getQuickActionRegistry().setQuickActionFabState(true);
+
+			MapLayers mapLayers = mapActivity.getMapLayers();
+			QuickActionButton selectedButton = mapLayers.getMapQuickActionLayer().getSelectedButton();
+			if (selectedButton != null) {
+				app.getMapButtonsHelper().setQuickActionFabState(selectedButton.getButtonState(), true);
+			}
 
 			String message = String.format(mapActivity.getString(
 					R.string.application_profile_changed), appMode.toHumanString());
@@ -205,7 +215,7 @@ public class SwitchProfileAction extends SwitchableAction<String> {
 	}
 
 	@Override
-	protected View.OnClickListener getOnAddBtnClickListener(final MapActivity activity, final Adapter adapter) {
+	protected View.OnClickListener getOnAddBtnClickListener(MapActivity activity, Adapter adapter) {
 		return new View.OnClickListener() {
 			@Override
 			public void onClick(View v) {
@@ -229,6 +239,11 @@ public class SwitchProfileAction extends SwitchableAction<String> {
 	}
 
 	@Override
+	public String getItemIdFromObject(String object) {
+		return object;
+	}
+
+	@Override
 	protected void onItemsSelected(Context ctx, List<String> selectedItems) {
 		Adapter adapter = getAdapter();
 		if (adapter == null) {
@@ -243,7 +258,7 @@ public class SwitchProfileAction extends SwitchableAction<String> {
 	}
 
 	@Override
-	public String getActionText(OsmandApplication app) {
+	public String getActionText(@NonNull OsmandApplication app) {
 		return getName(app);
 	}
 }

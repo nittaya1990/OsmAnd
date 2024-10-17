@@ -1,5 +1,7 @@
 package net.osmand.plus.settings.backend.backup;
 
+import static net.osmand.IndexConstants.OSMAND_SETTINGS_FILE_EXT;
+
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -22,8 +24,6 @@ import java.util.List;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipFile;
 import java.util.zip.ZipInputStream;
-
-import static net.osmand.IndexConstants.OSMAND_SETTINGS_FILE_EXT;
 
 class SettingsImporter {
 
@@ -66,10 +66,7 @@ class SettingsImporter {
 							updateFilesInfo(file, settingsItemList);
 							items.addAll(settingsItemList);
 						}
-					} catch (IllegalArgumentException e) {
-						SettingsHelper.LOG.error("Error parsing items: " + itemsJson, e);
-						throw new IllegalArgumentException("No items");
-					} catch (JSONException e) {
+					} catch (IllegalArgumentException | JSONException e) {
 						SettingsHelper.LOG.error("Error parsing items: " + itemsJson, e);
 						throw new IllegalArgumentException("No items");
 					}
@@ -129,7 +126,7 @@ class SettingsImporter {
 					try {
 						SettingsItemReader<? extends SettingsItem> reader = item.getReader();
 						if (reader != null) {
-							reader.readFromStream(ois, fileName);
+							reader.readFromStream(ois, file, fileName);
 						}
 						item.applyAdditionalParams(reader);
 					} catch (IllegalArgumentException | IOException e) {

@@ -1,19 +1,22 @@
 package net.osmand.plus.measurementtool.command;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import net.osmand.plus.measurementtool.MeasurementToolLayer;
 import net.osmand.plus.measurementtool.command.MeasurementModeCommand.MeasurementCommandType;
 
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.LinkedList;
+import java.util.List;
 
 public class MeasurementCommandManager {
 
 	private final Deque<MeasurementModeCommand> undoCommands = new LinkedList<>();
 	private final Deque<MeasurementModeCommand> redoCommands = new LinkedList<>();
 
-	private int changesCounter = 0;
+	private int changesCounter;
 
 	public boolean hasChanges() {
 		return changesCounter != 0;
@@ -29,6 +32,12 @@ public class MeasurementCommandManager {
 
 	public boolean canRedo() {
 		return redoCommands.size() > 0;
+	}
+
+	public void clearCommands() {
+		resetChangesCounter();
+		undoCommands.clear();
+		redoCommands.clear();
 	}
 
 	public boolean execute(MeasurementModeCommand command) {
@@ -81,5 +90,10 @@ public class MeasurementCommandManager {
 
 	public MeasurementModeCommand getLastCommand() {
 		return undoCommands.getFirst();
+	}
+
+	@NonNull
+	public List<MeasurementModeCommand> getAppliedCommands() {
+		return new ArrayList<>(undoCommands);
 	}
 }

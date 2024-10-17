@@ -14,9 +14,19 @@ import net.osmand.osm.PoiFilter;
 import net.osmand.osm.PoiType;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
+import static net.osmand.search.core.SearchCoreFactory.PREFERRED_DEFAULT_ZOOM;
+
 
 public class SearchResult {
-	private static final double MAX_TYPE_WEIGHT = 10;
+
+	public static final String DELIMITER = " ";
+	private static final String HYPHEN = "-";
+	private static final int NEAREST_METERS_LIMIT = 30000;
+	
+	// MAX_TYPES_BASE_10 should be > ObjectType.getTypeWeight(objectType) = 5
+	public static final double MAX_TYPES_BASE_10 = 10;
+	// MAX_PHRASE_WEIGHT_TOTAL should be  > getSumPhraseMatchWeight
+	public static final double MAX_PHRASE_WEIGHT_TOTAL = MAX_TYPES_BASE_10 * MAX_TYPES_BASE_10;
 
 	// search phrase that makes search result valid
 	public SearchPhrase requiredSearchPhrase;
@@ -35,7 +45,7 @@ public class SearchResult {
 	public double priorityDistance;
 
 	public LatLon location;
-	public int preferredZoom = 15;
+	public int preferredZoom = PREFERRED_DEFAULT_ZOOM;
 
 	public String localeName;
 	public String alternateName;
@@ -60,38 +70,54 @@ public class SearchResult {
 		if (unknownPhraseMatchWeight != 0) {
 			return unknownPhraseMatchWeight;
 		}
-		// if result is a complete match in the search we prioritize it higher
-		double res = getSumPhraseMatchWeight() / Math.pow(MAX_TYPE_WEIGHT, getDepth() - 1);
-		unknownPhraseMatchWeight = res;
-		return res;
+		// normalize number to get as power, so we get numbers > 1
+		unknownPhraseMatchWeight = getSumPhraseMatchWeight() / Math.pow(MAX_PHRASE_WEIGHT_TOTAL, getDepth() - 1);
+		return unknownPhraseMatchWeight;
 	}
 
 	private double getSumPhraseMatchWeight() {
-		// if result is a complete match in the search we prioritize it higher
-		List<String> searchPhraseNames = getSearchPhraseNames();
-		boolean allWordsMatched = allWordsMatched(SearchPhrase.splitWords(localeName, new ArrayList<String>()), searchPhraseNames);
-		if (otherNames != null && !allWordsMatched) {
-			for (String otherName : otherNames) {
-				allWordsMatched = allWordsMatched(SearchPhrase.splitWords(otherName, new ArrayList<String>()), searchPhraseNames);
-				if (allWordsMatched) {
-					break;
-				}
-			}
-		}
-		if (objectType == ObjectType.POI_TYPE) {
-			allWordsMatched = false;
-		}
-
-		double res = allWordsMatched ? ObjectType.getTypeWeight(objectType) * 10 : ObjectType.getTypeWeight(null);
+		double res = ObjectType.getTypeWeight(objectType);
 		if (requiredSearchPhrase.getUnselectedPoiType() != null) {
 			// search phrase matches poi type, then we lower all POI matches and don't check allWordsMatched
-			res = ObjectType.getTypeWeight(objectType);
+		} else if (objectType == ObjectType.POI_TYPE) {
+			// don't overload with poi types
+		} else {
+			CheckWordsMatchCount completeMatchRes = new CheckWordsMatchCount();
+			if (allWordsMatched(localeName, completeMatchRes)) {
+				// ignore other names
+			} else if (otherNames != null) {
+				for (String otherName : otherNames) {
+					if (allWordsMatched(otherName, completeMatchRes)) {
+						break;
+					}
+				}
+			}
+			// if all words from search phrase match (<) the search result words - we prioritize it higher
+			if (completeMatchRes.allWordsInPhraseAreInResult) {
+				res = getPhraseWeightForCompleteMatch(completeMatchRes);
+			}
 		}
 		if (parentSearchResult != null) {
-			res = res + parentSearchResult.getSumPhraseMatchWeight() / MAX_TYPE_WEIGHT;
+			// parent search result should not change weight of current result, so we divide by MAX_TYPES_BASE_10^2
+			res = res + parentSearchResult.getSumPhraseMatchWeight() / (MAX_PHRASE_WEIGHT_TOTAL);
 		}
 		return res;
 	}
+
+	private double getPhraseWeightForCompleteMatch(CheckWordsMatchCount completeMatchRes) {
+		double res = ObjectType.getTypeWeight(objectType) * MAX_TYPES_BASE_10;
+		// if all words from search phrase == the search result words - we prioritize it even higher
+		if (completeMatchRes.allWordsEqual && requiredSearchPhrase.getLastTokenLocation() != null && this.location != null) {
+			boolean closeDistance = MapUtils.getDistance(requiredSearchPhrase.getLastTokenLocation(),
+					this.location) <= NEAREST_METERS_LIMIT;
+			if (objectType == ObjectType.CITY || objectType == ObjectType.VILLAGE || closeDistance) {
+				res = ObjectType.getTypeWeight(objectType) * MAX_TYPES_BASE_10 + MAX_PHRASE_WEIGHT_TOTAL / 2;
+			}
+		}
+		return res;
+	}
+	
+	
 
 	public int getDepth() {
 		if (parentSearchResult != null) {
@@ -108,14 +134,23 @@ public class SearchResult {
 		return inc;
 	}
 
-	private boolean allWordsMatched(List<String> localResultNames, List<String> searchPhraseNames) {
-		if (searchPhraseNames.size() == 0) {
+	private boolean allWordsMatched(String name, CheckWordsMatchCount cnt) {
+		List<String> searchPhraseNames = getSearchPhraseNames();
+		List<String> localResultNames;
+		if (!requiredSearchPhrase.getFullSearchPhrase().contains(HYPHEN)) {
+			// we split '-' words in result, so user can input same without '-'
+			localResultNames = SearchPhrase.splitWords(name, new ArrayList<String>(), SearchPhrase.ALLDELIMITERS_WITH_HYPHEN);
+		} else {
+			localResultNames = SearchPhrase.splitWords(name, new ArrayList<String>(), SearchPhrase.ALLDELIMITERS);
+		}
+		
+		boolean wordMatched;
+		if (searchPhraseNames.isEmpty()) {
 			return false;
 		}
 		int idxMatchedWord = -1;
 		for (String searchPhraseName : searchPhraseNames) {
-			
-			boolean wordMatched = false;
+			wordMatched = false;
 			for (int i = idxMatchedWord + 1; i < localResultNames.size(); i++) {
 				int r = requiredSearchPhrase.getCollator().compare(searchPhraseName, localResultNames.get(i));
 				if (r == 0) {
@@ -128,7 +163,16 @@ public class SearchResult {
 				return false;
 			}
 		}
+		if (searchPhraseNames.size() == localResultNames.size()) {
+			cnt.allWordsEqual = true;
+		}
+		cnt.allWordsInPhraseAreInResult = true;
 		return true;
+	}
+	
+	static class CheckWordsMatchCount {
+		boolean allWordsEqual;
+		boolean allWordsInPhraseAreInResult;
 	}
 
 	private List<String> getSearchPhraseNames() {

@@ -1,9 +1,10 @@
 apply plugin: 'com.android.application'
 
 android {
-	compileSdkVersion 28
-	buildToolsVersion "28.0.3"
+	compileSdk 34
+	buildToolsVersion = "34.0.0"
 
+	namespace = "net.osmand.nauticalPlugin"
 	signingConfigs {
 		development {
 			storeFile file("../../keystores/debug.keystore")
@@ -20,8 +21,8 @@ android {
 	}
 
 	defaultConfig {
-		minSdkVersion 15
-		targetSdkVersion 27
+		minSdkVersion 24
+		targetSdkVersion 34
 	}
 
 	lintOptions {
@@ -36,7 +37,6 @@ android {
 			aidl.srcDirs = ["src"]
 			java.srcDirs = ["src"]
 			resources.srcDirs = ["src"]
-			renderscript.srcDirs = ["src"]
 			res.srcDirs = ["res"]
 			assets.srcDirs = ["assets"]
 		}
@@ -50,19 +50,22 @@ android {
 			signingConfig signingConfigs.release
 		}
 	}
+	buildFeatures {
+		aidl true
+	}
 }
 
 repositories {
 	ivy {
 		name = "OsmAndBinariesIvy"
 		url = "https://builder.osmand.net"
-		layout "pattern", {
+		patternLayout {
 			artifact "ivy/[organisation]/[module]/[revision]/[artifact]-[revision].[ext]"
 		}
 	}
 }
 
 dependencies {
-	implementation 'androidx.appcompat:appcompat:1.0.0'
-    implementation 'com.google.android.material:material:1.0.0'
+	implementation 'androidx.appcompat:appcompat:1.6.1'
+	implementation 'com.google.android.material:material:1.9.0'
 }

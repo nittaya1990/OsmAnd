@@ -1,22 +1,21 @@
 package net.osmand.plus.onlinerouting.ui;
 
 import static net.osmand.plus.onlinerouting.engine.OnlineRoutingEngine.CUSTOM_VEHICLE;
+import static net.osmand.plus.profiles.SelectProfileBottomSheet.DERIVED_PROFILE_ARG;
+import static net.osmand.plus.profiles.SelectProfileBottomSheet.OnSelectProfileCallback;
+import static net.osmand.plus.profiles.SelectProfileBottomSheet.PROFILE_KEY_ARG;
+import static net.osmand.plus.settings.fragments.BaseSettingsFragment.APP_MODE_KEY;
 
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.content.Context;
-import android.content.DialogInterface;
-import android.graphics.Rect;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
-import android.view.View.OnClickListener;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
 import android.view.ViewTreeObserver.OnScrollChangedListener;
-import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.ScrollView;
 import android.widget.TextView;
@@ -30,47 +29,48 @@ import androidx.appcompat.widget.Toolbar;
 import androidx.fragment.app.FragmentActivity;
 import androidx.fragment.app.FragmentManager;
 
-import net.osmand.AndroidUtils;
-import net.osmand.CallbackWithObject;
 import net.osmand.data.LatLon;
-import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
-import net.osmand.plus.UiUtilities.DialogButtonType;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.BaseOsmAndFragment;
-import net.osmand.plus.mapcontextmenu.other.HorizontalSelectionAdapter.HorizontalSelectionItem;
 import net.osmand.plus.onlinerouting.EngineParameter;
 import net.osmand.plus.onlinerouting.OnlineRoutingHelper;
 import net.osmand.plus.onlinerouting.OnlineRoutingUtils;
 import net.osmand.plus.onlinerouting.VehicleType;
 import net.osmand.plus.onlinerouting.engine.EngineType;
 import net.osmand.plus.onlinerouting.engine.OnlineRoutingEngine;
-import net.osmand.plus.onlinerouting.ui.OnlineRoutingCard.OnTextChangedListener;
+import net.osmand.plus.profiles.SelectOnlineApproxProfileBottomSheet;
 import net.osmand.plus.routepreparationmenu.cards.BaseCard;
 import net.osmand.plus.settings.backend.ApplicationMode;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.UiUtilities;
+import net.osmand.plus.widgets.chips.ChipItem;
+import net.osmand.plus.widgets.dialogbutton.DialogButton;
+import net.osmand.plus.widgets.dialogbutton.DialogButtonType;
 import net.osmand.util.Algorithms;
 
 import org.json.JSONException;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
+public class OnlineRoutingEngineFragment extends BaseOsmAndFragment implements OnSelectProfileCallback {
+
 
 	public static final String TAG = OnlineRoutingEngineFragment.class.getSimpleName();
 
 	private static final String ENGINE_TYPE_KEY = "engine_type";
 	private static final String ENGINE_CUSTOM_VEHICLE_KEY = "engine_custom_vehicle";
 	private static final String EXAMPLE_LOCATION_KEY = "example_location";
-	private static final String APP_MODE_KEY = "app_mode";
 	private static final String EDITED_ENGINE_KEY = "edited_engine_key";
 
-	private OsmandApplication app;
 	private ApplicationMode appMode;
+	private String approxRouteProfile;
+	private String approxDerivedProfile;
 	private MapActivity mapActivity;
 	private OnlineRoutingHelper helper;
 
@@ -81,14 +81,16 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 	private OnlineRoutingCard vehicleCard;
 	private OnlineRoutingCard apiKeyCard;
 	private OnlineRoutingCard approximateCard;
+	private OnlineRoutingCard useExternalTimestampsCard;
+	private OnlineRoutingCard routingFallbackCard;
 	private OnlineRoutingCard exampleCard;
 	private View testResultsContainer;
-	private View saveButton;
+	private DialogButton saveButton;
 	private ScrollView scrollView;
 	private AppCompatImageView buttonsShadow;
 	private OnGlobalLayoutListener onGlobalLayout;
 	private OnScrollChangedListener onScroll;
-	private boolean isKeyboardShown = false;
+	private boolean isKeyboardShown;
 
 	private OnlineRoutingEngine engine;
 	private OnlineRoutingEngine initEngine;
@@ -99,7 +101,6 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 	@Override
 	public void onCreate(@Nullable Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		app = requireMyApplication();
 		mapActivity = getMapActivity();
 		helper = app.getOnlineRoutingHelper();
 		if (savedInstanceState != null) {
@@ -120,22 +121,24 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 	@Nullable
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater,
-							 @Nullable ViewGroup container,
-							 @Nullable Bundle savedInstanceState) {
-		view = getInflater().inflate(
+	                         @Nullable ViewGroup container,
+	                         @Nullable Bundle savedInstanceState) {
+		updateNightMode();
+		view = themedInflater.inflate(
 				R.layout.online_routing_engine_fragment, container, false);
-		segmentsContainer = (ViewGroup) view.findViewById(R.id.segments_container);
-		scrollView = (ScrollView) view.findViewById(R.id.segments_scroll);
-		buttonsShadow = (AppCompatImageView) view.findViewById(R.id.buttons_shadow);
-		if (Build.VERSION.SDK_INT >= 21) {
-			AndroidUtils.addStatusBarPadding21v(getContext(), view);
-		}
-		setupToolbar((Toolbar) view.findViewById(R.id.toolbar));
+		segmentsContainer = view.findViewById(R.id.segments_container);
+		scrollView = view.findViewById(R.id.segments_scroll);
+		buttonsShadow = view.findViewById(R.id.buttons_shadow);
+
+		AndroidUtils.addStatusBarPadding21v(mapActivity, view);
+		setupToolbar(view.findViewById(R.id.toolbar));
 
 		setupNameCard();
 		setupTypeCard();
 		setupVehicleCard();
 		setupApproximateCard();
+		setupExternalTimestampsCard();
+		setupRoutingFallbackCard();
 		setupApiKeyCard();
 		setupExampleCard();
 		setupResultsContainer();
@@ -154,12 +157,7 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 	private void setupToolbar(Toolbar toolbar) {
 		ImageView navigationIcon = toolbar.findViewById(R.id.close_button);
 		navigationIcon.setImageResource(R.drawable.ic_action_close);
-		navigationIcon.setOnClickListener(new OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				showExitDialog();
-			}
-		});
+		navigationIcon.setOnClickListener(v -> showExitDialog());
 		TextView title = toolbar.findViewById(R.id.toolbar_title);
 		toolbar.findViewById(R.id.toolbar_subtitle).setVisibility(View.GONE);
 		View actionBtn = toolbar.findViewById(R.id.action_button);
@@ -168,12 +166,7 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 			ImageView ivBtn = toolbar.findViewById(R.id.action_button_icon);
 			ivBtn.setImageDrawable(
 					getIcon(R.drawable.ic_action_delete_dark, R.color.color_osm_edit_delete));
-			actionBtn.setOnClickListener(new OnClickListener() {
-				@Override
-				public void onClick(View v) {
-					delete(mapActivity);
-				}
-			});
+			actionBtn.setOnClickListener(v -> delete(mapActivity));
 		} else {
 			title.setText(getString(R.string.add_online_routing_engine));
 			actionBtn.setVisibility(View.GONE);
@@ -186,14 +179,11 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 		nameCard.setDescription(getString(R.string.select_nav_profile_dialog_message));
 		nameCard.setEditedText(engine.getName(app));
 		nameCard.setFieldBoxLabelText(getString(R.string.shared_string_name));
-		nameCard.setOnTextChangedListener(new OnTextChangedListener() {
-			@Override
-			public void onTextChanged(boolean changedByUser, @NonNull String text) {
-				if (changedByUser) {
-					engine.put(EngineParameter.CUSTOM_NAME, text);
-					engine.remove(EngineParameter.NAME_INDEX);
-					checkCustomNameUnique(engine);
-				}
+		nameCard.setOnTextChangedListener((changedByUser, text) -> {
+			if (changedByUser) {
+				engine.put(EngineParameter.CUSTOM_NAME, text);
+				engine.remove(EngineParameter.NAME_INDEX);
+				checkCustomNameUnique(engine);
 			}
 		});
 		nameCard.showDivider();
@@ -204,29 +194,28 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 		typeCard = new OnlineRoutingCard(mapActivity, isNightMode(), appMode);
 		typeCard.build(mapActivity);
 		typeCard.setHeaderTitle(getString(R.string.shared_string_type));
-		List<HorizontalSelectionItem> typeItems = new ArrayList<>();
+		List<net.osmand.plus.widgets.chips.ChipItem> typeItems = new ArrayList<>();
 		for (OnlineRoutingEngine type : EngineType.values()) {
-			typeItems.add(new HorizontalSelectionItem(type.getTitle(), type));
+			String title = type.getTitle();
+			ChipItem item = new ChipItem(title);
+			item.title = title;
+			item.contentDescription = title;
+			item.tag = type;
+			typeItems.add(item);
 		}
 		typeCard.setSelectionMenu(typeItems, engine.getType().getTitle(),
-				new CallbackWithObject<HorizontalSelectionItem>() {
-					@Override
-					public boolean processResult(HorizontalSelectionItem result) {
-						OnlineRoutingEngine type = (OnlineRoutingEngine) result.getObject();
-						if (engine.getType() != type) {
-							changeEngineType(type);
-							return true;
-						}
-						return false;
+				result -> {
+					OnlineRoutingEngine type = (OnlineRoutingEngine) result.tag;
+					if (engine.getType() != type) {
+						changeEngineType(type);
+						return true;
 					}
+					return false;
 				});
-		typeCard.setOnTextChangedListener(new OnTextChangedListener() {
-			@Override
-			public void onTextChanged(boolean editedByUser, @NonNull String text) {
-				if (editedByUser) {
-					engine.put(EngineParameter.CUSTOM_URL, text);
-					updateCardViews(exampleCard);
-				}
+		typeCard.setOnTextChangedListener((editedByUser, text) -> {
+			if (editedByUser) {
+				engine.put(EngineParameter.CUSTOM_URL, text);
+				updateCardViews(exampleCard);
 			}
 		});
 		typeCard.setFieldBoxLabelText(getString(R.string.shared_string_server_url));
@@ -239,14 +228,11 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 		vehicleCard.build(mapActivity);
 		vehicleCard.setHeaderTitle(getString(R.string.shared_string_vehicle));
 		vehicleCard.setFieldBoxLabelText(getString(R.string.shared_string_custom));
-		vehicleCard.setOnTextChangedListener(new OnTextChangedListener() {
-			@Override
-			public void onTextChanged(boolean editedByUser, @NonNull String text) {
-				if (editedByUser) {
-					customVehicleKey = text;
-					engine.put(EngineParameter.VEHICLE_KEY, customVehicleKey);
-					updateCardViews(nameCard, exampleCard);
-				}
+		vehicleCard.setOnTextChangedListener((editedByUser, text) -> {
+			if (editedByUser) {
+				customVehicleKey = text;
+				engine.put(EngineParameter.VEHICLE_KEY, customVehicleKey);
+				updateCardViews(nameCard, exampleCard);
 			}
 		});
 		vehicleCard.setEditedText(customVehicleKey);
@@ -257,37 +243,79 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 	}
 
 	private void setupVehicleTypes() {
-		List<HorizontalSelectionItem> vehicleItems = new ArrayList<>();
+		List<ChipItem> vehicleItems = new ArrayList<>();
 		for (VehicleType vehicle : engine.getAllowedVehicles()) {
-			vehicleItems.add(new HorizontalSelectionItem(vehicle.getTitle(app), vehicle));
+			String title = vehicle.getTitle(app);
+			ChipItem item = new ChipItem(title);
+			item.title = title;
+			item.contentDescription = title;
+			item.tag = vehicle;
+			vehicleItems.add(item);
 		}
 		vehicleCard.setSelectionMenu(vehicleItems, engine.getSelectedVehicleType().getTitle(app),
-				new CallbackWithObject<HorizontalSelectionItem>() {
-					@Override
-					public boolean processResult(HorizontalSelectionItem result) {
-						VehicleType vehicle = (VehicleType) result.getObject();
-						if (!Algorithms.objectEquals(engine.getSelectedVehicleType(), vehicle)) {
-							String vehicleKey = vehicle.equals(CUSTOM_VEHICLE) ? customVehicleKey : vehicle.getKey();
-							engine.put(EngineParameter.VEHICLE_KEY, vehicleKey);
-							generateUniqueNameIfNeeded();
-							updateCardViews(nameCard, vehicleCard, exampleCard);
-							return true;
-						}
-						return false;
+				result -> {
+					VehicleType vehicle = (VehicleType) result.tag;
+					if (!Algorithms.objectEquals(engine.getSelectedVehicleType(), vehicle)) {
+						String vehicleKey = vehicle.equals(CUSTOM_VEHICLE) ? customVehicleKey : vehicle.getKey();
+						engine.put(EngineParameter.VEHICLE_KEY, vehicleKey);
+						generateUniqueNameIfNeeded();
+						updateCardViews(nameCard, vehicleCard, exampleCard);
+						return true;
 					}
+					return false;
 				});
 	}
 
 	private void setupApproximateCard() {
 		approximateCard = new OnlineRoutingCard(mapActivity, isNightMode(), appMode);
 		approximateCard.build(mapActivity);
-		approximateCard.setHeaderTitle(getString(R.string.attach_to_the_roads));
-		approximateCard.setCheckBox(getString(R.string.approximate_route_description), engine.shouldApproximateRoute(), result -> {
-			engine.put(EngineParameter.APPROXIMATE_ROUTE, String.valueOf(result));
+		setApproximateCardTitle();
+		approximateCard.onClickCheckBox(getString(R.string.attach_roads_descr), result -> {
+			if (getActivity() != null) {
+				SelectOnlineApproxProfileBottomSheet.showInstance(getActivity(), this,
+						appMode, approxRouteProfile, approxDerivedProfile, false);
+			}
 			return false;
 		});
 		approximateCard.showDivider();
 		segmentsContainer.addView(approximateCard.getView());
+	}
+
+	private void setApproximateCardTitle() {
+		approxRouteProfile = engine.getApproximationRoutingProfile();
+		approxDerivedProfile = engine.get(EngineParameter.APPROXIMATION_DERIVED_PROFILE);
+		String appModeName = "";
+		if (approxRouteProfile != null) {
+			appModeName = approxDerivedProfile != null ? approxDerivedProfile : approxRouteProfile;
+			appModeName = " (" + appModeName + ")";
+		}
+		String title = getString(R.string.attach_to_the_roads) + appModeName;
+		approximateCard.setHeaderTitle(title);
+		approximateCard.setCheckBox(approxRouteProfile != null);
+	}
+
+	private void setupExternalTimestampsCard() {
+		useExternalTimestampsCard = new OnlineRoutingCard(mapActivity, isNightMode(), appMode);
+		useExternalTimestampsCard.build(mapActivity);
+		useExternalTimestampsCard.setHeaderTitle(getString(R.string.use_external_timestamps));
+		useExternalTimestampsCard.setCheckBox(getString(R.string.use_external_timestamps_description), engine.useExternalTimestamps(), result -> {
+			engine.put(EngineParameter.USE_EXTERNAL_TIMESTAMPS, String.valueOf(result));
+			return false;
+		});
+		useExternalTimestampsCard.showDivider();
+		segmentsContainer.addView(useExternalTimestampsCard.getView());
+	}
+
+	private void setupRoutingFallbackCard() {
+		routingFallbackCard = new OnlineRoutingCard(mapActivity, isNightMode(), appMode);
+		routingFallbackCard.build(mapActivity);
+		routingFallbackCard.setHeaderTitle(getString(R.string.use_routing_fallback));
+		routingFallbackCard.setCheckBox(getString(R.string.use_routing_fallback_description), engine.useRoutingFallback(), result -> {
+			engine.put(EngineParameter.USE_ROUTING_FALLBACK, String.valueOf(result));
+			return false;
+		});
+		routingFallbackCard.showDivider();
+		segmentsContainer.addView(routingFallbackCard.getView());
 	}
 
 	private void setupApiKeyCard() {
@@ -300,16 +328,13 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 			apiKeyCard.setEditedText(apiKey);
 		}
 		apiKeyCard.showDivider();
-		apiKeyCard.setOnTextChangedListener(new OnTextChangedListener() {
-			@Override
-			public void onTextChanged(boolean editedByUser, @NonNull String text) {
-				if (Algorithms.isBlank(text)) {
-					engine.remove(EngineParameter.API_KEY);
-				} else {
-					engine.put(EngineParameter.API_KEY, text);
-				}
-				updateCardViews(exampleCard);
+		apiKeyCard.setOnTextChangedListener((editedByUser, text) -> {
+			if (Algorithms.isBlank(text)) {
+				engine.remove(EngineParameter.API_KEY);
+			} else {
+				engine.put(EngineParameter.API_KEY, text);
 			}
+			updateCardViews(exampleCard);
 		});
 		segmentsContainer.addView(apiKeyCard.getView());
 	}
@@ -319,36 +344,33 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 		exampleCard.build(mapActivity);
 		exampleCard.setHeaderTitle(getString(R.string.shared_string_example));
 		exampleCard.hideFieldBoxLabel();
-		List<HorizontalSelectionItem> locationItems = new ArrayList<>();
+		List<ChipItem> locationItems = new ArrayList<>();
 		for (ExampleLocation location : ExampleLocation.values()) {
-			locationItems.add(new HorizontalSelectionItem(location.getName(), location));
+			String title = location.getName();
+			ChipItem item = new ChipItem(title);
+			item.title = title;
+			item.contentDescription = title;
+			item.tag = location;
+			locationItems.add(item);
 		}
 		exampleCard.setSelectionMenu(locationItems, selectedLocation.getName(),
-				new CallbackWithObject<HorizontalSelectionItem>() {
-					@Override
-					public boolean processResult(HorizontalSelectionItem result) {
-						ExampleLocation location = (ExampleLocation) result.getObject();
-						if (selectedLocation != location) {
-							selectedLocation = location;
-							updateCardViews(exampleCard);
-							return true;
-						}
-						return false;
+				result -> {
+					ExampleLocation location = (ExampleLocation) result.tag;
+					if (selectedLocation != location) {
+						selectedLocation = location;
+						updateCardViews(exampleCard);
+						return true;
 					}
+					return false;
 				});
 		exampleCard.setDescription(getString(R.string.online_routing_example_hint));
 		exampleCard.showFieldBox();
-		exampleCard.setButton(getString(R.string.test_route_calculation), new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				testEngineWork();
-			}
-		});
+		exampleCard.setButton(getString(R.string.test_route_calculation), v -> testEngineWork());
 		segmentsContainer.addView(exampleCard.getView());
 	}
 
 	private void setupResultsContainer() {
-		testResultsContainer = getInflater().inflate(
+		testResultsContainer = themedInflater.inflate(
 				R.layout.bottom_sheet_item_with_descr_64dp, segmentsContainer, false);
 		testResultsContainer.setVisibility(View.GONE);
 		segmentsContainer.addView(testResultsContainer);
@@ -356,28 +378,20 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 
 	private void setupButtons() {
 		boolean nightMode = isNightMode();
-		View cancelButton = view.findViewById(R.id.dismiss_button);
-		UiUtilities.setupDialogButton(nightMode, cancelButton,
-				DialogButtonType.SECONDARY, R.string.shared_string_cancel);
-		cancelButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				showExitDialog();
-			}
-		});
+		DialogButton cancelButton = view.findViewById(R.id.dismiss_button);
+		cancelButton.setButtonType(DialogButtonType.SECONDARY);
+		cancelButton.setTitleId(R.string.shared_string_cancel);
+		cancelButton.setOnClickListener(v -> showExitDialog());
 
 		view.findViewById(R.id.buttons_divider).setVisibility(View.VISIBLE);
 
 		saveButton = view.findViewById(R.id.right_bottom_button);
-		UiUtilities.setupDialogButton(nightMode, saveButton,
-				UiUtilities.DialogButtonType.PRIMARY, R.string.shared_string_save);
+		saveButton.setButtonType(DialogButtonType.PRIMARY);
+		saveButton.setTitleId(R.string.shared_string_save);
 		saveButton.setVisibility(View.VISIBLE);
-		saveButton.setOnClickListener(new OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				onSaveEngine();
-				dismiss();
-			}
+		saveButton.setOnClickListener(v -> {
+			onSaveEngine();
+			dismiss();
 		});
 	}
 
@@ -445,12 +459,9 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 			AlertDialog.Builder builder = new AlertDialog.Builder(UiUtilities.getThemedContext(activity, isNightMode()));
 			builder.setMessage(getString(R.string.delete_online_routing_engine));
 			builder.setNegativeButton(R.string.shared_string_no, null);
-			builder.setPositiveButton(R.string.shared_string_yes, new DialogInterface.OnClickListener() {
-				@Override
-				public void onClick(DialogInterface dialog, int which) {
-					onDeleteEngine();
-					dismiss();
-				}
+			builder.setPositiveButton(R.string.shared_string_yes, (dialog, which) -> {
+				onDeleteEngine();
+				dismiss();
 			});
 			builder.create().show();
 		}
@@ -464,34 +475,35 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 		List<LatLon> path = new ArrayList<>();
 		path.add(selectedLocation.getCityCenterLatLon());
 		path.add(selectedLocation.getCityAirportLatLon());
-		return engine.getFullUrl(path);
+		return engine.getFullUrl(path, 0f);
 	}
 
 	private void testEngineWork() {
-		final OnlineRoutingEngine requestedEngine = (OnlineRoutingEngine) engine.clone();
-		final ExampleLocation location = selectedLocation;
-		new Thread(new Runnable() {
-			@Override
-			public void run() {
-				StringBuilder errorMessage = new StringBuilder();
-				boolean resultOk = false;
-				try {
-					String response = helper.makeRequest(exampleCard.getEditedText());
-					resultOk = requestedEngine.isResultOk(errorMessage, response);
-				} catch (IOException | JSONException e) {
-					errorMessage.append(e.toString());
-				}
-				showTestResults(resultOk, errorMessage.toString(), location);
+		OnlineRoutingEngine requestedEngine = (OnlineRoutingEngine) engine.clone();
+		ExampleLocation location = selectedLocation;
+		new Thread(() -> {
+			StringBuilder errorMessage = new StringBuilder();
+			boolean resultOk = false;
+			try {
+				String method = engine.getHTTPMethod();
+				List<LatLon> path = Arrays.asList(location.getCityAirportLatLon(),
+						location.getCityCenterLatLon());
+				String body = engine.getRequestBody(path, null);
+				Map<String, String> headers = engine.getRequestHeaders();
+				String response = helper.makeRequest(exampleCard.getEditedText(), method, body, headers);
+				resultOk = requestedEngine.isResultOk(errorMessage, response);
+			} catch (IOException | JSONException e) {
+				errorMessage.append(e);
 			}
+			showTestResults(resultOk, errorMessage.toString(), location);
 		}).start();
 	}
 
-	private void showTestResults(final boolean resultOk,
-								 final @NonNull String message,
-								 final @NonNull ExampleLocation location) {
-		app.runInUIThread(new Runnable() {
-			@Override
-			public void run() {
+	private void showTestResults(boolean resultOk,
+	                             @NonNull String message,
+	                             @NonNull ExampleLocation location) {
+		app.runInUIThread(() -> {
+			if (isAdded()) {
 				testResultsContainer.setVisibility(View.VISIBLE);
 				ImageView ivImage = testResultsContainer.findViewById(R.id.icon);
 				TextView tvTitle = testResultsContainer.findViewById(R.id.title);
@@ -504,12 +516,7 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 					tvTitle.setText(String.format(getString(R.string.message_server_error), message));
 				}
 				tvDescription.setText(location.getName());
-				scrollView.post(new Runnable() {
-					@Override
-					public void run() {
-						scrollView.scrollTo(0, scrollView.getChildAt(0).getBottom());
-					}
-				});
+				scrollView.post(() -> scrollView.scrollTo(0, scrollView.getChildAt(0).getBottom()));
 			}
 		});
 	}
@@ -526,7 +533,9 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 				typeCard.setEditedText(engine.getBaseUrl());
 				updateCardVisibility(apiKeyCard, EngineParameter.API_KEY);
 				updateCardVisibility(vehicleCard, EngineParameter.VEHICLE_KEY);
-				updateCardVisibility(approximateCard, EngineParameter.APPROXIMATE_ROUTE);
+				updateCardVisibility(approximateCard, EngineParameter.APPROXIMATION_ROUTING_PROFILE);
+				updateCardVisibility(useExternalTimestampsCard, EngineParameter.USE_EXTERNAL_TIMESTAMPS);
+				updateCardVisibility(routingFallbackCard, EngineParameter.USE_ROUTING_FALLBACK);
 
 			} else if (vehicleCard.equals(card)) {
 				VehicleType vt = engine.getSelectedVehicleType();
@@ -539,7 +548,7 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 				}
 
 			} else if (exampleCard.equals(card)) {
-				exampleCard.setEditedText(getTestUrl());
+				exampleCard.setEditedText(getTestUrl(), false);
 			}
 		}
 	}
@@ -562,12 +571,7 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 		if (!engine.equals(initEngine)) {
 			AlertDialog.Builder dismissDialog = createWarningDialog(mapActivity,
 					R.string.shared_string_dismiss, R.string.exit_without_saving, R.string.shared_string_cancel);
-			dismissDialog.setPositiveButton(R.string.shared_string_exit, new DialogInterface.OnClickListener() {
-				@Override
-				public void onClick(DialogInterface dialog, int which) {
-					dismiss();
-				}
-			});
+			dismissDialog.setPositiveButton(R.string.shared_string_exit, (dialog, which) -> dismiss());
 			dismissDialog.show();
 		} else {
 			dismiss();
@@ -593,10 +597,6 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 		}
 	}
 
-	private boolean isNightMode() {
-		return !app.getSettings().isLightContentForMode(getAppMode());
-	}
-
 	@NonNull
 	private ApplicationMode getAppMode() {
 		return appMode != null ? appMode : app.getSettings().getApplicationMode();
@@ -610,10 +610,6 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 		} else {
 			return null;
 		}
-	}
-
-	private LayoutInflater getInflater() {
-		return UiUtilities.getInflater(mapActivity, isNightMode());
 	}
 
 	@Override
@@ -689,8 +685,8 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 	}
 
 	public static void showInstance(@NonNull FragmentActivity activity,
-									@NonNull ApplicationMode appMode,
-									@Nullable String editedEngineKey) {
+	                                @NonNull ApplicationMode appMode,
+	                                @Nullable String editedEngineKey) {
 		FragmentManager fragmentManager = activity.getSupportFragmentManager();
 		if (AndroidUtils.isFragmentCanBeAdded(fragmentManager, TAG)) {
 			OnlineRoutingEngineFragment fragment = new OnlineRoutingEngineFragment();
@@ -706,7 +702,7 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 	@SuppressLint("ClickableViewAccessibility")
 	private void hideKeyboardOnScroll() {
 		scrollView.setOnTouchListener(new View.OnTouchListener() {
-			int scrollViewY = 0;
+			int scrollViewY;
 
 			@Override
 			public boolean onTouch(View v, MotionEvent event) {
@@ -729,22 +725,17 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 	}
 
 	private void showButtonsAboveKeyboard() {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-			view.getViewTreeObserver().addOnGlobalLayoutListener(getShowButtonsOnGlobalListener());
-		}
+		view.getViewTreeObserver().addOnGlobalLayoutListener(getShowButtonsOnGlobalListener());
 	}
 
 	private OnScrollChangedListener getShowShadowOnScrollListener() {
 		if (onScroll == null) {
-			onScroll = new OnScrollChangedListener() {
-				@Override
-				public void onScrollChanged() {
-					boolean scrollToBottomAvailable = scrollView.canScrollVertically(1);
-					if (scrollToBottomAvailable) {
-						showShadowButton();
-					} else {
-						hideShadowButton();
-					}
+			onScroll = () -> {
+				boolean scrollToBottomAvailable = scrollView.canScrollVertically(1);
+				if (scrollToBottomAvailable) {
+					showShadowButton();
+				} else {
+					hideShadowButton();
 				}
 			};
 		}
@@ -759,35 +750,21 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 
 				@Override
 				public void onGlobalLayout() {
-					if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-						view.getViewTreeObserver().removeOnGlobalLayoutListener(this);
-					} else {
-						view.getViewTreeObserver().removeGlobalOnLayoutListener(this);
-					}
+					view.getViewTreeObserver().removeOnGlobalLayoutListener(this);
 
-					Rect visibleDisplayFrame = new Rect();
-					view.getWindowVisibleDisplayFrame(visibleDisplayFrame);
-					int layoutHeight = visibleDisplayFrame.bottom;
-
+					int layoutHeight = AndroidUtils.resizeViewForKeyboard(mapActivity, view, layoutHeightPrevious);
 					if (layoutHeight < layoutHeightPrevious) {
 						isKeyboardShown = true;
 						layoutHeightMin = layoutHeight;
 					} else {
 						isKeyboardShown = layoutHeight == layoutHeightMin;
 					}
-
 					if (layoutHeight != layoutHeightPrevious) {
-						FrameLayout.LayoutParams rootViewLayout = (FrameLayout.LayoutParams) view.getLayoutParams();
-						rootViewLayout.height = layoutHeight;
-						view.requestLayout();
 						layoutHeightPrevious = layoutHeight;
 					}
 
-					view.post(new Runnable() {
-						@Override
-						public void run() {
-							view.getViewTreeObserver().addOnGlobalLayoutListener(getShowButtonsOnGlobalListener());
-						}
+					view.post(() -> {
+						view.getViewTreeObserver().addOnGlobalLayoutListener(getShowButtonsOnGlobalListener());
 					});
 				}
 			};
@@ -800,11 +777,7 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 	}
 
 	private void removeOnGlobalLayoutListener() {
-		if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.JELLY_BEAN) {
-			view.getViewTreeObserver().removeOnGlobalLayoutListener(getShowButtonsOnGlobalListener());
-		} else {
-			view.getViewTreeObserver().removeGlobalOnLayoutListener(getShowButtonsOnGlobalListener());
-		}
+		view.getViewTreeObserver().removeOnGlobalLayoutListener(getShowButtonsOnGlobalListener());
 	}
 
 	private void showShadowButton() {
@@ -819,5 +792,12 @@ public class OnlineRoutingEngineFragment extends BaseOsmAndFragment {
 		buttonsShadow.animate()
 				.alpha(0f)
 				.setDuration(200);
+	}
+
+	@Override
+	public void onProfileSelected(Bundle args) {
+		engine.put(EngineParameter.APPROXIMATION_ROUTING_PROFILE, args.getString(PROFILE_KEY_ARG));
+		engine.put(EngineParameter.APPROXIMATION_DERIVED_PROFILE, args.getString(DERIVED_PROFILE_ARG));
+		setApproximateCardTitle();
 	}
 }

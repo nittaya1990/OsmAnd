@@ -23,16 +23,17 @@ public enum SettingsItemType {
 	ACTIVE_MARKERS,
 	HISTORY_MARKERS,
 	SEARCH_HISTORY,
+	NAVIGATION_HISTORY,
 	ONLINE_ROUTING_ENGINES,
 	ITINERARY_GROUPS;
 
 	@Nullable
 	public static SettingsItemType fromName(@NonNull String name) {
 		if (name.equals("QUICK_ACTION")) {
-			return SettingsItemType.QUICK_ACTIONS;
+			return QUICK_ACTIONS;
 		}
 		try {
-			return SettingsItemType.valueOf(name);
+			return valueOf(name);
 		} catch (RuntimeException e) {
 			return null;
 		}

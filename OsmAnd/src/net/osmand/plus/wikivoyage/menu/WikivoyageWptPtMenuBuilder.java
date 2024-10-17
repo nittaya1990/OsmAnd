@@ -2,7 +2,9 @@ package net.osmand.plus.wikivoyage.menu;
 
 import android.view.View;
 
-import net.osmand.GPXUtilities.WptPt;
+import androidx.annotation.NonNull;
+
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.mapcontextmenu.builders.WptPtMenuBuilder;
@@ -10,22 +12,24 @@ import net.osmand.util.Algorithms;
 
 import java.util.HashMap;
 
-import androidx.annotation.NonNull;
-
 public class WikivoyageWptPtMenuBuilder extends WptPtMenuBuilder {
 
-	private final static String KEY_PHONE = "Phone: ";
-	private final static String KEY_EMAIL = "Email: ";
-	private final static String KEY_WORKING_HOURS = "Working hours: ";
-	private final static String KEY_PRICE = "Price: ";
-	private final static String KEY_DIRECTIONS = "Directions: ";
-	private final static String KEY_DESCRIPTION = "Description";
+	private static final String KEY_PHONE = "Phone: ";
+	private static final String KEY_EMAIL = "Email: ";
+	private static final String KEY_WORKING_HOURS = "Working hours: ";
+	private static final String KEY_PRICE = "Price: ";
+	private static final String KEY_DIRECTIONS = "Directions: ";
+	private static final String KEY_DESCRIPTION = "Description";
 
 	private HashMap<String, String> descTokens;
 
 	public WikivoyageWptPtMenuBuilder(@NonNull MapActivity mapActivity, @NonNull WptPt wpt) {
 		super(mapActivity, wpt);
-		descTokens = getDescriptionTokens(wpt.desc, KEY_PHONE, KEY_EMAIL, KEY_WORKING_HOURS, KEY_PRICE, KEY_DIRECTIONS);
+		updateDescriptionTokens(wpt);
+	}
+
+	public void updateDescriptionTokens(@NonNull WptPt wpt) {
+		descTokens = getDescriptionTokens(wpt.getDesc(), KEY_PHONE, KEY_EMAIL, KEY_WORKING_HOURS, KEY_PRICE, KEY_DIRECTIONS);
 	}
 
 	@Override
@@ -36,9 +40,8 @@ public class WikivoyageWptPtMenuBuilder extends WptPtMenuBuilder {
 		}
 	}
 
-
 	@Override
-	protected void prepareDescription(final WptPt wpt, View view) {
+	protected void prepareDescription(WptPt wpt, View view) {
 		String phones = descTokens.get(KEY_PHONE);
 		String emails = descTokens.get(KEY_EMAIL);
 		String workingHours = descTokens.get(KEY_WORKING_HOURS);
@@ -50,9 +53,9 @@ public class WikivoyageWptPtMenuBuilder extends WptPtMenuBuilder {
 					null, phones, 0,
 					false, null, false, 0, false, true, false, null, false);
 		}
-		if (!Algorithms.isEmpty(wpt.link)) {
+		if (!Algorithms.isEmpty(wpt.getLink())) {
 			buildRow(view, R.drawable.ic_world_globe_dark,
-					null, wpt.link, 0,
+					null, wpt.getLink(), 0,
 					false, null, false, 0, true, null, false);
 		}
 		if (!Algorithms.isEmpty(emails)) {

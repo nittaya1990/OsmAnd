@@ -11,14 +11,15 @@ import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
+import androidx.recyclerview.widget.RecyclerView.ViewHolder;
 
-import net.osmand.GPXUtilities.WptPt;
+import net.osmand.shared.gpx.primitives.WptPt;
 import net.osmand.Location;
-import net.osmand.plus.ColorUtilities;
-import net.osmand.plus.OsmAndFormatter;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.views.controls.ReorderItemTouchHelperCallback;
 
@@ -32,7 +33,7 @@ public class MeasurementToolAdapter extends RecyclerView.Adapter<MeasurementTool
 	private final List<WptPt> points;
 	private MeasurementAdapterListener listener;
 	private boolean nightMode;
-	private final static String BULLET = "   •   ";
+	private static final String BULLET = "   •   ";
 
 	public MeasurementToolAdapter(MapActivity mapActivity, List<WptPt> points) {
 		this.mapActivity = mapActivity;
@@ -51,13 +52,13 @@ public class MeasurementToolAdapter extends RecyclerView.Adapter<MeasurementTool
 		if (!nightMode) {
 			view.findViewById(R.id.points_divider).setBackgroundResource(R.drawable.divider);
 		}
-		final int backgroundColor = ColorUtilities.getActivityBgColor(mapActivity, nightMode);
+		int backgroundColor = ColorUtilities.getActivityBgColor(mapActivity, nightMode);
 		view.setBackgroundColor(backgroundColor);
 		return new MeasureToolItemVH(view);
 	}
 
 	@Override
-	public void onBindViewHolder(@NonNull final MeasureToolItemVH holder, int pos) {
+	public void onBindViewHolder(@NonNull MeasureToolItemVH holder, int pos) {
 		OsmandApplication app = mapActivity.getMyApplication();
 		UiUtilities iconsCache = app.getUIUtilities();
 		holder.iconReorder.setImageDrawable(iconsCache.getThemedIcon(R.drawable.ic_action_item_move));
@@ -70,13 +71,13 @@ public class MeasurementToolAdapter extends RecyclerView.Adapter<MeasurementTool
 		holder.icon.setImageDrawable(iconsCache.getIcon(R.drawable.ic_action_measure_point,
 				ColorUtilities.getDefaultIconColorId(nightMode)));
 		WptPt pt = points.get(pos);
-		String pointTitle = pt.name;
+		String pointTitle = pt.getAmenityOriginName();
 		if (!TextUtils.isEmpty(pointTitle)) {
 			holder.title.setText(pointTitle);
 		} else {
 			holder.title.setText(mapActivity.getString(R.string.ltr_or_rtl_combine_via_dash, mapActivity.getString(R.string.plugin_distance_point), String.valueOf(pos + 1)));
 		}
-		String pointDesc = pt.desc;
+		String pointDesc = pt.getDesc();
 		if (!TextUtils.isEmpty(pointDesc)) {
 			holder.descr.setText(pointDesc);
 		} else {
@@ -87,7 +88,7 @@ public class MeasurementToolAdapter extends RecyclerView.Adapter<MeasurementTool
 				text = mapActivity.getString(R.string.start_point);
 				if (app.getLocationProvider().getLastKnownLocation() != null) {
 					l1 = app.getLocationProvider().getLastKnownLocation();
-					l2 = getLocationFromLL(points.get(0).lat, points.get(0).lon);
+					l2 = getLocationFromLL(points.get(0).getLat(), points.get(0).getLon());
 					text = text
 						+ BULLET + OsmAndFormatter.getFormattedDistance(l1.distanceTo(l2), app)
 						+ BULLET + OsmAndFormatter.getFormattedAzimuth(l1.bearingTo(l2), app);
@@ -95,8 +96,8 @@ public class MeasurementToolAdapter extends RecyclerView.Adapter<MeasurementTool
 			} else {
 				float dist = 0;
 				for (int i = 1; i <= pos; i++) {
-					l1 = getLocationFromLL(points.get(i - 1).lat, points.get(i - 1).lon);
-					l2 = getLocationFromLL(points.get(i).lat, points.get(i).lon);
+					l1 = getLocationFromLL(points.get(i - 1).getLat(), points.get(i - 1).getLon());
+					l2 = getLocationFromLL(points.get(i).getLat(), points.get(i).getLon());
 					dist += l1.distanceTo(l2);
 					text = OsmAndFormatter.getFormattedDistance(dist, app)
 						+ BULLET + OsmAndFormatter.getFormattedAzimuth(l1.bearingTo(l2), app);
@@ -104,7 +105,7 @@ public class MeasurementToolAdapter extends RecyclerView.Adapter<MeasurementTool
 			}
 			holder.descr.setText(text);
 		}
-		double elevation = pt.ele;
+		double elevation = pt.getEle();
 		if (!Double.isNaN(elevation)) {
 			String eleStr = (mapActivity.getString(R.string.altitude)).substring(0, 1);
 			holder.elevation.setText(mapActivity.getString(R.string.ltr_or_rtl_combine_via_colon,
@@ -112,9 +113,9 @@ public class MeasurementToolAdapter extends RecyclerView.Adapter<MeasurementTool
 		} else {
 			holder.elevation.setText("");
 		}
-		float speed = (float) pt.speed;
+		float speed = (float) pt.getSpeed();
 		if (speed != 0) {
-			String speedStr = (mapActivity.getString(R.string.map_widget_speed)).substring(0, 1);
+			String speedStr = (mapActivity.getString(R.string.shared_string_speed)).substring(0, 1);
 			holder.speed.setText(mapActivity.getString(R.string.ltr_or_rtl_combine_via_colon,
 					speedStr, OsmAndFormatter.getFormattedSpeed(speed, app)));
 		} else {
@@ -146,7 +147,7 @@ public class MeasurementToolAdapter extends RecyclerView.Adapter<MeasurementTool
 	}
 
 	@Override
-	public void onItemDismiss(RecyclerView.ViewHolder holder) {
+	public void onItemDismiss(@NonNull ViewHolder holder) {
 		listener.onDragEnded(holder);
 	}
 
@@ -162,13 +163,13 @@ public class MeasurementToolAdapter extends RecyclerView.Adapter<MeasurementTool
 
 		MeasureToolItemVH(View view) {
 			super(view);
-			iconReorder = (ImageView) view.findViewById(R.id.measure_point_reorder_icon);
-			icon = (ImageView) view.findViewById(R.id.measure_point_icon);
-			title = (TextView) view.findViewById(R.id.measure_point_title);
-			descr = (TextView) view.findViewById(R.id.measure_point_descr);
-			elevation = (TextView) view.findViewById(R.id.measure_point_ele);
-			speed = (TextView) view.findViewById(R.id.measure_point_speed);
-			deleteBtn = (ImageButton) view.findViewById(R.id.measure_point_remove_image_button);
+			iconReorder = view.findViewById(R.id.measure_point_reorder_icon);
+			icon = view.findViewById(R.id.measure_point_icon);
+			title = view.findViewById(R.id.measure_point_title);
+			descr = view.findViewById(R.id.measure_point_descr);
+			elevation = view.findViewById(R.id.measure_point_ele);
+			speed = view.findViewById(R.id.measure_point_speed);
+			deleteBtn = view.findViewById(R.id.measure_point_remove_image_button);
 		}
 	}
 

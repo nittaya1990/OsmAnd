@@ -1,8 +1,8 @@
 package net.osmand.plus.routepreparationmenu.cards;
 
 import android.annotation.SuppressLint;
+import android.content.Context;
 import android.graphics.drawable.Drawable;
-import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
@@ -12,32 +12,34 @@ import android.widget.TextView;
 import androidx.annotation.NonNull;
 import androidx.appcompat.view.ContextThemeWrapper;
 
-import net.osmand.AndroidUtils;
 import net.osmand.data.LatLon;
-import net.osmand.plus.ColorUtilities;
-import net.osmand.plus.mapmarkers.MapMarker;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.MapViewTrackingUtilities;
+import net.osmand.plus.helpers.AndroidUiHelper;
 import net.osmand.plus.helpers.MapMarkerDialogHelper;
+import net.osmand.plus.mapmarkers.MapMarker;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.views.DirectionDrawable;
 
 import java.util.List;
 
 public class MapMarkersCard extends MapBaseCard {
-	private List<MapMarker> markers;
+	private final List<MapMarker> markers;
 	private boolean showLimited = true;
 	private LatLon loc;
 	private Float heading;
 	private boolean useCenter;
-	private int screenOrientation;
+	private final int screenOrientation;
 
 
 	public MapMarkersCard(@NonNull MapActivity mapActivity, @NonNull List<MapMarker> mapMarkers) {
 		super(mapActivity);
 		markers = mapMarkers;
 
-		screenOrientation = app.getUIUtilities().getScreenOrientation();
+		screenOrientation = AndroidUiHelper.getScreenOrientation(mapActivity);
 
 		MapViewTrackingUtilities trackingUtils = mapActivity.getMapViewTrackingUtilities();
 		if (trackingUtils != null) {
@@ -67,11 +69,11 @@ public class MapMarkersCard extends MapBaseCard {
 	@SuppressLint("DefaultLocale")
 	@Override
 	protected void updateContent() {
-		LinearLayout root = (LinearLayout) view.findViewById(R.id.items);
+		LinearLayout root = view.findViewById(R.id.items);
 		root.removeAllViews();
 
-		int minCardHeight = app.getResources().getDimensionPixelSize(R.dimen.route_info_card_item_height);
-		int listTextPadding = app.getResources().getDimensionPixelSize(R.dimen.route_info_list_text_padding);
+		int minCardHeight = getDimen(R.dimen.route_info_card_item_height);
+		int listTextPadding = getDimen(R.dimen.route_info_list_text_padding);
 
 		List<MapMarker> markers = getMarkers();
 		int i = 0;
@@ -81,28 +83,27 @@ public class MapMarkersCard extends MapBaseCard {
 		int descriptionColor = getSecondaryColor();
 		int activeColor = getActiveColor();
 
-		ContextThemeWrapper ctx = new ContextThemeWrapper(mapActivity, !nightMode ? R.style.OsmandLightTheme : R.style.OsmandDarkTheme);
-		LayoutInflater inflater = LayoutInflater.from(ctx);
-		for (final MapMarker marker : markers) {
+		Context context = UiUtilities.getThemedContext(mapActivity, nightMode);
+		for (MapMarker marker : markers) {
 			if (showLimitExceeds && i >= 3 && showLimited) {
 				break;
 			}
-			View v = inflater.inflate(R.layout.map_marker_item, root, false);
-			MapMarkerDialogHelper.updateMapMarkerInfo(ctx, v, loc, heading, useCenter, nightMode, screenOrientation, marker);
-			final View remove = v.findViewById(R.id.info_close);
+			View v = themedInflater.inflate(R.layout.map_marker_item, root, false);
+			MapMarkerDialogHelper.updateMapMarkerInfo(context, v, loc, heading, useCenter, nightMode, screenOrientation, marker);
+			View remove = v.findViewById(R.id.info_close);
 			remove.setVisibility(View.GONE);
 
 			((TextView) v.findViewById(R.id.waypoint_dist)).setTextColor(activeColor);
 			((TextView) v.findViewById(R.id.waypoint_text)).setTextColor(mainFontColor);
 			((TextView) v.findViewById(R.id.date_group_text)).setTextColor(descriptionColor);
 
-			ImageView arrow = (ImageView) v.findViewById(R.id.direction);
+			ImageView arrow = v.findViewById(R.id.direction);
 			Drawable arrowIcon = arrow.getDrawable();
 			if (arrowIcon instanceof DirectionDrawable) {
 				((DirectionDrawable) arrowIcon).setImage(R.drawable.ic_direction_arrow, ColorUtilities.getActiveColorId(nightMode));
 			}
 
-			v.setBackgroundResource(AndroidUtils.resolveAttribute(ctx, android.R.attr.selectableItemBackground));
+			v.setBackgroundResource(AndroidUtils.resolveAttribute(context, android.R.attr.selectableItemBackground));
 			v.setMinimumHeight(minCardHeight);
 			v.setOnClickListener(new View.OnClickListener() {
 				@Override
@@ -113,11 +114,11 @@ public class MapMarkersCard extends MapBaseCard {
 				}
 			});
 			if (i > 0) {
-				View div = new View(ctx);
-				LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, AndroidUtils.dpToPx(ctx, 1f));
+				View div = new View(context);
+				LinearLayout.LayoutParams p = new LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, AndroidUtils.dpToPx(context, 1f));
 				AndroidUtils.setMargins(p, listTextPadding, 0, 0, 0);
 				div.setLayoutParams(p);
-				AndroidUtils.setBackgroundColor(ctx, div, ColorUtilities.getDividerColorId(nightMode));
+				AndroidUtils.setBackgroundColor(context, div, ColorUtilities.getDividerColorId(nightMode));
 				div.setVisibility(View.VISIBLE);
 				root.addView(div);
 			}

@@ -1,35 +1,36 @@
 package net.osmand.plus.base;
 
 import android.app.Activity;
-import android.graphics.Shader.TileMode;
-import android.graphics.drawable.BitmapDrawable;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ExpandableListAdapter;
 import android.widget.ExpandableListView;
 import android.widget.ExpandableListView.OnChildClickListener;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.OsmandActionBarActivity;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
 
-public abstract class OsmandExpandableListFragment extends BaseOsmAndFragment
-		implements OnChildClickListener {
+public abstract class OsmandExpandableListFragment extends BaseOsmAndFragment implements OnChildClickListener {
 
 	protected ExpandableListView listView;
 	protected ExpandableListAdapter adapter;
 
 	@Override
-	public View onCreateView(@NonNull android.view.LayoutInflater inflater, android.view.ViewGroup container, Bundle savedInstanceState) {
+	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
+		updateNightMode();
 		View v = createView(inflater, container);
-		listView = (ExpandableListView) v.findViewById(android.R.id.list);
+		listView = v.findViewById(android.R.id.list);
 		listView.setOnChildClickListener(this);
 		if (this.adapter != null) {
 			listView.setAdapter(this.adapter);
@@ -40,8 +41,6 @@ public abstract class OsmandExpandableListFragment extends BaseOsmAndFragment
 	@Override
 	public void onActivityCreated(Bundle savedInstanceState) {
 		super.onActivityCreated(savedInstanceState);
-		OsmandApplication app = requireMyApplication();
-		boolean nightMode = !app.getSettings().isLightContent();
 		getExpandableListView().setBackgroundColor(ColorUtilities.getListBgColor(app, nightMode));
 	}
 
@@ -50,27 +49,15 @@ public abstract class OsmandExpandableListFragment extends BaseOsmAndFragment
 		return inflater.inflate(R.layout.expandable_list, container, false);
 	}
 
-	public void setAdapter(ExpandableListAdapter a) {
-		this.adapter = a;
+	public void setAdapter(ExpandableListAdapter adapter) {
+		this.adapter = adapter;
 		if (listView != null) {
-			listView.setAdapter(a);
+			listView.setAdapter(adapter);
 		}
-
 	}
 
 	public ExpandableListAdapter getAdapter() {
 		return adapter;
-	}
-
-	public void fixBackgroundRepeat(View view) {
-		Drawable bg = view.getBackground();
-		if (bg != null) {
-			if (bg instanceof BitmapDrawable) {
-				BitmapDrawable bmp = (BitmapDrawable) bg;
-				// bmp.mutate(); // make sure that we aren't sharing state anymore
-				bmp.setTileModeXY(TileMode.REPEAT, TileMode.REPEAT);
-			}
-		}
 	}
 
 	public ExpandableListView getExpandableListView() {
@@ -89,21 +76,15 @@ public abstract class OsmandExpandableListFragment extends BaseOsmAndFragment
 
 	public MenuItem createMenuItem(Menu m, int id, int titleRes, int iconId, int menuItemType,
 	                               boolean flipIconForRtl, int iconColor) {
-		OsmandApplication app = requireMyApplication();
-		Drawable d = iconId == 0 ? null : app.getUIUtilities().getIcon(iconId, iconColor);
+		Drawable drawable = iconId == 0 ? null : uiUtilities.getIcon(iconId, iconColor);
 		MenuItem menuItem = m.add(0, id, 0, titleRes);
-		if (d != null) {
+		if (drawable != null) {
 			if (flipIconForRtl) {
-				d = AndroidUtils.getDrawableForDirection(app, d);
+				drawable = AndroidUtils.getDrawableForDirection(app, drawable);
 			}
-			menuItem.setIcon(d);
+			menuItem.setIcon(drawable);
 		}
-		menuItem.setOnMenuItemClickListener(new MenuItem.OnMenuItemClickListener() {
-			@Override
-			public boolean onMenuItemClick(MenuItem item) {
-				return onOptionsItemSelected(item);
-			}
-		});
+		menuItem.setOnMenuItemClickListener(this::onOptionsItemSelected);
 		menuItem.setShowAsAction(menuItemType);
 		return menuItem;
 	}
@@ -111,25 +92,21 @@ public abstract class OsmandExpandableListFragment extends BaseOsmAndFragment
 
 	public boolean isLightActionBar() {
 		Activity activity = getActivity();
-		return activity == null || ((OsmandApplication) activity.getApplication()).getSettings().isLightActionBar();
+		return activity == null || ((OsmandApplication) activity.getApplication()).getSettings().isLightContent();
 	}
 
-
-	public void collapseTrees(final int count) {
+	public void collapseTrees(int count) {
 		Activity activity = getActivity();
 		if (activity != null) {
-			activity.runOnUiThread(new Runnable() {
-				@Override
-				public void run() {
-					synchronized (adapter) {
-						final ExpandableListView expandableListView = getExpandableListView();
-						for (int i = 0; i < adapter.getGroupCount(); i++) {
-							int cp = adapter.getChildrenCount(i);
-							if (cp < count) {
-								expandableListView.expandGroup(i);
-							} else {
-								expandableListView.collapseGroup(i);
-							}
+			activity.runOnUiThread(() -> {
+				synchronized (adapter) {
+					ExpandableListView expandableListView = getExpandableListView();
+					for (int i = 0; i < adapter.getGroupCount(); i++) {
+						int cp = adapter.getChildrenCount(i);
+						if (cp < count) {
+							expandableListView.expandGroup(i);
+						} else {
+							expandableListView.collapseGroup(i);
 						}
 					}
 				}
@@ -137,6 +114,7 @@ public abstract class OsmandExpandableListFragment extends BaseOsmAndFragment
 		}
 	}
 
+	@Nullable
 	public OsmandActionBarActivity getActionBarActivity() {
 		if (getActivity() instanceof OsmandActionBarActivity) {
 			return (OsmandActionBarActivity) getActivity();

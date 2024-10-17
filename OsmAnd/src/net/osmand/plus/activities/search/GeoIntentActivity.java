@@ -1,61 +1,53 @@
 package net.osmand.plus.activities.search;
 
 import android.app.ProgressDialog;
-import android.content.DialogInterface;
-import android.content.DialogInterface.OnCancelListener;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 
+import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
+import androidx.appcompat.app.ActionBar;
+
+import net.osmand.PlatformUtil;
 import net.osmand.data.PointDescription;
-import net.osmand.plus.AppInitializer;
-import net.osmand.plus.AppInitializer.AppInitializeListener;
-import net.osmand.plus.AppInitializer.InitEvents;
+import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
-import net.osmand.plus.activities.OsmandListActivity;
+import net.osmand.plus.base.OsmandListActivity;
 import net.osmand.plus.settings.backend.OsmandSettings;
 import net.osmand.util.Algorithms;
+import net.osmand.util.GeoParsedPoint;
 import net.osmand.util.GeoPointParserUtil;
-import net.osmand.util.GeoPointParserUtil.GeoParsedPoint;
+
+import org.apache.commons.logging.Log;
+
+import java.util.List;
 
 public class GeoIntentActivity extends OsmandListActivity {
 
-	private ProgressDialog progressDlg;
+	private static final Log LOG = PlatformUtil.getLog(GeoIntentActivity.class);
+
+	private ProgressDialog progressDialog;
 
 	@Override
 	protected void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		setContentView(R.layout.search_address_offline);
-		getSupportActionBar().setTitle(R.string.search_osm_offline);
 
-		getMyApplication().checkApplicationIsBeingInitialized(new AppInitializeListener() {
-			@Override
-			public void onStart(AppInitializer init) {
+		ActionBar actionBar = getSupportActionBar();
+		if (actionBar != null) {
+			actionBar.setTitle(R.string.search_osm_offline);
+		}
 
-			}
-
-			@Override
-			public void onProgress(AppInitializer init, InitEvents event) {
-			}
-
-			@Override
-			public void onFinish(AppInitializer init) {
-			}
-		});
-		final Intent intent = getIntent();
+		Intent intent = getIntent();
 		if (intent != null) {
-			final ProgressDialog progress = ProgressDialog.show(GeoIntentActivity.this, getString(R.string.searching),
+			ProgressDialog progress = ProgressDialog.show(this, getString(R.string.searching),
 					getString(R.string.searching_address));
-			final GeoIntentTask task = new GeoIntentTask(progress, intent);
+			GeoIntentTask task = new GeoIntentTask(intent, progress);
 
-			progress.setOnCancelListener(new OnCancelListener() {
-				@Override
-				public void onCancel(DialogInterface dialog) {
-					task.cancel(true);
-				}
-			});
+			progress.setOnCancelListener(dialog -> task.cancel(true));
 			progress.setCancelable(true);
 
 			task.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
@@ -63,18 +55,14 @@ public class GeoIntentActivity extends OsmandListActivity {
 		}
 	}
 
-	private class GeoIntentTask extends AsyncTask<Void, Void, GeoParsedPoint> {
+	private class GeoIntentTask extends AsyncTask<Void, Void, List<GeoParsedPoint>> {
 
-		private final ProgressDialog progress;
 		private final Intent intent;
+		private final ProgressDialog progress;
 
-		private GeoIntentTask(final ProgressDialog progress, final Intent intent) {
-			this.progress = progress;
+		private GeoIntentTask(@NonNull Intent intent, @Nullable ProgressDialog progress) {
 			this.intent = intent;
-		}
-
-		@Override
-		protected void onPreExecute() {
+			this.progress = progress;
 		}
 
 		/**
@@ -89,48 +77,55 @@ public class GeoIntentActivity extends OsmandListActivity {
 		 * @return
 		 */
 		@Override
-		protected GeoParsedPoint doInBackground(Void... nothing) {
+		protected List<GeoParsedPoint> doInBackground(Void... nothing) {
 			try {
 				while (getMyApplication().isApplicationInitializing()) {
 					Thread.sleep(200);
 				}
 				Uri uri = intent.getData();
-				return GeoPointParserUtil.parse(uri.toString());
+				if (uri != null) {
+					return GeoPointParserUtil.parsePoints(uri.toString());
+				}
 			} catch (Exception e) {
-				return null;
+				LOG.error(e);
 			}
+			return null;
 		}
 
 		@Override
-		protected void onPostExecute(GeoParsedPoint p) {
+		protected void onPostExecute(List<GeoParsedPoint> points) {
 			if (progress != null && progress.isShowing()) {
 				try {
 					progress.dismiss();
 				} catch (Exception e) {
-					e.printStackTrace();
+					LOG.error(e);
 				}
 			}
+			if (Algorithms.isEmpty(points)) {
+				return;
+			}
 			try {
-				OsmandSettings settings = getMyApplication().getSettings();
-				if (p != null && p.isGeoPoint()) {
-					PointDescription pd = new PointDescription(p.getLatitude(), p.getLongitude());
-					if (!Algorithms.isEmpty(p.getLabel())) {
-						pd.setName(p.getLabel());
+				OsmandApplication app = getMyApplication();
+				OsmandSettings settings = app.getSettings();
+				GeoParsedPoint point = points.get(0);
+				if (point != null && point.isGeoPoint()) {
+					PointDescription pd = new PointDescription(point.getLatitude(), point.getLongitude());
+					if (!Algorithms.isEmpty(point.getLabel())) {
+						pd.setName(point.getLabel());
 					}
-					settings.setMapLocationToShow(p.getLatitude(), p.getLongitude(),
-							settings.getLastKnownMapZoom(), pd); //$NON-NLS-1$
+					settings.setMapLocationToShow(point.getLatitude(), point.getLongitude(),
+							settings.getLastKnownMapZoom(), pd);
 				} else {
 					Uri uri = intent.getData();
-					String searchString = p != null && p.isGeoAddress() ? p.getQuery() : uri.toString();
+					String searchString = point != null && point.isGeoAddress() ? point.getQuery() : uri.toString();
 					settings.setSearchRequestToShow(searchString);
 				}
 				MapActivity.launchMapActivityMoveToTop(GeoIntentActivity.this);
 				GeoIntentActivity.this.finish();
 			} catch (Exception e) {
-				e.printStackTrace();
+				LOG.error(e);
 			}
 		}
-
 	}
 
 	@Override
@@ -140,9 +135,9 @@ public class GeoIntentActivity extends OsmandListActivity {
 	}
 
 	private void dismiss() {
-		if (progressDlg != null) {
-			progressDlg.dismiss();
-			progressDlg = null;
+		if (progressDialog != null) {
+			progressDialog.dismiss();
+			progressDialog = null;
 		}
 	}
 }

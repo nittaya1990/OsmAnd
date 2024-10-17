@@ -1,10 +1,12 @@
 package net.osmand.plus.poi;
 
 
+import static net.osmand.CollatorStringMatcher.StringMatcherMode.CHECK_STARTS_FROM_SPACE;
 import static net.osmand.osm.MapPoiTypes.OSM_WIKI_CATEGORY;
 import static net.osmand.osm.MapPoiTypes.ROUTES;
 import static net.osmand.osm.MapPoiTypes.ROUTE_ARTICLE;
 import static net.osmand.osm.MapPoiTypes.ROUTE_ARTICLE_POINT;
+import static net.osmand.osm.MapPoiTypes.ROUTE_TRACK;
 import static net.osmand.osm.MapPoiTypes.WIKI_PLACE;
 
 import android.content.Context;
@@ -13,10 +15,8 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import net.osmand.CollatorStringMatcher;
-import net.osmand.CollatorStringMatcher.StringMatcherMode;
 import net.osmand.Location;
 import net.osmand.ResultMatcher;
-import net.osmand.binary.BinaryMapIndexReader.SearchPoiTypeFilter;
 import net.osmand.data.Amenity;
 import net.osmand.data.LatLon;
 import net.osmand.osm.AbstractPoiType;
@@ -24,11 +24,14 @@ import net.osmand.osm.MapPoiTypes;
 import net.osmand.osm.PoiCategory;
 import net.osmand.osm.PoiFilter;
 import net.osmand.osm.PoiType;
-import net.osmand.plus.OsmAndFormatter;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
+import net.osmand.plus.poi.PoiFilterUtils.AmenityNameFilter;
 import net.osmand.plus.render.RenderingIcons;
+import net.osmand.plus.settings.backend.OsmandSettings;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.search.core.CustomSearchPoiFilter;
+import net.osmand.search.core.TopIndexFilter;
 import net.osmand.util.Algorithms;
 import net.osmand.util.MapUtils;
 import net.osmand.util.OpeningHoursParser;
@@ -47,13 +50,13 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.TreeSet;
 
-public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>, CustomSearchPoiFilter {
+public class PoiUIFilter implements Comparable<PoiUIFilter>, CustomSearchPoiFilter {
 
-	public final static String STD_PREFIX = "std_";
-	public final static String USER_PREFIX = "user_";
-	public final static String CUSTOM_FILTER_ID = USER_PREFIX + "custom_id";
-	public final static String BY_NAME_FILTER_ID = USER_PREFIX + "by_name";
-	public final static int INVALID_ORDER = -1;
+	public static final String STD_PREFIX = "std_";
+	public static final String USER_PREFIX = "user_";
+	public static final String CUSTOM_FILTER_ID = USER_PREFIX + "custom_id";
+	public static final String BY_NAME_FILTER_ID = USER_PREFIX + "by_name";
+	public static final int INVALID_ORDER = -1;
 
 	private Map<PoiCategory, LinkedHashSet<String>> acceptedTypes = new LinkedHashMap<>();
 	private Map<PoiCategory, LinkedHashSet<String>> acceptedTypesOrigin = new LinkedHashMap<>();
@@ -68,27 +71,28 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 
 	protected final OsmandApplication app;
 
-	protected int distanceInd = 0;
+	protected int distanceInd;
 	// in kilometers
-	protected double[] distanceToSearchValues = new double[] {1, 2, 5, 10, 20, 50, 100, 200, 500};
+	protected double[] distanceToSearchValues = {1, 2, 5, 10, 20, 50, 100, 200, 500};
 
 	private final MapPoiTypes poiTypes;
 
-	protected String filterByName = null;
-	protected String savedFilterByName = null;
-	protected List<Amenity> currentSearchResult = null;
+	protected String filterByName;
+	protected String savedFilterByName;
+	protected List<Amenity> currentSearchResult;
+	protected String filterByKey = null;
 
 	private boolean deleted;
 
 	// constructor for standard filters
-	public PoiUIFilter(AbstractPoiType type, OsmandApplication application, String idSuffix) {
-		this.app = application;
+	public PoiUIFilter(@Nullable AbstractPoiType type, @NonNull OsmandApplication app, @NonNull String idSuffix) {
+		this.app = app;
 		isStandardFilter = true;
 		standardIconId = type == null ? null : type.getKeyName();
 		filterId = STD_PREFIX + standardIconId + idSuffix;
 
-		poiTypes = application.getPoiTypes();
-		name = type == null ? application.getString(R.string.poi_filter_closest_poi) : (type.getTranslation() + idSuffix); //$NON-NLS-1$
+		poiTypes = app.getPoiTypes();
+		name = type == null ? app.getString(R.string.poi_filter_closest_poi) : (type.getTranslation() + idSuffix);
 		if (type == null) {
 			initSearchAll();
 			updatePoiAdditionals();
@@ -100,17 +104,35 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		}
 	}
 
+	public PoiUIFilter(TopIndexFilter topIndexFilter, @Nullable Map<PoiCategory, LinkedHashSet<String>> acceptedTypes, @NonNull OsmandApplication app) {
+		this.app = app;
+		isStandardFilter = true;
+		standardIconId = topIndexFilter.getIconResource();
+		filterId = topIndexFilter.getFilterId();
+		this.name = topIndexFilter.getName();
+		poiTypes = app.getPoiTypes();
+
+		if (acceptedTypes == null) {
+			initSearchAll();
+		} else {
+			this.acceptedTypes.putAll(acceptedTypes);
+		}
+		updatePoiAdditionals();
+		updateAcceptedTypeOrigins();
+	}
+
 	// search by name standard
-	protected PoiUIFilter(OsmandApplication application) {
-		this.app = application;
+	protected PoiUIFilter(@NonNull OsmandApplication app) {
+		this.app = app;
 		isStandardFilter = true;
 		filterId = STD_PREFIX; // overridden
-		poiTypes = application.getPoiTypes();
+		poiTypes = app.getPoiTypes();
 	}
 
 	// constructor for user defined filters
-	public PoiUIFilter(String name, String filterId,
-					   Map<PoiCategory, LinkedHashSet<String>> acceptedTypes, OsmandApplication app) {
+	public PoiUIFilter(@NonNull String name, @Nullable String filterId,
+	                   @Nullable Map<PoiCategory, LinkedHashSet<String>> acceptedTypes,
+	                   @NonNull OsmandApplication app) {
 		this.app = app;
 		isStandardFilter = false;
 		poiTypes = app.getPoiTypes();
@@ -128,14 +150,14 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		updateAcceptedTypeOrigins();
 	}
 
-	public PoiUIFilter(Set<PoiUIFilter> filtersToMerge, OsmandApplication app) {
+	public PoiUIFilter(@NonNull Set<PoiUIFilter> filtersToMerge, @NonNull OsmandApplication app) {
 		this(app);
 		combineWithPoiFilters(filtersToMerge);
-		filterId = PoiUIFilter.STD_PREFIX + "combined";
+		filterId = STD_PREFIX + "combined";
 		name = app.getPoiFilters().getFiltersName(filtersToMerge);
 	}
 
-	public PoiUIFilter(PoiUIFilter filter, String name, String filterId) {
+	public PoiUIFilter(@NonNull PoiUIFilter filter, @NonNull String name, @NonNull String filterId) {
 		this.app = filter.app;
 		this.name = name;
 		this.filterId = filterId;
@@ -176,6 +198,14 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		return filterId.startsWith(STD_PREFIX + ROUTE_ARTICLE_POINT);
 	}
 
+	public boolean isRouteTrackFilter() {
+		return filterId.startsWith(STD_PREFIX + ROUTE_TRACK);
+	}
+
+	public boolean isShowPrivateNeeded() {
+		return filterByName != null && filterByName.contains("access:private");
+	}
+
 	public String getFilterByName() {
 		return filterByName;
 	}
@@ -183,6 +213,10 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 	public void setFilterByName(String filterByName) {
 		this.filterByName = filterByName;
 		updateFilterResults();
+	}
+
+	public void setFilterByKey(String key) {
+		filterByKey = key;
 	}
 
 	public void removeUnsavedFilterByName() {
@@ -193,8 +227,8 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 	public void updateFilterResults() {
 		List<Amenity> prev = currentSearchResult;
 		if (prev != null) {
-			AmenityNameFilter nameFilter = getNameFilter(filterByName);
-			List<Amenity> newResults = new ArrayList<Amenity>();
+			AmenityNameFilter nameFilter = getNameFilter();
+			List<Amenity> newResults = new ArrayList<>();
 			for (Amenity a : prev) {
 				if (nameFilter.accept(a)) {
 					newResults.add(a);
@@ -253,9 +287,9 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		}
 		double val = distanceToSearchValues[distInd];
 		if (val >= 1) {
-			return " < " + OsmAndFormatter.getFormattedDistance(((int) val * 1000), app);  //$NON-NLS-1$//$NON-NLS-2$
+			return " < " + OsmAndFormatter.getFormattedDistance(((int) val * 1000), app);
 		} else {
-			return " < " + OsmAndFormatter.getFormattedDistance(500, app);  //$NON-NLS-1$
+			return " < " + OsmAndFormatter.getFormattedDistance(500, app);
 		}
 	}
 
@@ -269,7 +303,8 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		}
 	}
 
-	public List<Amenity> initializeNewSearch(double lat, double lon, int firstTimeLimit, ResultMatcher<Amenity> matcher, int radius) {
+	public List<Amenity> initializeNewSearch(double lat, double lon, int firstTimeLimit,
+	                                         ResultMatcher<Amenity> matcher, int radius) {
 		if (radius < 0) {
 			clearPreviousZoom();
 		} else if (radius < distanceToSearchValues.length) {
@@ -326,15 +361,14 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		return searchAmenitiesInternal(lat, lon, topLatitude, bottomLatitude, leftLongitude, rightLongitude, -1, matcher);
 	}
 
-	public List<Amenity> searchAmenities(double top, double left, double bottom, double right, int zoom,
-										 ResultMatcher<Amenity> matcher) {
+	public List<Amenity> searchAmenities(double top, double left, double bottom, double right, int zoom, ResultMatcher<Amenity> matcher) {
 		List<Amenity> results = new ArrayList<>();
 		List<Amenity> tempResults = currentSearchResult;
 		if (tempResults != null) {
 			for (Amenity a : tempResults) {
 				LatLon l = a.getLocation();
-				if (l != null && l.getLatitude() <= top && l.getLatitude() >= bottom && l.getLongitude() >= left
-						&& l.getLongitude() <= right) {
+				if (l != null && l.getLatitude() <= top && l.getLatitude() >= bottom
+						&& l.getLongitude() >= left && l.getLongitude() <= right) {
 					if (matcher == null || matcher.publish(a)) {
 						results.add(a);
 					}
@@ -352,22 +386,21 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 	}
 
 	protected List<Amenity> searchAmenitiesInternal(double lat, double lon, double topLatitude,
-													double bottomLatitude, double leftLongitude, double rightLongitude, int zoom, final ResultMatcher<Amenity> matcher) {
-		return app.getResourceManager().searchAmenities(this,
-				topLatitude, leftLongitude, bottomLatitude, rightLongitude, zoom, wrapResultMatcher(matcher));
+	                                                double bottomLatitude, double leftLongitude,
+	                                                double rightLongitude, int zoom,
+	                                                ResultMatcher<Amenity> matcher) {
+		return app.getResourceManager().searchAmenities(this, topLatitude, leftLongitude,
+				bottomLatitude, rightLongitude, zoom, true, wrapResultMatcher(matcher));
 	}
 
-	public AmenityNameFilter getNameFilter(String filter) {
-		if (Algorithms.isEmpty(filter)) {
-			return new AmenityNameFilter() {
-
-				@Override
-				public boolean accept(Amenity a) {
-					return true;
-				}
-			};
+	public PoiFilterUtils.AmenityNameFilter getNameFilter() {
+		if (Algorithms.isEmpty(filterByName)) {
+			return a -> true;
 		}
-		String[] items = filter.split(" ");
+		if (!Algorithms.isEmpty(filterByKey)) {
+			return getKeyNameFilter(filterByKey, filterByName);
+		}
+		String[] items = filterByName.split(" ");
 		boolean allTime = false;
 		boolean open = false;
 		List<PoiType> poiAdditionalsFilter = null;
@@ -398,40 +431,37 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		return getNameFilterInternal(unknownFilters, allTime, open, poiAdditionalsFilter);
 	}
 
-	private AmenityNameFilter getNameFilterInternal(
-			final List<String> unknownFilters, final boolean shouldBeAllTime,
-			final boolean shouldBeOpened, final List<PoiType> selectedFilters
-	) {
-		return new AmenityNameFilter() {
-
-			@Override
-			public boolean accept(Amenity amenity) {
-				if (shouldBeAllTime) {
-					if (!"24/7".equalsIgnoreCase(amenity.getOpeningHours()) &&
-							!"Mo-Su 00:00-24:00".equalsIgnoreCase(amenity.getOpeningHours())) {
-						return false;
-					}
-				}
-
-				if (shouldBeOpened && !isOpened(amenity)) {
+	@NonNull
+	private PoiFilterUtils.AmenityNameFilter getNameFilterInternal(List<String> unknownFilters,
+	                                                               boolean shouldBeAllTime,
+	                                                               boolean shouldBeOpened,
+	                                                               List<PoiType> selectedFilters) {
+		return amenity -> {
+			if (shouldBeAllTime) {
+				if (!"24/7".equalsIgnoreCase(amenity.getOpeningHours())
+						&& !"Mo-Su 00:00-24:00".equalsIgnoreCase(amenity.getOpeningHours())) {
 					return false;
 				}
-
-				String nameFilter = extractNameFilter(amenity, unknownFilters);
-				if (!matchesAnyAmenityName(amenity, nameFilter)) {
-					return false;
-				}
-
-				if (!acceptedAnyFilterOfEachCategory(amenity, selectedFilters)) {
-					return false;
-				}
-
-				return true;
 			}
+			if (shouldBeOpened && !isOpened(amenity)) {
+				return false;
+			}
+			String nameFilter = extractNameFilter(amenity, unknownFilters);
+			if (!matchesAnyAmenityName(amenity, nameFilter)) {
+				return false;
+			}
+			return acceptedAnyFilterOfEachCategory(amenity, selectedFilters);
 		};
 	}
 
-	private boolean isOpened(Amenity amenity) {
+	public PoiFilterUtils.AmenityNameFilter getKeyNameFilter(String key, String value) {
+		return amenity -> {
+			String val = amenity.getAdditionalInfo(key);
+			return val != null && val.equals(value);
+		};
+	}
+
+	private boolean isOpened(@NonNull Amenity amenity) {
 		OpeningHours openedHours = OpeningHoursParser.parseOpenedHours(amenity.getOpeningHours());
 		if (openedHours == null) {
 			return false;
@@ -443,7 +473,7 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		return openedHours.isOpenedForTime(calendar);
 	}
 
-	private String extractNameFilter(Amenity amenity, List<String> unknownFilters) {
+	private String extractNameFilter(@NonNull Amenity amenity, @Nullable List<String> unknownFilters) {
 		if (unknownFilters == null) {
 			return "";
 		}
@@ -459,26 +489,24 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		return nameFilter.toString();
 	}
 
-	private boolean matchesAnyAmenityName(Amenity amenity, String nameFilter) {
+	private boolean matchesAnyAmenityName(@NonNull Amenity amenity, @NonNull String nameFilter) {
 		if (nameFilter.length() == 0) {
 			return true;
 		}
+		CollatorStringMatcher matcher = new CollatorStringMatcher(nameFilter.trim(), CHECK_STARTS_FROM_SPACE);
+		OsmandSettings settings = app.getSettings();
+		List<String> names = OsmAndFormatter.getPoiStringsWithoutType(amenity,
+				settings.MAP_PREFERRED_LOCALE.get(), settings.MAP_TRANSLITERATE_NAMES.get());
 
-		final CollatorStringMatcher sm =
-				new CollatorStringMatcher(nameFilter.trim(), StringMatcherMode.CHECK_CONTAINS);
-
-		List<String> names = OsmAndFormatter.getPoiStringsWithoutType(
-				amenity, app.getSettings().MAP_PREFERRED_LOCALE.get(),
-				app.getSettings().MAP_TRANSLITERATE_NAMES.get());
 		for (String name : names) {
-			if (sm.matches(name)) {
+			if (matcher.matches(name)) {
 				return true;
 			}
 		}
 		return false;
 	}
 
-	private boolean acceptedAnyFilterOfEachCategory(Amenity amenity, List<PoiType> selectedFilters) {
+	private boolean acceptedAnyFilterOfEachCategory(@NonNull Amenity amenity, @Nullable List<PoiType> selectedFilters) {
 		if (selectedFilters == null) {
 			return true;
 		}
@@ -497,10 +525,9 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		return true;
 	}
 
-	private void fillFilterCategories(
-			List<PoiType> selectedFilters,
-			Map<String, List<PoiType>> filterCategories, Map<PoiType, PoiType> textFilters
-	) {
+	private void fillFilterCategories(@NonNull List<PoiType> selectedFilters,
+	                                  @NonNull Map<String, List<PoiType>> filterCategories,
+	                                  @NonNull Map<PoiType, PoiType> textFilters) {
 		for (PoiType filter : selectedFilters) {
 			String category = filter.getPoiAdditionalCategory();
 			List<PoiType> filtersOfCategory = filterCategories.get(category);
@@ -520,8 +547,8 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		}
 	}
 
-	private boolean acceptedAnyFilterOfCategory(
-			Amenity amenity, List<PoiType> category, Map<PoiType, PoiType> textFilters) {
+	private boolean acceptedAnyFilterOfCategory(@NonNull Amenity amenity, @NonNull List<PoiType> category,
+	                                            @NonNull Map<PoiType, PoiType> textFilters) {
 		for (PoiType filter : category) {
 			if (acceptedFilter(amenity, filter, textFilters)) {
 				return true;
@@ -531,9 +558,8 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		return false;
 	}
 
-	private boolean acceptedFilter(
-			Amenity amenity, PoiType filter, Map<PoiType, PoiType> textFilterCategories
-	) {
+	private boolean acceptedFilter(@NonNull Amenity amenity, @NonNull PoiType filter,
+	                               @NonNull Map<PoiType, PoiType> textFilterCategories) {
 		String filterValue = amenity.getAdditionalInfo(filter.getKeyName());
 
 		if (filterValue != null) {
@@ -575,9 +601,9 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 	}
 
 	@Override
-	public ResultMatcher<Amenity> wrapResultMatcher(final ResultMatcher<Amenity> matcher) {
-		final AmenityNameFilter nm = getNameFilter(filterByName);
-		final Set<String> searchedPois = new TreeSet<>();
+	public ResultMatcher<Amenity> wrapResultMatcher(@Nullable ResultMatcher<Amenity> matcher) {
+		PoiFilterUtils.AmenityNameFilter nm = getNameFilter();
+		Set<String> searchedPois = new TreeSet<>();
 		return new ResultMatcher<Amenity>() {
 
 			@Override
@@ -588,10 +614,7 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 						if (!searchedPois.add(poiID)) {
 							return false;
 						}
-						if (a.isClosed()) {
-							return false;
-						}
-						return true;
+						return !a.isClosed();
 					}
 				}
 				return false;
@@ -614,8 +637,7 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 	}
 
 	public String getGeneratedName(int chars) {
-		if (!filterId.equals(CUSTOM_FILTER_ID) ||
-				areAllTypesAccepted() || acceptedTypes.isEmpty()) {
+		if (!isCustomPoiFilter() || areAllTypesAccepted() || acceptedTypes.isEmpty()) {
 			return getName();
 		}
 		StringBuilder res = new StringBuilder();
@@ -650,6 +672,7 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		return res.toString();
 	}
 
+	@NonNull
 	public String getTypesName() {
 		StringBuilder sb = new StringBuilder();
 		for (Map.Entry<PoiCategory, LinkedHashSet<String>> entry : acceptedTypes.entrySet()) {
@@ -668,7 +691,7 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		return sb.toString();
 	}
 
-	private void appendWithSeparator(StringBuilder sb, String s) {
+	private void appendWithSeparator(@NonNull StringBuilder sb, String s) {
 		if (sb.length() > 0) {
 			sb.append(", ");
 		}
@@ -679,14 +702,14 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 	 * @param type
 	 * @return null if all subtypes are accepted/ empty list if type is not accepted at all
 	 */
-	public Set<String> getAcceptedSubtypes(PoiCategory type) {
+	public Set<String> getAcceptedSubtypes(@NonNull PoiCategory type) {
 		if (!acceptedTypes.containsKey(type)) {
 			return Collections.emptySet();
 		}
 		return acceptedTypes.get(type);
 	}
 
-	public boolean isTypeAccepted(PoiCategory t) {
+	public boolean isTypeAccepted(@NonNull PoiCategory t) {
 		return acceptedTypes.containsKey(t);
 	}
 
@@ -709,9 +732,9 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		return false;
 	}
 
-	public void updateTypesToAccept(AbstractPoiType pt) {
+	public void updateTypesToAccept(@NonNull AbstractPoiType pt) {
 		pt.putTypes(acceptedTypes);
-		if (pt instanceof PoiType && ((PoiType) pt).isAdditional() && ((PoiType) pt).getParentType() != null) {
+		if (pt instanceof PoiType && pt.isAdditional() && ((PoiType) pt).getParentType() != null) {
 			fillPoiAdditionals(((PoiType) pt).getParentType(), true);
 		} else {
 			fillPoiAdditionals(pt, true);
@@ -719,7 +742,7 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		addOtherPoiAdditionals();
 	}
 
-	private void fillPoiAdditionals(AbstractPoiType pt, boolean allFromCategory) {
+	private void fillPoiAdditionals(@NonNull AbstractPoiType pt, boolean allFromCategory) {
 		for (PoiType add : pt.getPoiAdditionals()) {
 			poiAdditionals.put(add.getKeyName().replace('_', ':').replace(' ', ':'), add);
 			poiAdditionals.put(add.getTranslation().replace(' ', ':').toLowerCase(), add);
@@ -788,12 +811,12 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		}
 	}
 
-	public void combineWithPoiFilter(PoiUIFilter f) {
+	public void combineWithPoiFilter(@NonNull PoiUIFilter f) {
 		putAllAcceptedTypes(f.acceptedTypes);
 		poiAdditionals.putAll(f.poiAdditionals);
 	}
 
-	private void putAllAcceptedTypes(Map<PoiCategory, LinkedHashSet<String>> types) {
+	private void putAllAcceptedTypes(@NonNull Map<PoiCategory, LinkedHashSet<String>> types) {
 		for (Entry<PoiCategory, LinkedHashSet<String>> entry : types.entrySet()) {
 			PoiCategory category = entry.getKey();
 			LinkedHashSet<String> typesSet = entry.getValue();
@@ -813,26 +836,9 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		}
 	}
 
-	public void combineWithPoiFilters(Set<PoiUIFilter> filters) {
+	public void combineWithPoiFilters(@NonNull Set<PoiUIFilter> filters) {
 		for (PoiUIFilter f : filters) {
 			combineWithPoiFilter(f);
-		}
-	}
-
-	public static void combineStandardPoiFilters(Set<PoiUIFilter> filters, OsmandApplication app) {
-		Set<PoiUIFilter> standardFilters = new TreeSet<>();
-		for (PoiUIFilter filter : filters) {
-			if (((filter.isStandardFilter() && filter.filterId.startsWith(PoiUIFilter.STD_PREFIX))
-					|| filter.filterId.startsWith(PoiUIFilter.CUSTOM_FILTER_ID))
-					&& (filter.getFilterByName() == null)
-					&& (filter.getSavedFilterByName() == null)) {
-				standardFilters.add(filter);
-			}
-		}
-		if (standardFilters.size() > 1) {
-			PoiUIFilter standardFiltersCombined = new PoiUIFilter(standardFilters, app);
-			filters.removeAll(standardFilters);
-			filters.add(standardFiltersCombined);
 		}
 	}
 
@@ -884,42 +890,9 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		if (RenderingIcons.containsBigIcon(iconName)) {
 			return iconName;
 		} else {
-			iconName = getCustomFilterIconName(this);
+			iconName = PoiFilterUtils.getCustomFilterIconName(this);
 			return RenderingIcons.containsBigIcon(iconName) ? iconName : filterId;
 		}
-	}
-
-	public static String getCustomFilterIconName(@Nullable PoiUIFilter filter) {
-		if (filter != null) {
-			Map<PoiCategory, LinkedHashSet<String>> acceptedTypes = filter.getAcceptedTypes();
-			List<PoiCategory> categories = new ArrayList<>(acceptedTypes.keySet());
-			if (categories.size() == 1) {
-				PoiCategory category = categories.get(0);
-				LinkedHashSet<String> filters = acceptedTypes.get(category);
-				if (filters == null || filters.size() > 1) {
-					return category.getIconKeyName();
-				} else {
-					return getPoiTypeIconName(category.getPoiTypeByKeyName(filters.iterator().next()));
-				}
-			}
-		}
-		return null;
-	}
-
-	@Nullable
-	public static String getPoiTypeIconName(@Nullable AbstractPoiType abstractPoiType) {
-		if (abstractPoiType != null && RenderingIcons.containsBigIcon(abstractPoiType.getIconKeyName())) {
-			return abstractPoiType.getIconKeyName();
-		} else if (abstractPoiType instanceof PoiType) {
-			PoiType poiType = (PoiType) abstractPoiType;
-			String iconId = poiType.getOsmTag() + "_" + poiType.getOsmValue();
-			if (RenderingIcons.containsBigIcon(iconId)) {
-				return iconId;
-			} else if (poiType.getParentType() != null) {
-				return getPoiTypeIconName(poiType.getParentType());
-			}
-		}
-		return null;
 	}
 
 	public boolean isStandardFilter() {
@@ -928,6 +901,10 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 
 	public void setStandardFilter(boolean isStandardFilter) {
 		this.isStandardFilter = isStandardFilter;
+	}
+
+	public boolean isCustomPoiFilter() {
+		return CUSTOM_FILTER_ID.equals(filterId);
 	}
 
 	public int getOrder() {
@@ -966,23 +943,20 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		}
 		if (acceptedTypesOrigin.containsKey(type)) {
 			LinkedHashSet<String> acceptedTypesSet = acceptedTypesOrigin.get(type);
-			if (acceptedTypesSet == null || acceptedTypesSet.contains(subtype)) {
-				return true;
-			}
+			return acceptedTypesSet == null || acceptedTypesSet.contains(subtype);
 		}
 		return false;
 	}
 
 	@Override
 	public boolean isEmpty() {
-		return acceptedTypes.isEmpty() &&
-				(currentSearchResult == null || currentSearchResult.isEmpty());
+		return acceptedTypes.isEmpty() && (currentSearchResult == null || currentSearchResult.isEmpty());
 	}
 
 	@Override
 	public int compareTo(@NonNull PoiUIFilter another) {
 		if (this.order != INVALID_ORDER && another.order != INVALID_ORDER) {
-			return (this.order < another.order) ? -1 : ((this.order == another.order) ? 0 : 1);
+			return Integer.compare(this.order, another.order);
 		} else if (another.filterId.equals(this.filterId)) {
 			String thisFilterByName = this.filterByName == null ? "" : this.filterByName;
 			String anotherFilterByName = another.filterByName == null ? "" : another.filterByName;
@@ -992,8 +966,9 @@ public class PoiUIFilter implements SearchPoiTypeFilter, Comparable<PoiUIFilter>
 		}
 	}
 
-	public interface AmenityNameFilter {
-
-		boolean accept(Amenity a);
+	@NonNull
+	@Override
+	public String toString() {
+		return getFilterId();
 	}
 }

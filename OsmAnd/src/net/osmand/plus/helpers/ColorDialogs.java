@@ -1,6 +1,6 @@
 package net.osmand.plus.helpers;
 
-import static net.osmand.AndroidUtils.dpToPx;
+import static net.osmand.plus.utils.AndroidUtils.dpToPx;
 
 import android.content.Context;
 import android.graphics.Color;
@@ -25,7 +25,7 @@ import java.util.List;
 import gnu.trove.list.array.TIntArrayList;
 
 public class ColorDialogs {
-	public static int[] paletteColors = new int[] {
+	public static int[] paletteColors = {
 			R.string.rendering_value_darkyellow_name,
 			R.string.rendering_value_red_name,
 			R.string.rendering_value_orange_name,
@@ -40,7 +40,7 @@ public class ColorDialogs {
 			R.string.rendering_value_black_name
 	};
 
-	public static int[] pallette = new int[] {
+	public static int[] pallette = {
 			0xffeecc22,
 			0xffd00d0d,
 			0xffff5020,
@@ -55,7 +55,7 @@ public class ColorDialogs {
 			0xff000001
 	};
 
-	public static String[] paletteColorTags = new String[] {
+	public static String[] paletteColorTags = {
 			"darkyellow",
 			"red",
 			"orange",
@@ -107,19 +107,8 @@ public class ColorDialogs {
 		return colors[index];
 	}
 
-	public static int getColorByTag(String tag) {
-		String t = tag.toLowerCase();
-		for (int i = 0; i < paletteColorTags.length; i++) {
-			String colorTag = paletteColorTags[i];
-			if (colorTag.equals(t)) {
-				return pallette[i];
-			}
-		}
-		return 0;
-	}
-
-	public static void setupColorSpinnerEx(final Context ctx, int selectedColor, final Spinner colorSpinner,
-										   final TIntArrayList colors, OnItemSelectedListener listener) {
+	public static void setupColorSpinnerEx(Context ctx, int selectedColor, Spinner colorSpinner,
+	                                       TIntArrayList colors, OnItemSelectedListener listener) {
 		colors.add(pallette);
 		List<String> colorNames = new ArrayList<String>();
 		int selection = -1;
@@ -180,7 +169,7 @@ public class ColorDialogs {
 		return "#" + c; //$NON-NLS-1$
 	}
 
-	private static Drawable getIcon(final Context ctx, int resId, int color) {
+	private static Drawable getIcon(Context ctx, int resId, int color) {
 		Drawable d = AppCompatResources.getDrawable(ctx, resId);
 		if (d != null) {
 			d = DrawableCompat.wrap(d).mutate();
@@ -188,27 +177,5 @@ public class ColorDialogs {
 			d.setColorFilter(color, PorterDuff.Mode.SRC_IN);
 		}
 		return d;
-	}
-
-	public static int getColorName(@ColorInt int color) {
-		int colorName = R.string.custom_color;
-		for (int i = 0; i < ColorDialogs.pallette.length; i++) {
-			if (ColorDialogs.pallette[i] == color) {
-				colorName = ColorDialogs.paletteColors[i];
-				break;
-			}
-		}
-		return colorName;
-	}
-
-	public static boolean isPaletteColor(@ColorInt int color) {
-		boolean isPaletteColor = false;
-		for (int i = 0; i < ColorDialogs.pallette.length; i++) {
-			if (ColorDialogs.pallette[i] == color) {
-				isPaletteColor = true;
-				break;
-			}
-		}
-		return isPaletteColor;
 	}
 }

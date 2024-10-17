@@ -1,5 +1,7 @@
 package net.osmand.aidl;
 
+import androidx.annotation.Nullable;
+
 import net.osmand.aidl.maplayer.AMapLayer;
 import net.osmand.aidl.maplayer.point.AMapPoint;
 
@@ -10,10 +12,10 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class AidlMapLayerWrapper {
 
-	private String id;
-	private String name;
-	private float zOrder;
-	private Map<String, AidlMapPointWrapper> points = new ConcurrentHashMap<>();
+	private final String id;
+	private final String name;
+	private final float zOrder;
+	private final Map<String, AidlMapPointWrapper> points = new ConcurrentHashMap<>();
 
 	private boolean imagePoints;
 	private int circlePointMinZoom;
@@ -79,6 +81,7 @@ public class AidlMapLayerWrapper {
 		return new ArrayList<>(points.values());
 	}
 
+	@Nullable
 	public AidlMapPointWrapper getPoint(String pointId) {
 		return points.get(pointId);
 	}
@@ -149,5 +152,9 @@ public class AidlMapLayerWrapper {
 
 	public int getBigPointMaxZoom() {
 		return bigPointMaxZoom;
+	}
+
+	public int getPointsSize() {
+		return points.size();
 	}
 }

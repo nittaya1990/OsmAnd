@@ -4,7 +4,6 @@ import android.content.Context;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
 import android.os.Bundle;
-import android.view.View;
 
 import androidx.annotation.NonNull;
 import androidx.fragment.app.FragmentActivity;
@@ -18,6 +17,7 @@ import net.osmand.plus.base.bottomsheetmenu.simpleitems.DividerHalfItem;
 import net.osmand.plus.base.bottomsheetmenu.simpleitems.TitleDividerItem;
 import net.osmand.plus.chooseplan.OsmAndFeature;
 import net.osmand.plus.chooseplan.ChoosePlanFragment;
+import net.osmand.plus.utils.AndroidUtils;
 import net.osmand.plus.wikivoyage.article.WikivoyageArticleWikiLinkFragment;
 
 
@@ -31,7 +31,7 @@ public class WikipediaArticleWikiLinkFragment extends MenuBottomSheetDialogFragm
 
 	@Override
 	public void createMenuItems(Bundle savedInstanceState) {
-		final Context ctx = getContext();
+		Context ctx = getContext();
 		if (ctx == null) {
 			return;
 		}
@@ -51,19 +51,16 @@ public class WikipediaArticleWikiLinkFragment extends MenuBottomSheetDialogFragm
 		Drawable osmandLiveIcon = getIcon(R.drawable.ic_action_subscription_osmand_live, 0);
 
 		Drawable viewOnlineIcon = getIcon(R.drawable.ic_world_globe_dark, nightMode
-				? R.color.wikivoyage_contents_parent_icon_dark : R.color.wikivoyage_contents_parent_icon_light);
+				? R.color.icon_color_active_dark : R.color.icon_color_active_light);
 
 		BaseBottomSheetItem wikiArticleOnlineItem = new BottomSheetItemWithDescription.Builder()
 				.setDescription(getString(R.string.open_wikipedia_link_online_description))
 				.setIcon(viewOnlineIcon)
 				.setTitle(getString(R.string.open_wikipedia_link_online))
 				.setLayoutId(R.layout.bottom_sheet_item_in_frame_with_descr_and_icon)
-				.setOnClickListener(new View.OnClickListener() {
-					@Override
-					public void onClick(View v) {
-						WikipediaDialogFragment.showFullArticle(ctx, Uri.parse(articleUrl), nightMode);
-						dismiss();
-					}
+				.setOnClickListener(v -> {
+					AndroidUtils.openUrl(ctx, Uri.parse(articleUrl), nightMode);
+					dismiss();
 				})
 				.create();
 		items.add(wikiArticleOnlineItem);

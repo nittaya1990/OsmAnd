@@ -1,5 +1,7 @@
 package net.osmand.plus.settings.fragments;
 
+import static net.osmand.plus.settings.backend.backup.items.FileSettingsItem.FileSubtype;
+
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -10,31 +12,33 @@ import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
-import net.osmand.AndroidUtils;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
 import net.osmand.map.ITileSource;
-import net.osmand.plus.FavouritesDbHelper.FavoriteGroup;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
-import net.osmand.plus.audionotes.AudioVideoNotesPlugin;
-import net.osmand.plus.audionotes.AudioVideoNotesPlugin.Recording;
-import net.osmand.plus.helpers.AvoidSpecificRoads.AvoidRoadInfo;
+import net.osmand.plus.avoidroads.AvoidRoadInfo;
+import net.osmand.plus.helpers.ColorsPaletteUtils;
 import net.osmand.plus.helpers.FileNameTranslationHelper;
-import net.osmand.plus.helpers.GpxUiHelper;
 import net.osmand.plus.helpers.SearchHistoryHelper.HistoryEntry;
 import net.osmand.plus.mapmarkers.ItineraryType;
 import net.osmand.plus.mapmarkers.MapMarker;
 import net.osmand.plus.mapmarkers.MapMarkersGroup;
+import net.osmand.plus.myplaces.favorites.FavoriteGroup;
 import net.osmand.plus.onlinerouting.engine.OnlineRoutingEngine;
+import net.osmand.plus.plugins.audionotes.AudioVideoNotesPlugin;
+import net.osmand.plus.plugins.audionotes.AudioVideoNotesPlugin.Recording;
 import net.osmand.plus.poi.PoiUIFilter;
 import net.osmand.plus.profiles.ProfileIconColors;
-import net.osmand.plus.profiles.data.RoutingDataObject.RoutingProfilesResources;
-import net.osmand.plus.quickaction.QuickAction;
+import net.osmand.plus.profiles.data.RoutingProfilesResources;
 import net.osmand.plus.render.RenderingIcons;
 import net.osmand.plus.settings.backend.ApplicationMode;
-import net.osmand.plus.settings.backend.ApplicationMode.ApplicationModeBean;
+import net.osmand.plus.settings.backend.ApplicationModeBean;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.utils.UiUtilities;
+import net.osmand.plus.views.mapwidgets.configure.buttons.QuickActionButtonState;
+import net.osmand.shared.gpx.GpxHelper;
 import net.osmand.util.Algorithms;
 
 import org.apache.commons.logging.Log;
@@ -42,19 +46,17 @@ import org.apache.commons.logging.Log;
 import java.io.File;
 import java.util.List;
 
-import static net.osmand.plus.settings.backend.backup.items.FileSettingsItem.FileSubtype;
-
 public class DuplicatesSettingsAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
 	private static final Log LOG = PlatformUtil.getLog(DuplicatesSettingsAdapter.class.getName());
 	private static final int HEADER_TYPE = 0;
 	private static final int ITEM_TYPE = 1;
 
-	private boolean nightMode;
-	private OsmandApplication app;
-	private UiUtilities uiUtilities;
-	private List<? super Object> items;
-	private int activeColorRes;
+	private final boolean nightMode;
+	private final OsmandApplication app;
+	private final UiUtilities uiUtilities;
+	private final List<? super Object> items;
+	private final int activeColorRes;
 
 	DuplicatesSettingsAdapter(OsmandApplication app, List<? super Object> items, boolean nightMode) {
 		this.app = app;
@@ -128,10 +130,10 @@ public class DuplicatesSettingsAdapter extends RecyclerView.Adapter<RecyclerView
 				int actualIconColor = customIconColor != null ?
 						customIconColor : ContextCompat.getColor(app, iconColor.getColor(nightMode));
 				itemHolder.icon.setImageDrawable(uiUtilities.getPaintedIcon(profileIconRes, actualIconColor));
-			} else if (currentItem instanceof QuickAction) {
-				QuickAction action = (QuickAction) currentItem;
-				itemHolder.title.setText(action.getName(app));
-				itemHolder.icon.setImageDrawable(uiUtilities.getIcon(action.getIconRes(), activeColorRes));
+			} else if (currentItem instanceof QuickActionButtonState) {
+				QuickActionButtonState buttonState = (QuickActionButtonState) currentItem;
+				itemHolder.title.setText(buttonState.getName());
+				itemHolder.icon.setImageDrawable(buttonState.getIcon(ColorUtilities.getColor(app, activeColorRes), nightMode, false));
 			} else if (currentItem instanceof PoiUIFilter) {
 				PoiUIFilter filter = (PoiUIFilter) currentItem;
 				itemHolder.title.setText(filter.getName());
@@ -149,7 +151,7 @@ public class DuplicatesSettingsAdapter extends RecyclerView.Adapter<RecyclerView
 				} else if (file.getAbsolutePath().contains(IndexConstants.ROUTING_PROFILES_DIR)) {
 					itemHolder.icon.setImageDrawable(uiUtilities.getIcon(R.drawable.ic_action_route_distance, activeColorRes));
 				} else if (file.getAbsolutePath().contains(IndexConstants.GPX_INDEX_DIR)) {
-					itemHolder.title.setText(GpxUiHelper.getGpxTitle(file.getName()));
+					itemHolder.title.setText(GpxHelper.INSTANCE.getGpxTitle(file.getName()));
 					itemHolder.icon.setImageDrawable(uiUtilities.getIcon(R.drawable.ic_action_route_distance, activeColorRes));
 				} else if (file.getAbsolutePath().contains(IndexConstants.AV_INDEX_DIR)) {
 					int iconId = AudioVideoNotesPlugin.getIconIdForRecordingFile(file);
@@ -158,6 +160,12 @@ public class DuplicatesSettingsAdapter extends RecyclerView.Adapter<RecyclerView
 					}
 					itemHolder.title.setText(new Recording(file).getName(app, true));
 					itemHolder.icon.setImageDrawable(uiUtilities.getIcon(iconId, activeColorRes));
+				} else if (fileSubtype == FileSubtype.FAVORITES_BACKUP) {
+					itemHolder.icon.setImageDrawable(uiUtilities.getIcon(R.drawable.ic_action_folder_favorites, activeColorRes));
+				} else if (fileSubtype == FileSubtype.COLOR_PALETTE) {
+					itemHolder.icon.setImageDrawable(uiUtilities.getIcon(fileSubtype.getIconId(), activeColorRes));
+					itemHolder.title.setText(ColorsPaletteUtils.getPaletteName(file));
+					itemHolder.subTitle.setText(ColorsPaletteUtils.getPaletteTypeName(app, file));
 				} else if (fileSubtype.isMap()
 						|| fileSubtype == FileSubtype.TTS_VOICE
 						|| fileSubtype == FileSubtype.VOICE) {
@@ -165,7 +173,7 @@ public class DuplicatesSettingsAdapter extends RecyclerView.Adapter<RecyclerView
 					itemHolder.icon.setImageDrawable(uiUtilities.getIcon(fileSubtype.getIconId(), activeColorRes));
 				}
 			} else if (currentItem instanceof AvoidRoadInfo) {
-				itemHolder.title.setText(((AvoidRoadInfo) currentItem).name);
+				itemHolder.title.setText(((AvoidRoadInfo) currentItem).getName(app));
 				itemHolder.icon.setImageDrawable(app.getUIUtilities().getIcon(R.drawable.ic_action_alert, activeColorRes));
 			} else if (currentItem instanceof FavoriteGroup) {
 				itemHolder.title.setText(((FavoriteGroup) currentItem).getDisplayName(app));

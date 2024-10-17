@@ -1,560 +1,412 @@
 package net.osmand.plus.views.layers;
 
-import android.animation.Animator;
-import android.animation.AnimatorListenerAdapter;
-import android.animation.AnimatorSet;
-import android.animation.ObjectAnimator;
+import static android.view.Gravity.BOTTOM;
+import static android.view.Gravity.END;
+import static android.view.ViewGroup.LayoutParams.WRAP_CONTENT;
+
 import android.annotation.SuppressLint;
 import android.content.Context;
 import android.graphics.Canvas;
 import android.graphics.PointF;
-import android.os.Build;
-import android.os.Vibrator;
-import android.view.MotionEvent;
+import android.view.LayoutInflater;
 import android.view.View;
-import android.view.ViewAnimationUtils;
+import android.view.ViewGroup;
 import android.widget.FrameLayout;
-import android.widget.ImageButton;
 import android.widget.ImageView;
 
-import androidx.annotation.DimenRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.content.res.AppCompatResources;
-import androidx.core.util.Pair;
 
-import com.getkeepsafe.taptargetview.TapTarget;
-import com.getkeepsafe.taptargetview.TapTargetView;
-
-import net.osmand.AndroidUtils;
+import net.osmand.core.android.MapRendererView;
 import net.osmand.data.LatLon;
 import net.osmand.data.RotatedTileBox;
-import net.osmand.plus.ColorUtilities;
 import net.osmand.plus.OsmAndLocationProvider;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.helpers.AndroidUiHelper;
+import net.osmand.plus.helpers.MapDisplayPositionManager;
+import net.osmand.plus.helpers.MapDisplayPositionManager.IMapDisplayPositionProvider;
 import net.osmand.plus.mapcontextmenu.MapContextMenu;
+import net.osmand.plus.quickaction.MapButtonsHelper;
+import net.osmand.plus.quickaction.MapButtonsHelper.QuickActionUpdatesListener;
 import net.osmand.plus.quickaction.QuickAction;
 import net.osmand.plus.quickaction.QuickAction.QuickActionSelectionListener;
-import net.osmand.plus.quickaction.QuickActionRegistry;
-import net.osmand.plus.quickaction.QuickActionRegistry.QuickActionUpdatesListener;
 import net.osmand.plus.quickaction.QuickActionsWidget;
 import net.osmand.plus.settings.backend.OsmandSettings;
-import net.osmand.plus.views.OsmandMapLayer;
+import net.osmand.plus.settings.enums.MapPosition;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.NativeUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.views.OsmandMapTileView;
+import net.osmand.plus.views.controls.maphudbuttons.QuickActionButton;
+import net.osmand.plus.views.layers.base.OsmandMapLayer;
+import net.osmand.plus.views.mapwidgets.configure.buttons.QuickActionButtonState;
+import net.osmand.util.Algorithms;
 
 import java.util.ArrayList;
 import java.util.List;
-
-import static net.osmand.plus.views.layers.ContextMenuLayer.VIBRATE_SHORT;
+import java.util.Objects;
 
 /**
  * Created by okorsun on 23.12.16.
  */
 
-public class MapQuickActionLayer extends OsmandMapLayer implements QuickActionUpdatesListener, QuickActionSelectionListener {
+public class MapQuickActionLayer extends OsmandMapLayer implements QuickActionUpdatesListener,
+		QuickActionSelectionListener, IMapDisplayPositionProvider {
 
-    private ImageView contextMarker;
-    private final OsmandApplication app;
-    private final OsmandSettings settings;
-    private final QuickActionRegistry quickActionRegistry;
+	private ImageView contextMarker;
+	private final OsmandApplication app;
+	private final OsmandSettings settings;
+	private final MapButtonsHelper mapButtonsHelper;
 
-    private ImageButton quickActionButton;
-    private QuickActionsWidget quickActionsWidget;
+	private List<QuickActionButton> actionButtons = new ArrayList<>();
+	private List<QuickActionButtonState> mapButtonStates = new ArrayList<>();
+	private QuickActionButton selectedButton;
+	private QuickActionsWidget quickActionsWidget;
 
-    private OsmandMapTileView view;
-    private boolean wasCollapseButtonVisible;
-    private int previousMapPosition;
+	private MapPosition previousMapPosition;
 
-    private boolean inMovingMarkerMode;
-    private boolean isLayerOn;
+	private boolean isLayerOn;
+	private boolean inMovingMarkerMode;
+	private Boolean currentWidgetState;
 
-    private boolean nightMode;
-    private Boolean currentWidgetState;
+	public MapQuickActionLayer(@NonNull Context context) {
+		super(context);
+		app = getApplication();
+		settings = app.getSettings();
+		mapButtonsHelper = app.getMapButtonsHelper();
+	}
 
-    public MapQuickActionLayer(@NonNull Context context) {
-        super(context);
-        app = getApplication();
-        settings = app.getSettings();
-        quickActionRegistry = app.getQuickActionRegistry();
-    }
+	@Override
+	public void initLayer(@NonNull OsmandMapTileView view) {
+		super.initLayer(view);
+		createContextMarker();
+	}
 
-    @Override
-    public void initLayer(@NonNull OsmandMapTileView view) {
-        this.view = view;
+	private void createContextMarker() {
+		Context context = AndroidUtils.createDisplayContext(getContext());
+		contextMarker = new ImageView(context);
+		contextMarker.setLayoutParams(new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT));
+		contextMarker.setImageDrawable(AppCompatResources.getDrawable(context, R.drawable.map_pin_context_menu));
+		contextMarker.setClickable(true);
+		int width = contextMarker.getDrawable().getMinimumWidth();
+		int height = contextMarker.getDrawable().getMinimumHeight();
+		contextMarker.layout(0, 0, width, height);
+	}
 
-        Context context = view.getContext();
-        contextMarker = new ImageView(context);
-        contextMarker.setLayoutParams(new FrameLayout.LayoutParams(FrameLayout.LayoutParams.WRAP_CONTENT, FrameLayout.LayoutParams.WRAP_CONTENT));
-        contextMarker.setImageDrawable(AppCompatResources.getDrawable(context, R.drawable.map_pin_context_menu));
-        contextMarker.setClickable(true);
-        int minw = contextMarker.getDrawable().getMinimumWidth();
-        int minh = contextMarker.getDrawable().getMinimumHeight();
-        contextMarker.layout(0, 0, minw, minh);
-    }
+	@Override
+	protected void updateResources() {
+		super.updateResources();
+		createContextMarker();
+	}
 
-    @SuppressLint("ClickableViewAccessibility")
-    @Override
-    public void setMapActivity(@Nullable MapActivity mapActivity) {
-        super.setMapActivity(mapActivity);
-        if (mapActivity != null) {
-            quickActionsWidget = mapActivity.findViewById(R.id.quick_action_widget);
-            quickActionButton = mapActivity.findViewById(R.id.map_quick_actions_button);
-            setQuickActionButtonMargin();
-            isLayerOn = quickActionRegistry.isQuickActionOn();
-            nightMode = app.getDaynightHelper().isNightMode();
-            updateQuickActionButton(false);
-            quickActionButton.setContentDescription(getString(R.string.configure_screen_quick_action));
-            quickActionButton.setOnClickListener(v -> {
-                mapActivity.dismissCardDialog();
-                if (!showTutorialIfNeeded()) {
-                    setLayerState(!isWidgetVisible());
-                }
-            });
-            quickActionButton.setOnLongClickListener(v -> {
-                Vibrator vibrator = (Vibrator) mapActivity.getSystemService(Context.VIBRATOR_SERVICE);
-                vibrator.vibrate(VIBRATE_SHORT);
-                quickActionButton.setScaleX(1.5f);
-                quickActionButton.setScaleY(1.5f);
-                quickActionButton.setAlpha(0.95f);
-                quickActionButton.setOnTouchListener(onQuickActionTouchListener);
-                return true;
-            });
-        } else {
-            quickActionsWidget = null;
-            quickActionButton = null;
-        }
-    }
+	@SuppressLint("ClickableViewAccessibility")
+	@Override
+	public void setMapActivity(@Nullable MapActivity mapActivity) {
+		super.setMapActivity(mapActivity);
+		if (mapActivity != null) {
+			updateButtons();
+			isLayerOn = mapButtonsHelper.hasEnabledButtons();
+			quickActionsWidget = mapActivity.findViewById(R.id.quick_action_widget);
+		} else {
+			quickActionsWidget = null;
+			actionButtons = new ArrayList<>();
+		}
+	}
 
-    public void refreshLayer() {
-        setLayerState(false);
-        isLayerOn = quickActionRegistry.isQuickActionOn();
-        setupQuickActionBtnVisibility();
-        if (isLayerOn) {
-            setQuickActionButtonMargin();
-        }
-    }
+	private void updateButtons() {
+		MapActivity activity = getMapActivity();
+		if (activity != null) {
+			boolean nightMode = app.getDaynightHelper().isNightMode();
+			LayoutInflater inflater = UiUtilities.getInflater(activity, nightMode);
+			ViewGroup container = activity.findViewById(R.id.MapHudButtonsOverlay);
+			for (QuickActionButton button : actionButtons) {
+				container.removeView(button);
+			}
 
-    private boolean showTutorialIfNeeded() {
-        MapActivity mapActivity = getMapActivity();
-        if (mapActivity != null && isLayerOn && !app.accessibilityEnabled()
-                && !settings.IS_QUICK_ACTION_TUTORIAL_SHOWN.get()) {
-            TapTargetView.showFor(mapActivity,                 // `this` is an Activity
-                    TapTarget.forView(quickActionButton, getString(R.string.quick_action_btn_tutorial_title), getString(R.string.quick_action_btn_tutorial_descr))
-                            // All options below are optional
-                            .outerCircleColor(R.color.osmand_orange)      // Specify a color for the outer circle
-                            .targetCircleColor(R.color.color_white)   // Specify a color for the target circle
-                            .titleTextSize(20)                  // Specify the size (in sp) of the title text
-                            .descriptionTextSize(16)            // Specify the size (in sp) of the description text
-                            .descriptionTextColor(R.color.color_white)            // Specify a color for both the title and description text
-                            .titleTextColor(R.color.color_white)            // Specify a color for both the title and description text
-                            .drawShadow(true)                   // Whether to draw a drop shadow or not
-                            .cancelable(false)                  // Whether tapping outside the outer circle dismisses the view
-                            .tintTarget(false)                   // Whether to tint the target view's color
-                            .transparentTarget(false)           // Specify whether the target is transparent (displays the content underneath)
-                            .targetRadius(50),                  // Specify the target radius (in dp)
-                    new TapTargetView.Listener() {          // The listener can listen for regular clicks, long clicks or cancels
-                        @Override
-                        public void onTargetClick(TapTargetView view) {
-                            super.onTargetClick(view);      // This call is optional
-                            settings.IS_QUICK_ACTION_TUTORIAL_SHOWN.set(true);
-                        }
-                    });
-            return true;
-        } else
-            return false;
-    }
+			List<QuickActionButton> buttons = new ArrayList<>();
+			List<QuickActionButtonState> buttonStates = mapButtonsHelper.getButtonsStates();
+			for (QuickActionButtonState state : buttonStates) {
+				QuickActionButton button = (QuickActionButton) inflater.inflate(R.layout.map_quick_actions_button, container, false);
+				button.setButtonState(state);
+				button.setMapActivity(activity);
+				button.setUseCustomPosition(true);
 
-    private void setQuickActionButtonMargin() {
-        MapActivity mapActivity = getMapActivity();
-        if (mapActivity != null) {
-            int defRightMargin = calculateTotalSizePx(R.dimen.map_button_size, R.dimen.map_button_spacing_land) * 2;
-            int defBottomMargin = calculateTotalSizePx(R.dimen.map_button_size, R.dimen.map_button_spacing) * 2;
-            FrameLayout.LayoutParams param = (FrameLayout.LayoutParams) quickActionButton.getLayoutParams();
-            if (AndroidUiHelper.isOrientationPortrait(mapActivity)) {
-                Pair<Integer, Integer> fabMargin = settings.getPortraitFabMargin();
-                setQuickActionButtonMargin(param, fabMargin, 0, defBottomMargin);
-            } else {
-                Pair<Integer, Integer> fabMargin = settings.getLandscapeFabMargin();
-                setQuickActionButtonMargin(param, fabMargin, defRightMargin, 0);
-            }
-        }
-    }
+				container.addView(button, new FrameLayout.LayoutParams(WRAP_CONTENT, WRAP_CONTENT, BOTTOM | END));
+				buttons.add(button);
+			}
+			actionButtons = buttons;
+			mapButtonStates = buttonStates;
+		}
+	}
 
-    private void setQuickActionButtonMargin(FrameLayout.LayoutParams params,
-                                            Pair<Integer, Integer> fabMargin,
-                                            int defRightMargin, int defBottomMargin) {
-        MapActivity mapActivity = getMapActivity();
-        if (mapActivity == null) {
-            return;
-        }
-        int screenHeight = AndroidUtils.getScreenHeight(mapActivity);
-        int screenWidth = AndroidUtils.getScreenWidth(mapActivity);
-        int btnHeight = quickActionButton.getHeight();
-        int btnWidth = quickActionButton.getWidth();
-        int rightMargin;
-        int bottomMargin;
-        if (fabMargin != null) {
-            rightMargin = fabMargin.first;
-            bottomMargin = fabMargin.second;
-            if (rightMargin < 0 || rightMargin > screenWidth - btnWidth) {
-                rightMargin = defRightMargin;
-            }
-            if (bottomMargin < 0 || bottomMargin > screenHeight - btnHeight) {
-                bottomMargin = defBottomMargin;
-            }
-        } else {
-            rightMargin = defRightMargin;
-            bottomMargin = defBottomMargin;
-        }
-        params.rightMargin = rightMargin;
-        params.bottomMargin = bottomMargin;
-        quickActionButton.setLayoutParams(params);
-    }
+	@NonNull
+	public List<QuickActionButton> getActionButtons() {
+		return actionButtons;
+	}
 
-    private int calculateTotalSizePx(@DimenRes int... dimensId) {
-        int result = 0;
-        for (int id : dimensId) {
-            result += app.getResources().getDimensionPixelSize(id);
-        }
-        return result;
-    }
+	public void refreshLayer() {
+		setSelectedButton(null);
+		isLayerOn = mapButtonsHelper.hasEnabledButtons();
+
+		for (QuickActionButton button : actionButtons) {
+			button.update();
+			if (isLayerOn) {
+				button.updateMargins();
+			}
+		}
+	}
+
+	@Nullable
+	public QuickActionButton getSelectedButton() {
+		return selectedButton;
+	}
 
 	public boolean isWidgetVisible() {
 		return quickActionsWidget != null && quickActionsWidget.getVisibility() == View.VISIBLE;
 	}
 
-	/**
-	 * @param showWidget
-	 * @return true, if state was changed
-	 */
-	public boolean setLayerState(boolean showWidget) {
-        MapActivity mapActivity = getMapActivity();
-        if (mapActivity == null) {
-            return false;
-        }
+	public boolean isWidgetVisibleForButton(@NonNull QuickActionButton button) {
+		return isWidgetVisibleForButton(button.getButtonId());
+	}
+
+	public boolean isWidgetVisibleForButton(@NonNull String buttonId) {
+		return isWidgetVisible() && selectedButton != null
+				&& Algorithms.stringsEqual(selectedButton.getButtonId(), buttonId);
+	}
+
+	public boolean setSelectedButton(@Nullable QuickActionButton button) {
+		boolean visible = button != null;
+		MapActivity mapActivity = getMapActivity();
 		// check if state change is needed
-		if (currentWidgetState != null && currentWidgetState == showWidget || isWidgetVisible() == showWidget) {
+		boolean buttonChanged = selectedButton != button;
+		boolean modeEnabled = currentWidgetState != null && currentWidgetState || isWidgetVisible();
+		boolean modeDisabled = currentWidgetState == null || !currentWidgetState || !isWidgetVisible();
+		if (mapActivity == null || modeEnabled == visible && modeDisabled == !visible && !buttonChanged) {
 			return false;
 		}
-		currentWidgetState = showWidget;
+		selectedButton = button;
+		currentWidgetState = visible;
 
-		updateQuickActionButton(showWidget);
-		if (settings.DO_NOT_USE_ANIMATIONS.get()) {
-			quickActionsWidget.setVisibility(!showWidget ? View.GONE : View.VISIBLE);
+		for (QuickActionButton actionButton : actionButtons) {
+			updateButton(actionButton, true);
+		}
+		if (visible) {
+			enterMovingMode(mapActivity.getMapView().getCurrentRotatedTileBox());
+			quickActionsWidget.setSelectedButton(button);
+			mapButtonsHelper.addUpdatesListener(this);
+			quickActionsWidget.setSelectionListener(this);
 		} else {
-			animateWidget(showWidget);
+			quitMovingMarker();
+			mapButtonsHelper.removeUpdatesListener(this);
+			quickActionsWidget.setSelectionListener(null);
+		}
+		if (settings.DO_NOT_USE_ANIMATIONS.get() || !quickActionsWidget.isAttachedToWindow()) {
+			AndroidUiHelper.updateVisibility(quickActionsWidget, visible);
+		} else {
+			animateWidget(visible);
 		}
 		mapActivity.updateStatusBarColor();
 
-		if (!showWidget) {
-		    quitMovingMarker();
-		    quickActionRegistry.setUpdatesListener(null);
-		    quickActionsWidget.setSelectionListener(null);
-		} else {
-		    enterMovingMode(mapActivity.getMapView().getCurrentRotatedTileBox());
-		    quickActionsWidget.setActions(quickActionRegistry.getFilteredQuickActions());
-		    quickActionRegistry.setUpdatesListener(MapQuickActionLayer.this);
-		    quickActionsWidget.setSelectionListener(MapQuickActionLayer.this);
-		}
 		return true;
 	}
 
-    private void animateWidget(final boolean show) {
-	    if (quickActionsWidget == null) {
-	        return;
-        }
-        AnimatorSet set = new AnimatorSet();
-        List<Animator> animators = new ArrayList<>();
-        int[] animationCoordinates = AndroidUtils.getCenterViewCoordinates(quickActionButton);
-        int centerX = quickActionsWidget.getWidth() / 2;
-        int centerY = quickActionsWidget.getHeight() / 2;
-        float initialValueX = show ? animationCoordinates[0] - centerX : 0;
-        float finalValueX = show ? 0 : animationCoordinates[0] - centerX;
-        float initialValueY = show ? animationCoordinates[1] - centerY : 0;
-        float finalValueY = show ? 0 : animationCoordinates[1] - centerY;
-        animators.add(ObjectAnimator.ofFloat(quickActionsWidget, View.TRANSLATION_X, initialValueX, finalValueX));
-        animators.add(ObjectAnimator.ofFloat(quickActionsWidget, View.TRANSLATION_Y, initialValueY, finalValueY));
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
-            float initialRadius = show ? 0 : (float) Math.sqrt(Math.pow(quickActionsWidget.getWidth() / 2, 2) + Math.pow(quickActionsWidget.getHeight() / 2, 2));
-            float finalRadius = show ? (float) Math.sqrt(Math.pow(quickActionsWidget.getWidth() / 2, 2) + Math.pow(quickActionsWidget.getHeight() / 2, 2)) : 0;
-            Animator circleAnimator = ViewAnimationUtils.createCircularReveal(quickActionsWidget, centerX, centerY, initialRadius, finalRadius);
-            animators.add(circleAnimator);
-        }
-        float initialValueScale = show ? 0f : 1f;
-        float finalValueScale = show ? 1f : 0f;
-        animators.add(ObjectAnimator.ofFloat(quickActionsWidget, View.SCALE_X, initialValueScale, finalValueScale));
-        animators.add(ObjectAnimator.ofFloat(quickActionsWidget, View.SCALE_Y, initialValueScale, finalValueScale));
-        set.setDuration(300).playTogether(animators);
-        set.addListener(new AnimatorListenerAdapter() {
-            @Override
-            public void onAnimationStart(Animator animation) {
-                super.onAnimationStart(animation);
-                if (show) {
-                    quickActionsWidget.setVisibility(View.VISIBLE);
-                }
-            }
-
-            @Override
-            public void onAnimationEnd(Animator animation) {
-                super.onAnimationEnd(animation);
-                if (!show) {
-                    quickActionsWidget.setVisibility(View.GONE);
-                    quickActionsWidget.setTranslationX(0);
-                    quickActionsWidget.setTranslationY(0);
-                }
-            }
-        });
-        set.start();
-    }
-
-	private void updateQuickActionButton(boolean widgetVisible) {
-	    if (quickActionButton != null) {
-            quickActionButton.setBackgroundResource(nightMode ? R.drawable.btn_circle_night : R.drawable.btn_circle_trans);
-            int iconId = !widgetVisible ? R.drawable.ic_quick_action : R.drawable.ic_action_close;
-            int colorId = ColorUtilities.getMapButtonIconColorId(nightMode);
-            setMapButtonIcon(quickActionButton, app.getUIUtilities().getIcon(iconId, colorId));
-            quickActionButton.setContentDescription(getString(!widgetVisible ? R.string.configure_screen_quick_action : R.string.shared_string_cancel));
-        }
+	private void animateWidget(boolean show) {
+		if (quickActionsWidget != null) {
+			quickActionsWidget.animateWidget(show);
+		}
 	}
 
-    private void enterMovingMode(RotatedTileBox tileBox) {
-        MapActivity mapActivity = getMapActivity();
-        if (mapActivity == null) {
-            return;
-        }
-        previousMapPosition = view.getMapPosition();
-        view.setMapPosition(OsmandSettings.MIDDLE_BOTTOM_CONSTANT);
-        MapContextMenu menu = mapActivity.getContextMenu();
+	private void enterMovingMode(RotatedTileBox tileBox) {
+		MapActivity mapActivity = getMapActivity();
+		if (mapActivity == null) {
+			return;
+		}
+		previousMapPosition = mapActivity.getMapPositionManager().getNavigationMapPosition();
+		MapContextMenu menu = mapActivity.getContextMenu();
 
-        LatLon ll = menu.isActive() && tileBox.containsLatLon(menu.getLatLon()) ? menu.getLatLon() : tileBox.getCenterLatLon();
-        boolean isFollowPoint = isFolowPoint(tileBox, menu);
+		LatLon ll = menu.isActive() && NativeUtilities.containsLatLon(getMapRenderer(), tileBox, menu.getLatLon())
+				? menu.getLatLon() : tileBox.getCenterLatLon();
+		boolean isFollowPoint = isFollowPoint(tileBox, menu);
 
-        menu.updateMapCenter(null);
-        menu.close();
+		menu.updateMapCenter(null);
+		menu.close();
 
-        RotatedTileBox rb = new RotatedTileBox(tileBox);
-        if (!isFollowPoint && previousMapPosition != OsmandSettings.BOTTOM_CONSTANT)
-            rb.setCenterLocation(0.5f, 0.3f);
+		RotatedTileBox rb = new RotatedTileBox(tileBox);
+		if (!isFollowPoint && previousMapPosition != MapPosition.BOTTOM)
+			rb.setCenterLocation(0.5f, 0.3f);
 
-        rb.setLatLonCenter(ll.getLatitude(), ll.getLongitude());
-        double lat = rb.getLatFromPixel(tileBox.getCenterPixelX(), tileBox.getCenterPixelY());
-        double lon = rb.getLonFromPixel(tileBox.getCenterPixelX(), tileBox.getCenterPixelY());
-        view.setLatLon(lat, lon);
+		rb.setLatLonCenter(ll.getLatitude(), ll.getLongitude());
 
-        inMovingMarkerMode = true;
-        AndroidUiHelper.setVisibility(mapActivity, View.INVISIBLE, R.id.map_ruler_layout,
-                R.id.map_left_widgets_panel, R.id.map_right_widgets_panel, R.id.map_center_info);
+		MapRendererView mapRenderer = view.getMapRenderer();
+		if (mapRenderer != null) {
+			if (!isFollowPoint) {
+				view.setLatLon(ll.getLatitude(), ll.getLongitude());
+			}
+		} else {
+			double lat = rb.getLatFromPixel(tileBox.getCenterPixelX(), tileBox.getCenterPixelY());
+			double lon = rb.getLonFromPixel(tileBox.getCenterPixelX(), tileBox.getCenterPixelY());
+			view.setLatLon(lat, lon);
+		}
+		inMovingMarkerMode = true;
+		AndroidUiHelper.setVisibility(mapActivity, View.INVISIBLE, R.id.map_ruler_layout, R.id.map_center_info);
+		AndroidUiHelper.setVisibility(mapActivity, View.GONE, R.id.map_left_widgets_panel, R.id.map_right_widgets_panel);
+		updateMapDisplayPosition();
+		view.refreshMap();
+	}
 
-        View collapseButton = mapActivity.findViewById(R.id.map_collapse_button);
-        if (collapseButton != null && collapseButton.getVisibility() == View.VISIBLE) {
-            wasCollapseButtonVisible = true;
-            collapseButton.setVisibility(View.INVISIBLE);
-        } else {
-            wasCollapseButtonVisible = false;
-        }
+	private void quitMovingMarker() {
+		MapActivity mapActivity = getMapActivity();
+		if (mapActivity == null) {
+			return;
+		}
+		RotatedTileBox tileBox = mapActivity.getMapView().getCurrentRotatedTileBox();
+		if (!isFollowPoint(tileBox, mapActivity.getContextMenu()) && previousMapPosition != MapPosition.BOTTOM) {
+			RotatedTileBox rb = tileBox.copy();
+			rb.setCenterLocation(0.5f, 0.5f);
+			LatLon ll = tileBox.getCenterLatLon();
+			MapRendererView mapRenderer = view.getMapRenderer();
+			if (mapRenderer != null) {
+				NativeUtilities.calculateTarget31(mapRenderer, ll.getLatitude(), ll.getLongitude(), true);
+			} else {
+				rb.setLatLonCenter(ll.getLatitude(), ll.getLongitude());
+				double lat = tileBox.getLatFromPixel(rb.getCenterPixelX(), rb.getCenterPixelY());
+				double lon = tileBox.getLonFromPixel(rb.getCenterPixelX(), rb.getCenterPixelY());
+				view.setLatLon(lat, lon);
+			}
+		}
+		inMovingMarkerMode = false;
+		AndroidUiHelper.setVisibility(mapActivity, View.VISIBLE,
+				R.id.map_ruler_layout, R.id.map_left_widgets_panel,
+				R.id.map_right_widgets_panel, R.id.map_center_info);
+		updateMapDisplayPosition();
+		view.refreshMap();
+	}
 
-        view.refreshMap();
-    }
+	private boolean isFollowPoint(RotatedTileBox tileBox, MapContextMenu menu) {
+		return OsmAndLocationProvider.isLocationPermissionAvailable(getContext()) &&
+				app.getMapViewTrackingUtilities().isMapLinkedToLocation() ||
+				menu.isActive() && NativeUtilities.containsLatLon(getMapRenderer(), tileBox, menu.getLatLon());  // remove if not to follow if there is selected point on map
+	}
 
-    private boolean isFolowPoint(RotatedTileBox tileBox, MapContextMenu menu) {
-        return OsmAndLocationProvider.isLocationPermissionAvailable(getContext()) &&
-                app.getMapViewTrackingUtilities().isMapLinkedToLocation() ||
-                menu.isActive() && tileBox.containsLatLon(menu.getLatLon());  // remove if not to folow if there is selected point on map
-    }
+	private void updateMapDisplayPosition() {
+		MapDisplayPositionManager manager = app.getMapViewTrackingUtilities().getMapDisplayPositionManager();
+		manager.updateMapPositionProviders(this, inMovingMarkerMode);
+		manager.updateMapDisplayPosition();
+	}
 
-    private void quitMovingMarker() {
-        MapActivity mapActivity = getMapActivity();
-        if (mapActivity == null) {
-            return;
-        }
-        RotatedTileBox tileBox = mapActivity.getMapView().getCurrentRotatedTileBox();
-        if (!isFolowPoint(tileBox, mapActivity.getContextMenu()) && previousMapPosition != OsmandSettings.BOTTOM_CONSTANT){
-            RotatedTileBox rb = tileBox.copy();
-            rb.setCenterLocation(0.5f, 0.5f);
-            LatLon ll = tileBox.getCenterLatLon();
-            rb.setLatLonCenter(ll.getLatitude(), ll.getLongitude());
-            double lat = tileBox.getLatFromPixel(rb.getCenterPixelX(), rb.getCenterPixelY());
-            double lon = tileBox.getLonFromPixel(rb.getCenterPixelX(), rb.getCenterPixelY());
-            view.setLatLon(lat, lon);
-        }
-        int currentPosition = view.getMapPosition();
-        if (currentPosition == OsmandSettings.MIDDLE_BOTTOM_CONSTANT) {
-            view.setMapPosition(previousMapPosition);
-        }
+	@Nullable
+	@Override
+	public MapPosition getMapDisplayPosition() {
+		if (inMovingMarkerMode) {
+			return MapPosition.MIDDLE_BOTTOM;
+		}
+		return null;
+	}
 
-        inMovingMarkerMode = false;
-        AndroidUiHelper.setVisibility(mapActivity, View.VISIBLE, R.id.map_ruler_layout,
-                R.id.map_left_widgets_panel, R.id.map_right_widgets_panel, R.id.map_center_info);
+	@Override
+	public boolean onSingleTap(@NonNull PointF point, @NonNull RotatedTileBox tileBox) {
+		if (isInMovingMarkerMode() && !pressedQuickActionWidget(point.x, point.y)) {
+			setSelectedButton(null);
+			return true;
+		}
+		return false;
+	}
 
-        View collapseButton = mapActivity.findViewById(R.id.map_collapse_button);
-        if (collapseButton != null && wasCollapseButtonVisible) {
-            collapseButton.setVisibility(View.VISIBLE);
-        }
-        view.refreshMap();
-    }
-
-    @Override
-    public boolean onSingleTap(PointF point, RotatedTileBox tileBox) {
-        if (isInMovingMarkerMode() && !pressedQuickActionWidget(point.x, point.y)) {
-            setLayerState(false);
-            return true;
-        } else
-            return false;
-    }
-
-    private boolean pressedQuickActionWidget(float px, float py) {
-        return quickActionsWidget != null && py <= quickActionsWidget.getHeight();
-    }
+	private boolean pressedQuickActionWidget(float px, float py) {
+		return quickActionsWidget != null && py <= quickActionsWidget.getHeight();
+	}
 
 	@Override
 	public void onDraw(Canvas canvas, RotatedTileBox box, DrawSettings settings) {
-		boolean nightMode = app.getDaynightHelper().isNightMode();
 		if (isInMovingMarkerMode()) {
-			canvas.translate(box.getCenterPixelX() - contextMarker.getWidth() / 2, box.getCenterPixelY() - contextMarker.getHeight());
+			canvas.translate(box.getCenterPixelX() - contextMarker.getWidth() / 2f, box.getCenterPixelY() - contextMarker.getHeight());
 			contextMarker.draw(canvas);
 		}
-		if (this.nightMode != nightMode) {
-            this.nightMode = nightMode;
-            boolean widgetVisible = false;
-            if (currentWidgetState != null) {
-                widgetVisible = currentWidgetState;
-            }
-            updateQuickActionButton(widgetVisible);
-        }
-		setupQuickActionBtnVisibility();
+		if (mapButtonStates != mapButtonsHelper.getButtonsStates()) {
+			app.runInUIThread(this::updateButtons);
+		}
+		for (QuickActionButton button : actionButtons) {
+			updateButton(button, false);
+		}
 	}
 
-    private void setupQuickActionBtnVisibility() {
-        MapActivity mapActivity = getMapActivity();
-        if (mapActivity != null) {
-            boolean visible = mapActivity.getWidgetsVisibilityHelper().shouldShowQuickActionButton();
-            quickActionButton.setVisibility(visible ? View.VISIBLE : View.GONE);
-        }
-    }
+	public boolean getCurrentWidgetState() {
+		return currentWidgetState != null ? currentWidgetState : false;
+	}
 
-    @Override
-    public void destroyLayer() {
+	@Override
+	public boolean drawInScreenPixels() {
+		return true;
+	}
 
-    }
+	public void invalidateRelatedButtons(@NonNull QuickActionButton trigger) {
+		for (QuickActionButton actionButton : getActionButtons()) {
+			if (isActionButtonsRelated(actionButton, trigger)) {
+				actionButton.setInvalidated(true);
+			}
+		}
+	}
 
-    @Override
-    public boolean drawInScreenPixels() {
-        return true;
-    }
+	private boolean isActionButtonsRelated(@NonNull QuickActionButton b1,
+	                                       @NonNull QuickActionButton b2) {
+		QuickActionButtonState s1 = b1.getButtonState();
+		QuickActionButtonState s2 = b2.getButtonState();
+		if (s1 != null && s2 != null) {
+			if (s1.isSingleAction() && s2.isSingleAction()) {
+				QuickAction a1 = s1.getQuickActions().get(0);
+				QuickAction a2 = s2.getQuickActions().get(0);
+				return Objects.equals(a1.getType(), a2.getType());
 
+				// There also can be types those have related UI elements and so should be
+				// updated at the same time. We should implement such functionality.
+				// For example, we can create a collection with nodes, each node is a list
+				// of action types that are related to each other.
+			} else {
+				return Objects.equals(s1.getId(), s2.getId());
+			}
+		}
+		return false;
+	}
 
-    @Override
-    public void onActionsUpdated() {
-	    if (quickActionsWidget != null) {
-            quickActionsWidget.setActions(quickActionRegistry.getFilteredQuickActions());
-        }
-    }
+	@Override
+	public void onActionsUpdated() {
+		if (quickActionsWidget != null) {
+			quickActionsWidget.updateActions();
+		}
+	}
 
-    @Override
-    public void onActionSelected(QuickAction action) {
-        MapActivity mapActivity = getMapActivity();
-        if (mapActivity != null) {
-            QuickActionRegistry.produceAction(action).execute(mapActivity);
-            setLayerState(false);
-        }
-    }
+	@Override
+	public void onActionSelected(@NonNull QuickActionButtonState buttonState, @NonNull QuickAction action) {
+		MapActivity mapActivity = getMapActivity();
+		if (mapActivity != null) {
+			MapButtonsHelper.produceAction(action).execute(mapActivity);
+			setSelectedButton(null);
+		}
+	}
 
-    public PointF getMovableCenterPoint(RotatedTileBox tb) {
-        return new PointF(tb.getPixWidth() / 2, tb.getPixHeight() / 2);
-    }
+	@NonNull
+	public PointF getMovableCenterPoint(@NonNull RotatedTileBox tb) {
+		return new PointF(tb.getPixWidth() / 2f, tb.getPixHeight() / 2f);
+	}
 
-    public boolean isInMovingMarkerMode() {
-        return isLayerOn && inMovingMarkerMode;
-    }
+	public boolean isInMovingMarkerMode() {
+		return isLayerOn && inMovingMarkerMode;
+	}
 
-    public boolean isLayerOn() {
-        return isLayerOn;
-    }
+	public boolean isLayerOn() {
+		return isLayerOn;
+	}
 
-    public boolean onBackPressed() {
-        return setLayerState(false);
-    }
+	public boolean onBackPressed() {
+		return setSelectedButton(null);
+	}
 
-    View.OnTouchListener onQuickActionTouchListener = new View.OnTouchListener() {
-        private int initialMarginX;
-        private int initialMarginY;
-        private float initialTouchX;
-        private float initialTouchY;
-
-        @SuppressLint("ClickableViewAccessibility")
-        @Override
-        public boolean onTouch(View v, MotionEvent event) {
-            MapActivity mapActivity = getMapActivity();
-            if (mapActivity == null) {
-                return false;
-            }
-            switch (event.getAction()) {
-                case MotionEvent.ACTION_DOWN:
-                    setUpInitialValues(v, event);
-                    return true;
-                case MotionEvent.ACTION_UP:
-                    quickActionButton.setOnTouchListener(null);
-                    quickActionButton.setPressed(false);
-                    quickActionButton.setScaleX(1);
-                    quickActionButton.setScaleY(1);
-                    quickActionButton.setAlpha(1f);
-                    FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) v.getLayoutParams();
-                    if (AndroidUiHelper.isOrientationPortrait(mapActivity))
-                        settings.setPortraitFabMargin(params.rightMargin, params.bottomMargin);
-                    else
-                        settings.setLandscapeFabMargin(params.rightMargin, params.bottomMargin);
-                    return true;
-                case MotionEvent.ACTION_MOVE:
-                    if (initialMarginX == 0 && initialMarginY == 0 && initialTouchX == 0 && initialTouchY == 0)
-                        setUpInitialValues(v, event);
-
-                    int padding = calculateTotalSizePx(R.dimen.map_button_margin);
-                    FrameLayout parent = (FrameLayout) v.getParent();
-                    FrameLayout.LayoutParams param = (FrameLayout.LayoutParams) v.getLayoutParams();
-
-                    int deltaX = (int) (initialTouchX - event.getRawX());
-                    int deltaY = (int) (initialTouchY - event.getRawY());
-
-                    int newMarginX = interpolate(initialMarginX + deltaX, v.getWidth(), parent.getWidth() - padding * 2);
-                    int newMarginY = interpolate(initialMarginY + deltaY, v.getHeight(), parent.getHeight() - padding * 2);
-
-                    if (v.getHeight() + newMarginY <= parent.getHeight() - padding * 2 && newMarginY > 0)
-                        param.bottomMargin = newMarginY;
-
-                    if (v.getWidth() + newMarginX <= parent.getWidth() - padding * 2 && newMarginX > 0) {
-                        param.rightMargin = newMarginX;
-                    }
-
-                    v.setLayoutParams(param);
-
-                    return true;
-            }
-            return false;
-        }
-
-        private int interpolate(int value, int divider, int boundsSize) {
-            if (value <= divider && value > 0)
-                return value * value / divider;
-            else {
-                int leftMargin = boundsSize - value - divider;
-                if (leftMargin <= divider && value < boundsSize - divider)
-                    return leftMargin - (leftMargin * leftMargin / divider) + value;
-                else
-                    return value;
-            }
-        }
-
-        private void setUpInitialValues(View v, MotionEvent event) {
-            FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) v.getLayoutParams();
-
-            initialMarginX = params.rightMargin;
-            initialMarginY = params.bottomMargin;
-
-            initialTouchX = event.getRawX();
-            initialTouchY = event.getRawY();
-        }
-    };
+	private void updateButton(@NonNull QuickActionButton button, boolean invalidated) {
+		button.setInvalidated(invalidated);
+		button.setNightMode(app.getDaynightHelper().isNightMode());
+		button.update();
+	}
 }

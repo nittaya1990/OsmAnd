@@ -1,9 +1,13 @@
 package net.osmand.plus.voice;
 
+import static android.media.MediaPlayer.OnCompletionListener;
+import static net.osmand.IndexConstants.TTSVOICE_INDEX_EXT_JS;
+
 import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 
-import net.osmand.IndexConstants;
+import androidx.annotation.NonNull;
+
 import net.osmand.PlatformUtil;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.api.AudioFocusHelperImpl;
@@ -17,8 +21,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
-
-import static android.media.MediaPlayer.OnCompletionListener;
 
 /**
  * That class represents command player.
@@ -35,13 +37,21 @@ public class JsMediaCommandPlayer extends CommandPlayer implements OnCompletionL
 	// indicates that player is ready to play first file
 	private final List<String> filesToPlay = Collections.synchronizedList(new ArrayList<>());
 
-	protected JsMediaCommandPlayer(OsmandApplication app,
-	                               ApplicationMode applicationMode,
-	                               VoiceRouter voiceRouter,
-	                               File voiceProviderDir) throws CommandPlayerException {
+	protected JsMediaCommandPlayer(@NonNull OsmandApplication app,
+	                               @NonNull ApplicationMode applicationMode,
+	                               @NonNull VoiceRouter voiceRouter,
+	                               @NonNull File voiceProviderDir) throws CommandPlayerException {
 		super(app, applicationMode, voiceRouter, voiceProviderDir);
 	}
 
+	@NonNull
+	@Override
+	public File getTtsFileFromDir(@NonNull File voiceProviderDir) {
+		String fileName = language + "_" + TTSVOICE_INDEX_EXT_JS;
+		return new File(voiceProviderDir, fileName);
+	}
+
+	@NonNull
 	@Override
 	public CommandBuilder newCommandBuilder() {
 		JsCommandBuilder commandBuilder = new JsCommandBuilder(this);
@@ -52,9 +62,7 @@ public class JsMediaCommandPlayer extends CommandPlayer implements OnCompletionL
 
 	@Override
 	public void stop() {
-		if (filesToPlay != null) {
-			filesToPlay.clear();
-		}
+		filesToPlay.clear();
 		if (mediaPlayer != null) {
 			mediaPlayer.stop();
 		}
@@ -64,9 +72,7 @@ public class JsMediaCommandPlayer extends CommandPlayer implements OnCompletionL
 	@Override
 	public void clear() {
 		super.clear();
-		if (filesToPlay != null) {
-			filesToPlay.clear();
-		}
+		filesToPlay.clear();
 		if (mediaPlayer != null) {
 			mediaPlayer.release();
 		}
@@ -74,8 +80,9 @@ public class JsMediaCommandPlayer extends CommandPlayer implements OnCompletionL
 	}
 
 	//  Called from the calculating route thread.
+	@NonNull
 	@Override
-	public synchronized List<String> playCommands(CommandBuilder builder) {
+	public synchronized List<String> playCommands(@NonNull CommandBuilder builder) {
 		if (voiceRouter.isMute()) {
 			return Collections.emptyList();
 		}
@@ -87,7 +94,7 @@ public class JsMediaCommandPlayer extends CommandPlayer implements OnCompletionL
 			requestAudioFocus();
 			// Delay first prompt of each batch to allow BT SCO link being established, or when VOICE_PROMPT_DELAY is set >0 for the other stream types
 			if (app != null) {
-				int vpd = settings.VOICE_PROMPT_DELAY[settings.AUDIO_MANAGER_STREAM.getModeValue(applicationMode)].get();
+				int vpd = settings.VOICE_PROMPT_DELAY[settings.AUDIO_MANAGER_STREAM.getModeValue(app.getRoutingHelper().getAppMode())].get();
 				if (vpd > 0) {
 					try {
 						Thread.sleep(vpd);
@@ -104,6 +111,7 @@ public class JsMediaCommandPlayer extends CommandPlayer implements OnCompletionL
 		}
 	}
 
+	@NonNull
 	private List<String> splitAnnouncements(List<String> execute) {
 		List<String> result = new ArrayList<>();
 		for (String files : execute) {
@@ -176,7 +184,7 @@ public class JsMediaCommandPlayer extends CommandPlayer implements OnCompletionL
 	 *
 	 * @param file
 	 */
-	private void playFile(File file) {
+	private void playFile(@NonNull File file) {
 		if (!file.exists() || file.isDirectory()) {
 			log.error("Unable to play, does not exist: " + file);
 			playQueue();
@@ -186,7 +194,7 @@ public class JsMediaCommandPlayer extends CommandPlayer implements OnCompletionL
 			log.debug("Playing file : " + file);
 			mediaPlayer.reset();
 			mediaPlayer.setAudioAttributes(new AudioAttributes.Builder()
-					.setUsage(settings.AUDIO_USAGE.get())
+					.setUsage(settings.AUDIO_USAGE[settings.AUDIO_MANAGER_STREAM.getModeValue(app.getRoutingHelper().getAppMode())].get())
 					.setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
 					.build());
 
@@ -205,10 +213,10 @@ public class JsMediaCommandPlayer extends CommandPlayer implements OnCompletionL
 		return false;
 	}
 
-	public static boolean isMyData(File voiceDir) {
+	public static boolean isMyData(@NonNull File voiceDir) {
 		if (voiceDir.getName().contains("tts")) {
 			return false;
 		}
-		return new File(voiceDir, voiceDir.getName() + "_" + IndexConstants.TTSVOICE_INDEX_EXT_JS).exists();
+		return new File(voiceDir, voiceDir.getName() + "_" + TTSVOICE_INDEX_EXT_JS).exists();
 	}
 }

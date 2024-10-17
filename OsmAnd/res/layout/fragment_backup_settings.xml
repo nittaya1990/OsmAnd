@@ -1,13 +1,23 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
-	xmlns:osmand="http://schemas.android.com/apk/res-auto"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:layout_width="match_parent"
 	android:layout_height="match_parent"
 	android:background="?attr/activity_background_color"
 	android:clickable="true"
 	android:fillViewport="true"
-	android:focusable="true">
+	android:focusable="true"
+	android:orientation="vertical">
+
+	<com.google.android.material.appbar.AppBarLayout
+		android:id="@+id/appbar"
+		android:layout_width="match_parent"
+		android:layout_height="wrap_content">
+
+		<include layout="@layout/global_preference_toolbar" />
+
+	</com.google.android.material.appbar.AppBarLayout>
 
 	<me.zhanghai.android.materialprogressbar.MaterialProgressBar
 		android:id="@+id/progress_bar"
@@ -16,9 +26,9 @@
 		android:layout_height="4dp"
 		android:indeterminate="true"
 		android:visibility="invisible"
-		osmand:mpb_progressStyle="horizontal"
-		osmand:mpb_setBothDrawables="true"
-		osmand:mpb_useIntrinsicPadding="false"
+		app:mpb_progressStyle="horizontal"
+		app:mpb_setBothDrawables="true"
+		app:mpb_useIntrinsicPadding="false"
 		tools:visibility="visible" />
 
 	<ScrollView
@@ -65,8 +75,8 @@
 						android:text="@string/backup_data"
 						android:textColor="?android:textColorPrimary"
 						android:textSize="@dimen/default_list_text_size"
-						osmand:lineHeight="@dimen/default_title_line_height"
-						osmand:typeface="@string/font_roboto_medium" />
+						app:lineHeight="@dimen/default_title_line_height"
+						app:typefaceWeight="medium" />
 
 					<net.osmand.plus.widgets.TextViewEx
 						android:id="@android:id/summary"
@@ -78,8 +88,8 @@
 						android:text="@string/select_backup_data_descr"
 						android:textColor="?android:textColorSecondary"
 						android:textSize="@dimen/default_desc_text_size"
-						osmand:lineHeight="@dimen/default_desc_line_height"
-						osmand:typeface="@string/font_roboto_regular" />
+						app:lineHeight="@dimen/default_desc_line_height"
+						android:textStyle="normal" />
 
 				</LinearLayout>
 
@@ -93,8 +103,8 @@
 					android:layout_marginEnd="@dimen/content_padding"
 					android:layout_marginRight="@dimen/content_padding"
 					android:layout_marginBottom="@dimen/content_padding_small"
-					osmand:srcCompat="@drawable/ic_action_info_dark"
-					osmand:tint="?attr/default_icon_color" />
+					app:srcCompat="@drawable/ic_action_info_dark"
+					app:tint="?attr/default_icon_color" />
 
 			</LinearLayout>
 
@@ -128,8 +138,8 @@
 						android:text="@string/backup_version_history"
 						android:textColor="?android:textColorPrimary"
 						android:textSize="@dimen/default_list_text_size"
-						osmand:lineHeight="@dimen/default_title_line_height"
-						osmand:typeface="@string/font_roboto_medium" />
+						app:lineHeight="@dimen/default_title_line_height"
+						app:typefaceWeight="medium" />
 
 					<androidx.appcompat.widget.AppCompatImageView
 						android:layout_width="@dimen/standard_icon_size"
@@ -141,8 +151,8 @@
 						android:layout_marginEnd="@dimen/content_padding"
 						android:layout_marginRight="@dimen/content_padding"
 						android:layout_marginBottom="@dimen/content_padding_small"
-						osmand:srcCompat="@drawable/ic_action_info_dark"
-						osmand:tint="?attr/default_icon_color" />
+						app:srcCompat="@drawable/ic_action_info_dark"
+						app:tint="?attr/default_icon_color" />
 
 				</LinearLayout>
 
@@ -172,8 +182,8 @@
 					android:text="@string/login_account"
 					android:textColor="?android:textColorPrimary"
 					android:textSize="@dimen/default_list_text_size"
-					osmand:lineHeight="@dimen/default_title_line_height"
-					osmand:typeface="@string/font_roboto_medium" />
+					app:lineHeight="@dimen/default_title_line_height"
+					app:typefaceWeight="medium" />
 
 				<LinearLayout
 					android:layout_width="match_parent"
@@ -191,8 +201,8 @@
 						android:layout_marginEnd="@dimen/content_padding"
 						android:layout_marginRight="@dimen/content_padding"
 						android:layout_marginBottom="@dimen/content_padding_small"
-						osmand:srcCompat="@drawable/ic_action_user_account"
-						osmand:tint="?attr/default_icon_color" />
+						app:srcCompat="@drawable/ic_action_user_account"
+						app:tint="?attr/default_icon_color" />
 
 					<net.osmand.plus.widgets.TextViewEx
 						android:id="@+id/user_name"
@@ -204,8 +214,8 @@
 						android:letterSpacing="@dimen/text_button_letter_spacing"
 						android:textColor="?android:textColorPrimary"
 						android:textSize="@dimen/default_list_text_size"
-						osmand:lineHeight="@dimen/default_title_line_height"
-						osmand:typeface="@string/font_roboto_regular"
+						app:lineHeight="@dimen/default_title_line_height"
+						android:textStyle="normal"
 						tools:text="user login" />
 
 				</LinearLayout>
@@ -244,8 +254,8 @@
 						android:text="@string/backup_danger_zone"
 						android:textColor="?android:textColorPrimary"
 						android:textSize="@dimen/default_list_text_size"
-						osmand:lineHeight="@dimen/default_title_line_height"
-						osmand:typeface="@string/font_roboto_medium" />
+						app:lineHeight="@dimen/default_title_line_height"
+						app:typefaceWeight="medium" />
 
 					<androidx.appcompat.widget.AppCompatImageView
 						android:layout_width="@dimen/standard_icon_size"
@@ -257,20 +267,26 @@
 						android:layout_marginEnd="@dimen/content_padding"
 						android:layout_marginRight="@dimen/content_padding"
 						android:layout_marginBottom="@dimen/content_padding_small"
-						osmand:srcCompat="@drawable/ic_action_alert"
-						osmand:tint="@color/color_osm_edit_delete" />
+						app:srcCompat="@drawable/ic_action_alert"
+						app:tint="@color/color_osm_edit_delete" />
 
 				</LinearLayout>
 
 				<include
 					android:id="@+id/delete_all_container"
-					layout="@layout/preference_with_descr" />
+					layout="@layout/preference_button" />
 
 				<include layout="@layout/divider_half_item_with_background" />
 
 				<include
 					android:id="@+id/delete_old_container"
-					layout="@layout/preference_with_descr" />
+					layout="@layout/preference_button" />
+
+				<include layout="@layout/divider_half_item_with_background" />
+
+				<include
+					android:id="@+id/delete_account_container"
+					layout="@layout/preference_button" />
 
 			</LinearLayout>
 
@@ -280,4 +296,4 @@
 
 	</ScrollView>
 
-</FrameLayout>
+</LinearLayout>

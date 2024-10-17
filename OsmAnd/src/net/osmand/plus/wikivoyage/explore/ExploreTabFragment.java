@@ -54,7 +54,6 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 	private static boolean SHOW_TRAVEL_NEEDED_MAPS_CARD = true;
 
 	private final ExploreRvAdapter adapter = new ExploreRvAdapter();
-	private boolean nightMode;
 
 	@Nullable
 	private TravelDownloadUpdateCard downloadUpdateCard;
@@ -72,12 +71,11 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 	@Nullable
 	@Override
 	public View onCreateView(@NonNull LayoutInflater inflater, @Nullable ViewGroup container, @Nullable Bundle savedInstanceState) {
-		OsmandApplication app = requireMyApplication();
+		updateNightMode();
 		downloadManager = new DownloadValidationManager(app);
-		nightMode = !app.getSettings().isLightContent();
 
-		final View mainView = inflater.inflate(R.layout.fragment_explore_tab, container, false);
-		final RecyclerView rv = (RecyclerView) mainView.findViewById(R.id.recycler_view);
+		View mainView = inflater.inflate(R.layout.fragment_explore_tab, container, false);
+		RecyclerView rv = mainView.findViewById(R.id.recycler_view);
 
 		rv.setLayoutManager(new LinearLayoutManager(getContext()));
 		rv.setAdapter(adapter);
@@ -88,19 +86,13 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 	@Override
 	public void onResume() {
 		super.onResume();
-		OsmandApplication app = getMyApplication();
-		if (app != null) {
-			app.getTravelHelper().getBookmarksHelper().addListener(this);
-		}
+		app.getTravelHelper().getBookmarksHelper().addListener(this);
 	}
 
 	@Override
 	public void onPause() {
 		super.onPause();
-		OsmandApplication app = getMyApplication();
-		if (app != null) {
-			app.getTravelHelper().getBookmarksHelper().removeListener(this);
-		}
+		app.getTravelHelper().getBookmarksHelper().removeListener(this);
 	}
 
 	@Override
@@ -113,8 +105,6 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 
 	@Override
 	public void downloadInProgress() {
-		OsmandApplication app = getMyApplication();
-		if (app != null) {
 			IndexItem current = app.getDownloadThread().getCurrentDownloadingItem();
 			if (current != null && current != currentDownloadingIndexItem) {
 				currentDownloadingIndexItem = current;
@@ -122,13 +112,10 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 			}
 			adapter.updateDownloadUpdateCard(true);
 			adapter.updateNeededMapsCard(true);
-		}
 	}
 
 	@Override
 	public void downloadHasFinished() {
-		OsmandApplication app = getMyApplication();
-		if (app != null) {
 			TravelHelper travelHelper = app.getTravelHelper();
 			if (travelHelper.isAnyTravelBookPresent()) {
 				app.getTravelHelper().initializeDataOnAppStartup();
@@ -139,13 +126,10 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 			} else {
 				removeRedundantCards();
 			}
-		}
 	}
 
 	@Override
 	public void savedArticlesUpdated() {
-		OsmandApplication app = getMyApplication();
-		if (app != null) {
 			DownloadIndexesThread downloadThread = app.getDownloadThread();
 			if (!downloadThread.getIndexes().isDownloadedFromInternet) {
 				waitForIndexes = true;
@@ -153,7 +137,6 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 			} else {
 				checkDownloadIndexes();
 			}
-		}
 	}
 
 	@Nullable
@@ -171,14 +154,14 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 	}
 
 	public void populateData() {
-		final List<BaseTravelCard> items = new ArrayList<>();
-		final FragmentActivity activity = getActivity();
-		final OsmandApplication app = activity != null ? (OsmandApplication) activity.getApplication() : null;
+		List<BaseTravelCard> items = new ArrayList<>();
+		FragmentActivity activity = getActivity();
+		OsmandApplication app = activity != null ? (OsmandApplication) activity.getApplication() : null;
 		if (app != null) {
 			if (!Version.isPaidVersion(app) && !OpenBetaTravelCard.isClosed()) {
 				items.add(new OpenBetaTravelCard(activity, nightMode));
 			}
-			final List<TravelArticle> popularArticles = app.getTravelHelper().getPopularArticles();
+			List<TravelArticle> popularArticles = app.getTravelHelper().getPopularArticles();
 			if (!popularArticles.isEmpty()) {
 				items.add(new HeaderTravelCard(app, nightMode, getString(R.string.popular_destinations)));
 				for (TravelArticle article : popularArticles) {
@@ -189,7 +172,7 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 					}
 				}
 			}
-			if (!isOnlyDefaultTravelBookPresent()) {
+			if (!isTravelGuidesRepositoryEmpty()) {
 				TravelButtonCard travelButtonCard = new TravelButtonCard(app, nightMode);
 				travelButtonCard.setListener(new TravelNeededMapsCard.CardListener() {
 					@Override
@@ -214,7 +197,7 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 			}
 			items.add(new StartEditingTravelCard(activity, nightMode));
 			adapter.setItems(items);
-			final DownloadIndexesThread downloadThread = app.getDownloadThread();
+			DownloadIndexesThread downloadThread = app.getDownloadThread();
 			if (!downloadThread.getIndexes().isDownloadedFromInternet) {
 				waitForIndexes = true;
 				downloadThread.runReloadIndexFilesSilent();
@@ -252,7 +235,7 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 	}
 
 	private void addIndexItemCards(List<IndexItem> mainIndexItem, List<IndexItem> neededIndexItems) {
-		if (isOnlyDefaultTravelBookPresent()) {
+		if (isTravelGuidesRepositoryEmpty()) {
 			this.mainIndexItems.clear();
 			this.mainIndexItems.addAll(mainIndexItem);
 			addDownloadUpdateCard();
@@ -262,18 +245,15 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 		addNeededMapsCard();
 	}
 
-	private boolean isOnlyDefaultTravelBookPresent() {
-		OsmandApplication app = getMyApplication();
-		if (app != null && !app.isApplicationInitializing()) {
-			return app.getResourceManager().isOnlyDefaultTravelBookPresent();
-
+	private boolean isTravelGuidesRepositoryEmpty() {
+		if (!app.isApplicationInitializing()) {
+			return app.getResourceManager().isTravelGuidesRepositoryEmpty();
 		}
 		return true;
 	}
 
 	private void addDownloadUpdateCard() {
-		final OsmandApplication app = getMyApplication();
-		if (app != null && !mainIndexItems.isEmpty() && SHOW_TRAVEL_UPDATE_CARD) {
+		if (!mainIndexItems.isEmpty() && SHOW_TRAVEL_UPDATE_CARD) {
 			boolean outdated = isMapsOutdated();
 			downloadUpdateCard = new TravelDownloadUpdateCard(app, nightMode, mainIndexItems, !outdated);
 			downloadUpdateCard.setListener(new TravelDownloadUpdateCard.CardListener() {
@@ -329,8 +309,7 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 	}
 
 	private void addNeededMapsCard() {
-		final OsmandApplication app = getMyApplication();
-		if (app != null && !neededIndexItems.isEmpty() && SHOW_TRAVEL_NEEDED_MAPS_CARD) {
+		if (!neededIndexItems.isEmpty() && SHOW_TRAVEL_NEEDED_MAPS_CARD) {
 			neededMapsCard = new TravelNeededMapsCard(app, nightMode, neededIndexItems);
 			neededMapsCard.setListener(new TravelNeededMapsCard.CardListener() {
 				@Override
@@ -376,7 +355,7 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 	}
 
 	private IndexItem[] getAllItemsForDownload(List<IndexItem> indexItems) {
-		boolean paidVersion = Version.isPaidVersion(getMyApplication());
+		boolean paidVersion = Version.isPaidVersion(app);
 		ArrayList<IndexItem> res = new ArrayList<>();
 		for (IndexItem item : indexItems) {
 			if (!item.isDownloaded() && (paidVersion || item.getType() != DownloadActivityType.WIKIPEDIA_FILE)) {
@@ -398,7 +377,7 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 
 	private static class ProcessIndexItemsTask extends AsyncTask<Void, Void, Pair<List<IndexItem>, List<IndexItem>>> {
 
-		private static final DownloadActivityType[] types = new DownloadActivityType[]{
+		private static final DownloadActivityType[] types = {
 				DownloadActivityType.NORMAL_FILE,
 				DownloadActivityType.WIKIPEDIA_FILE
 		};
@@ -407,7 +386,7 @@ public class ExploreTabFragment extends BaseOsmAndFragment implements DownloadEv
 		private final WeakReference<ExploreTabFragment> weakFragment;
 
 		ProcessIndexItemsTask(ExploreTabFragment fragment) {
-			app = fragment.getMyApplication();
+			app = fragment.app;
 			weakFragment = new WeakReference<>(fragment);
 		}
 

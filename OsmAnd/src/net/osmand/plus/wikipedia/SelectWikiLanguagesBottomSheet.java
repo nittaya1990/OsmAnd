@@ -17,12 +17,12 @@ import androidx.core.os.LocaleListCompat;
 
 import com.google.android.material.snackbar.Snackbar;
 
-import net.osmand.AndroidUtils;
-import net.osmand.plus.ColorUtilities;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
 import net.osmand.plus.OsmandApplication;
-import net.osmand.plus.OsmandPlugin;
+import net.osmand.plus.plugins.PluginsHelper;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.MenuBottomSheetDialogFragment;
 import net.osmand.plus.base.bottomsheetmenu.BottomSheetItemWithCompoundButton;
@@ -50,14 +50,14 @@ public class SelectWikiLanguagesBottomSheet extends MenuBottomSheetDialogFragmen
 	private List<BottomSheetItemWithCompoundButton> languageItems;
 
 	private ArrayList<WikiLanguageItem> languages;
-	private boolean isGlobalWikiPoiEnabled = false;
+	private boolean isGlobalWikiPoiEnabled;
 
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
 		app = requiredMyApplication();
 		appMode = app.getSettings().getApplicationMode();
-		wikiPlugin = OsmandPlugin.getPlugin(WikipediaPlugin.class);
+		wikiPlugin = PluginsHelper.getPlugin(WikipediaPlugin.class);
 		initLanguagesData();
 	}
 
@@ -69,12 +69,12 @@ public class SelectWikiLanguagesBottomSheet extends MenuBottomSheetDialogFragmen
 
 	@Override
 	public void createMenuItems(Bundle savedInstanceState) {
-		final int activeColorResId = ColorUtilities.getActiveColorId(nightMode);
-		final int profileColor = appMode.getProfileColor(nightMode);
+		int activeColorResId = ColorUtilities.getActiveColorId(nightMode);
+		int profileColor = appMode.getProfileColor(nightMode);
 
-		final int contentPadding = app.getResources().getDimensionPixelSize(R.dimen.content_padding);
-		final int contentPaddingSmall = app.getResources().getDimensionPixelSize(R.dimen.content_padding_small);
-		final int contentPaddingHalf = app.getResources().getDimensionPixelSize(R.dimen.content_padding_half);
+		int contentPadding = app.getResources().getDimensionPixelSize(R.dimen.content_padding);
+		int contentPaddingSmall = app.getResources().getDimensionPixelSize(R.dimen.content_padding_small);
+		int contentPaddingHalf = app.getResources().getDimensionPixelSize(R.dimen.content_padding_half);
 
 		items.add(new TitleItem(getString(R.string.shared_string_languages)));
 		items.add(new LongDescriptionItem(getString(R.string.some_articles_may_not_available_in_lang)));
@@ -82,7 +82,7 @@ public class SelectWikiLanguagesBottomSheet extends MenuBottomSheetDialogFragmen
 		items.add(new LongDescriptionItem(getString(R.string.select_wikipedia_article_langs)));
 		items.add(new DividerSpaceItem(app, contentPaddingSmall));
 
-		final BottomSheetItemWithCompoundButton[] btnSelectAll = new BottomSheetItemWithCompoundButton[1];
+		BottomSheetItemWithCompoundButton[] btnSelectAll = new BottomSheetItemWithCompoundButton[1];
 		btnSelectAll[0] = (BottomSheetItemWithCompoundButton) new BottomSheetItemWithCompoundButton.Builder()
 				.setChecked(this.isGlobalWikiPoiEnabled)
 				.setCompoundButtonColor(profileColor)
@@ -103,14 +103,14 @@ public class SelectWikiLanguagesBottomSheet extends MenuBottomSheetDialogFragmen
 
 		languageItems = new ArrayList<>();
 		boolean categoryChanged = false;
-		for (final WikiLanguageItem language : languages) {
+		for (WikiLanguageItem language : languages) {
 			if (!categoryChanged && !language.isTopDefined()) {
 				categoryChanged = true;
 				DividerItem divider = new DividerItem(app);
 				divider.setMargins(contentPadding, 0, 0, 0);
 				items.add(divider);
 			}
-			final BottomSheetItemWithCompoundButton[] languageItem = new BottomSheetItemWithCompoundButton[1];
+			BottomSheetItemWithCompoundButton[] languageItem = new BottomSheetItemWithCompoundButton[1];
 			languageItem[0] = (BottomSheetItemWithCompoundButton) new BottomSheetItemWithCompoundButton.Builder()
 					.setChecked(language.isChecked())
 					.setTitle(language.getTitle())
@@ -170,8 +170,8 @@ public class SelectWikiLanguagesBottomSheet extends MenuBottomSheetDialogFragmen
 	private void setLanguageListEnable(boolean enable) {
 		int textColorPrimaryId = ColorUtilities.getPrimaryTextColorId(nightMode);
 		int disableColorId = nightMode ?
-				R.color.active_buttons_and_links_text_disabled_dark :
-				R.color.active_buttons_and_links_text_disabled_light;
+				R.color.text_color_secondary_dark :
+				R.color.text_color_secondary_light;
 		int profileColor = appMode.getProfileColor(nightMode);
 		int disableColor = ContextCompat.getColor(app, disableColorId);
 		for (BottomSheetItemWithCompoundButton item : languageItems) {
@@ -216,7 +216,7 @@ public class SelectWikiLanguagesBottomSheet extends MenuBottomSheetDialogFragmen
 		wikiPlugin.updateWikipediaState();
 	}
 
-	protected void applyPreferenceWithSnackBar(final List<String> localesForSaving, final boolean global) {
+	protected void applyPreferenceWithSnackBar(List<String> localesForSaving, boolean global) {
 		applyPreference(false, localesForSaving, global);
 		MapActivity mapActivity = getMapActivity();
 		if (mapActivity != null) {
@@ -267,10 +267,10 @@ public class SelectWikiLanguagesBottomSheet extends MenuBottomSheetDialogFragmen
 	}
 
 	private static class WikiLanguageItem implements Comparable<WikiLanguageItem> {
-		private String locale;
-		private String title;
+		private final String locale;
+		private final String title;
 		private boolean checked;
-		private boolean topDefined;
+		private final boolean topDefined;
 
 		public WikiLanguageItem(String locale, String title, boolean checked, boolean topDefined) {
 			this.locale = locale;
@@ -310,6 +310,6 @@ public class SelectWikiLanguagesBottomSheet extends MenuBottomSheetDialogFragmen
 									boolean usedOnMap) {
 		SelectWikiLanguagesBottomSheet fragment = new SelectWikiLanguagesBottomSheet();
 		fragment.setUsedOnMap(usedOnMap);
-		fragment.show(mapActivity.getSupportFragmentManager(), SelectWikiLanguagesBottomSheet.TAG);
+		fragment.show(mapActivity.getSupportFragmentManager(), TAG);
 	}
 }

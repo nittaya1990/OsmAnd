@@ -18,13 +18,13 @@ import com.squareup.picasso.Callback;
 import com.squareup.picasso.Picasso;
 import com.squareup.picasso.RequestCreator;
 
-import net.osmand.AndroidUtils;
-import net.osmand.PicassoUtils;
-import net.osmand.osm.RouteActivityType;
-import net.osmand.plus.OsmAndFormatter;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.PicassoUtils;
+import net.osmand.osm.OsmRouteType;
+import net.osmand.plus.utils.OsmAndFormatter;
 import net.osmand.plus.OsmandApplication;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
+import net.osmand.plus.utils.UiUtilities;
 import net.osmand.plus.settings.backend.OsmandSettings;
 import net.osmand.plus.widgets.tools.CropCircleTransformation;
 import net.osmand.plus.wikipedia.WikiArticleHelper;
@@ -38,7 +38,6 @@ import java.util.ArrayList;
 import java.util.List;
 
 import static net.osmand.plus.wikivoyage.explore.travelcards.TravelGpxCard.TravelGpxVH;
-import static net.osmand.util.Algorithms.capitalizeFirstLetterAndLowercase;
 
 public class SavedArticlesRvAdapter extends RecyclerView.Adapter<RecyclerView.ViewHolder> {
 
@@ -55,7 +54,7 @@ public class SavedArticlesRvAdapter extends RecyclerView.Adapter<RecyclerView.Vi
 
 	private final Drawable readIcon;
 	private final Drawable deleteIcon;
-	private PicassoUtils picasso;
+	private final PicassoUtils picasso;
 	boolean nightMode;
 
 	public void setListener(Listener listener) {
@@ -72,7 +71,7 @@ public class SavedArticlesRvAdapter extends RecyclerView.Adapter<RecyclerView.Vi
 	}
 
 	private Drawable getActiveIcon(@DrawableRes int iconId) {
-		int colorId = nightMode ? R.color.wikivoyage_active_dark : R.color.wikivoyage_active_light;
+		int colorId = nightMode ? R.color.active_color_primary_dark : R.color.active_color_primary_light;
 		return app.getUIUtilities().getIcon(iconId, colorId);
 	}
 
@@ -99,13 +98,13 @@ public class SavedArticlesRvAdapter extends RecyclerView.Adapter<RecyclerView.Vi
 	@Override
 	public void onBindViewHolder(@NonNull RecyclerView.ViewHolder viewHolder, int position) {
 		if (viewHolder instanceof HeaderVH) {
-			final HeaderVH holder = (HeaderVH) viewHolder;
+			HeaderVH holder = (HeaderVH) viewHolder;
 			holder.title.setText((String) getItem(position));
 			holder.description.setText(String.valueOf(items.size() - 1));
 		} else if (viewHolder instanceof ItemVH) {
-			final ItemVH holder = (ItemVH) viewHolder;
+			ItemVH holder = (ItemVH) viewHolder;
 			TravelArticle article = (TravelArticle) getItem(position);
-			final String url = TravelArticle.getImageUrl(article.getImageTitle(), false);
+			String url = TravelArticle.getImageUrl(article.getImageTitle(), false);
 			Boolean loaded = picasso.isURLLoaded(url);
 			boolean lastItem = position == getItemCount() - 1;
 
@@ -137,17 +136,17 @@ public class SavedArticlesRvAdapter extends RecyclerView.Adapter<RecyclerView.Vi
 			holder.divider.setVisibility(lastItem ? View.GONE : View.VISIBLE);
 			holder.shadow.setVisibility(lastItem ? View.VISIBLE : View.GONE);
 		} else if (viewHolder instanceof TravelGpxVH) {
-			final TravelGpx article = (TravelGpx) getItem(position);
-			final TravelGpxVH holder = (TravelGpxVH) viewHolder;
+			TravelGpx article = (TravelGpx) getItem(position);
+			TravelGpxVH holder = (TravelGpxVH) viewHolder;
 			holder.title.setText(article.getTitle());
 			holder.userIcon.setImageDrawable(getActiveIcon(R.drawable.ic_action_user_account_16));
 			holder.user.setText(article.user);
 			String activityTypeKey = article.activityType;
 			if (!Algorithms.isEmpty(activityTypeKey)) {
-				RouteActivityType activityType = RouteActivityType.getOrCreateTypeFromName(activityTypeKey);
-				int activityTypeIcon = getActivityTypeIcon(activityType);
+				OsmRouteType activityType = OsmRouteType.getOrCreateTypeFromName(activityTypeKey);
+				int activityTypeIcon = AndroidUtils.getActivityTypeIcon(app, activityType);
 				holder.activityTypeIcon.setImageDrawable(getActiveIcon(activityTypeIcon));
-				holder.activityType.setText(getActivityTypeTitle(activityType));
+				holder.activityType.setText(AndroidUtils.getActivityTypeTitle(app, activityType));
 				holder.activityTypeLabel.setVisibility(View.VISIBLE);
 			}
 			holder.distance.setText(OsmAndFormatter.getFormattedDistance(article.totalDistance, app));
@@ -169,21 +168,10 @@ public class SavedArticlesRvAdapter extends RecyclerView.Adapter<RecyclerView.Vi
 		}
 	}
 
-	@DrawableRes
-	private int getActivityTypeIcon(RouteActivityType activityType) {
-		int iconId = app.getResources().getIdentifier("mx_" + activityType.getIcon(), "drawable", app.getPackageName());
-		return iconId != 0 ? iconId : R.drawable.mx_special_marker;
-	}
-
-	private String getActivityTypeTitle(RouteActivityType activityType) {
-		return AndroidUtils.getActivityTypeStringPropertyName(app, activityType.getName(),
-				capitalizeFirstLetterAndLowercase(activityType.getName()));
-	}
-
-	private void updateSaveButton(final TravelGpxVH holder, final TravelGpx article) {
+	private void updateSaveButton(TravelGpxVH holder, TravelGpx article) {
 		if (article != null) {
-			final TravelHelper helper = app.getTravelHelper();
-			final boolean saved = helper.getBookmarksHelper().isArticleSaved(article);
+			TravelHelper helper = app.getTravelHelper();
+			boolean saved = helper.getBookmarksHelper().isArticleSaved(article);
 			Drawable icon = getActiveIcon(saved ? R.drawable.ic_action_read_later_fill : R.drawable.ic_action_read_later);
 			holder.rightButton.setText(saved ? R.string.shared_string_remove : R.string.shared_string_save);
 			holder.rightButton.setCompoundDrawablesWithIntrinsicBounds(null, null, icon, null);
@@ -233,8 +221,8 @@ public class SavedArticlesRvAdapter extends RecyclerView.Adapter<RecyclerView.Vi
 
 		HeaderVH(View itemView) {
 			super(itemView);
-			title = (TextView) itemView.findViewById(R.id.title);
-			description = (TextView) itemView.findViewById(R.id.description);
+			title = itemView.findViewById(R.id.title);
+			description = itemView.findViewById(R.id.description);
 		}
 	}
 
@@ -249,14 +237,14 @@ public class SavedArticlesRvAdapter extends RecyclerView.Adapter<RecyclerView.Vi
 		final View divider;
 		final View shadow;
 
-		ItemVH(final View itemView) {
+		ItemVH(View itemView) {
 			super(itemView);
-			title = (TextView) itemView.findViewById(R.id.title);
-			content = (TextView) itemView.findViewById(R.id.content);
-			partOf = (TextView) itemView.findViewById(R.id.part_of);
-			icon = (ImageView) itemView.findViewById(R.id.icon);
-			leftButton = (TextView) itemView.findViewById(R.id.left_button);
-			rightButton = (TextView) itemView.findViewById(R.id.right_button);
+			title = itemView.findViewById(R.id.title);
+			content = itemView.findViewById(R.id.content);
+			partOf = itemView.findViewById(R.id.part_of);
+			icon = itemView.findViewById(R.id.icon);
+			leftButton = itemView.findViewById(R.id.left_button);
+			rightButton = itemView.findViewById(R.id.right_button);
 			divider = itemView.findViewById(R.id.divider);
 			shadow = itemView.findViewById(R.id.shadow);
 
@@ -280,8 +268,8 @@ public class SavedArticlesRvAdapter extends RecyclerView.Adapter<RecyclerView.Vi
 				public void onClick(View view) {
 					Object item = getItemByPosition();
 					if (item instanceof TravelArticle) {
-						final TravelArticle article = (TravelArticle) item;
-						final TravelHelper helper = app.getTravelHelper();
+						TravelArticle article = (TravelArticle) item;
+						TravelHelper helper = app.getTravelHelper();
 						helper.saveOrRemoveArticle(article, false);
 						Snackbar snackbar = Snackbar.make(itemView, R.string.article_removed, Snackbar.LENGTH_LONG)
 								.setAction(R.string.shared_string_undo, new View.OnClickListener() {
@@ -292,7 +280,7 @@ public class SavedArticlesRvAdapter extends RecyclerView.Adapter<RecyclerView.Vi
 								});
 						boolean nightMode = !settings.isLightContent();
 						UiUtilities.setupSnackbar(snackbar, nightMode);
-						int wikivoyageActiveColorResId = nightMode ? R.color.wikivoyage_active_dark : R.color.wikivoyage_active_light;
+						int wikivoyageActiveColorResId = nightMode ? R.color.active_color_primary_dark : R.color.active_color_primary_light;
 						UiUtilities.setupSnackbar(snackbar, nightMode, null, null, wikivoyageActiveColorResId, null);
 						snackbar.show();
 					}

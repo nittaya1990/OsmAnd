@@ -4,7 +4,6 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.drawable.Drawable;
 import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
 import android.view.Gravity;
 import android.view.LayoutInflater;
@@ -15,33 +14,21 @@ import android.widget.ImageButton;
 import android.widget.LinearLayout;
 
 import androidx.annotation.NonNull;
-import androidx.fragment.app.FragmentActivity;
 
-import net.osmand.AndroidUtils;
 import net.osmand.CallbackWithObject;
-import net.osmand.GPXUtilities.GPXFile;
 import net.osmand.IndexConstants;
 import net.osmand.PlatformUtil;
-import net.osmand.ValueHolder;
 import net.osmand.data.QuadRect;
 import net.osmand.data.RotatedTileBox;
-import net.osmand.plus.ColorUtilities;
-import net.osmand.plus.GpxSelectionHelper.SelectedGpxFile;
-import net.osmand.plus.OsmandApplication;
+import net.osmand.shared.data.KQuadRect;
+import net.osmand.shared.gpx.GpxFile;
 import net.osmand.plus.R;
-import net.osmand.plus.UiUtilities;
-import net.osmand.plus.UiUtilities.DialogButtonType;
 import net.osmand.plus.activities.MapActivity;
 import net.osmand.plus.base.ContextMenuScrollFragment;
 import net.osmand.plus.helpers.AndroidUiHelper;
-import net.osmand.plus.helpers.GpxUiHelper;
-import net.osmand.plus.helpers.GpxUiHelper.GPXInfo;
-import net.osmand.plus.helpers.enums.TracksSortByMode;
 import net.osmand.plus.importfiles.ImportHelper;
-import net.osmand.plus.importfiles.ImportHelper.OnGpxImportCompleteListener;
-import net.osmand.plus.importfiles.ImportHelper.OnSuccessfulGpxImport;
-import net.osmand.plus.measurementtool.GpxData;
-import net.osmand.plus.measurementtool.MeasurementEditingContext;
+import net.osmand.plus.importfiles.GpxImportListener;
+import net.osmand.plus.importfiles.OnSuccessfulGpxImport;
 import net.osmand.plus.measurementtool.MeasurementToolFragment;
 import net.osmand.plus.routepreparationmenu.cards.AttachTrackToRoadsCard;
 import net.osmand.plus.routepreparationmenu.cards.BaseCard;
@@ -54,11 +41,19 @@ import net.osmand.plus.routepreparationmenu.cards.SelectedTrackToFollowCard;
 import net.osmand.plus.routepreparationmenu.cards.TrackEditCard;
 import net.osmand.plus.routepreparationmenu.cards.TracksToFollowCard;
 import net.osmand.plus.routing.GPXRouteParams.GPXRouteParamsBuilder;
-import net.osmand.plus.routing.IRouteInformationListener;
 import net.osmand.plus.routing.RoutingHelper;
-import net.osmand.plus.track.TrackSelectSegmentBottomSheet.OnSegmentSelectedListener;
-import net.osmand.plus.views.layers.MapControlsLayer.MapControlsThemeInfoProvider;
-import net.osmand.plus.widgets.popup.PopUpMenuHelper;
+import net.osmand.plus.settings.enums.TracksSortByMode;
+import net.osmand.plus.track.SelectTrackTabsFragment;
+import net.osmand.plus.track.data.GPXInfo;
+import net.osmand.plus.track.fragments.TrackSelectSegmentBottomSheet.OnSegmentSelectedListener;
+import net.osmand.plus.track.helpers.GpxUiHelper;
+import net.osmand.plus.track.helpers.SelectedGpxFile;
+import net.osmand.plus.utils.AndroidUtils;
+import net.osmand.plus.utils.ColorUtilities;
+import net.osmand.plus.widgets.dialogbutton.DialogButtonType;
+import net.osmand.plus.widgets.dialogbutton.DialogButton;
+import net.osmand.plus.widgets.popup.PopUpMenu;
+import net.osmand.plus.widgets.popup.PopUpMenuDisplayData;
 import net.osmand.plus.widgets.popup.PopUpMenuItem;
 
 import org.apache.commons.logging.Log;
@@ -69,7 +64,7 @@ import java.util.List;
 
 
 public class FollowTrackFragment extends ContextMenuScrollFragment implements CardListener,
-		IRouteInformationListener, MapControlsThemeInfoProvider, OnSegmentSelectedListener {
+		OnSegmentSelectedListener {
 
 	public static final String TAG = FollowTrackFragment.class.getName();
 
@@ -77,10 +72,9 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 
 	private static final String SELECTING_TRACK = "selecting_track";
 
-	private OsmandApplication app;
 	private ImportHelper importHelper;
 
-	private GPXFile gpxFile;
+	private GpxFile gpxFile;
 
 	private View buttonsShadow;
 	private ImageButton sortButton;
@@ -129,9 +123,7 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 	@Override
 	public void onCreate(Bundle savedInstanceState) {
 		super.onCreate(savedInstanceState);
-		app = requireMyApplication();
-		MapActivity mapActivity = requireMapActivity();
-		importHelper = new ImportHelper(mapActivity, getMyApplication());
+		importHelper = app.getImportHelper();
 
 		GPXRouteParamsBuilder routeParamsBuilder = app.getRoutingHelper().getCurrentGPXRoute();
 		if (routeParamsBuilder != null) {
@@ -153,12 +145,7 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 			buttonsShadow = view.findViewById(R.id.buttons_shadow);
 			sortButton = view.findViewById(R.id.sort_button);
 			closeButton.setImageDrawable(getContentIcon(AndroidUtils.getNavigationIconResId(app)));
-			closeButton.setOnClickListener(new View.OnClickListener() {
-				@Override
-				public void onClick(View view) {
-					dismiss();
-				}
-			});
+			closeButton.setOnClickListener(v -> dismiss());
 
 			if (isPortrait()) {
 				updateCardsLayout();
@@ -203,7 +190,7 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 			} else {
 				sortButton.setVisibility(View.GONE);
 				SelectedTrackToFollowCard selectedTrackToFollowCard =
-						new SelectedTrackToFollowCard(mapActivity, FollowTrackFragment.this, gpxFile);
+						new SelectedTrackToFollowCard(mapActivity, this, gpxFile);
 				getCardsContainer().addView(selectedTrackToFollowCard.build(mapActivity));
 			}
 		}
@@ -217,8 +204,8 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 			List<GPXInfo> list = GpxUiHelper.getSortedGPXFilesInfo(dir, selectedTrackNames, false);
 			if (list.size() > 0) {
 				String defaultCategory = app.getString(R.string.shared_string_all);
-				tracksCard = new TracksToFollowCard(mapActivity, FollowTrackFragment.this, list, defaultCategory);
-				tracksCard.setListener(FollowTrackFragment.this);
+				tracksCard = new TracksToFollowCard(mapActivity, this, list, defaultCategory);
+				tracksCard.setListener(this);
 				getCardsContainer().addView(tracksCard.build(mapActivity));
 				sortButton.setVisibility(View.VISIBLE);
 			}
@@ -228,14 +215,12 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 	@Override
 	public void onResume() {
 		super.onResume();
-		app.getRoutingHelper().addListener(this);
 		MapRouteInfoMenu.followTrackVisible = true;
 	}
 
 	@Override
 	public void onPause() {
 		super.onPause();
-		app.getRoutingHelper().removeListener(this);
 		MapRouteInfoMenu.followTrackVisible = false;
 	}
 
@@ -275,16 +260,16 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 		}
 
 		RoutingHelper rh = app.getRoutingHelper();
-		if (rh.isRoutePlanningMode() && mapActivity.getMapView() != null) {
+		if (rh.isRoutePlanningMode()) {
 			QuadRect rect = mapActivity.getMapRouteInfoMenu().getRouteRect(mapActivity);
 
 			if (gpxFile != null) {
-				QuadRect gpxRect = gpxFile.getRect();
+				KQuadRect gpxRect = gpxFile.getRect();
 
-				rect.left = Math.min(rect.left, gpxRect.left);
-				rect.right = Math.max(rect.right, gpxRect.right);
-				rect.top = Math.max(rect.top, gpxRect.top);
-				rect.bottom = Math.min(rect.bottom, gpxRect.bottom);
+				rect.left = Math.min(rect.left, gpxRect.getLeft());
+				rect.right = Math.max(rect.right, gpxRect.getRight());
+				rect.top = Math.max(rect.top, gpxRect.getTop());
+				rect.bottom = Math.min(rect.bottom, gpxRect.getBottom());
 			}
 
 			RotatedTileBox tb = mapActivity.getMapView().getCurrentRotatedTileBox().copy();
@@ -347,14 +332,12 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 		if (view != null) {
 			boolean nightMode = isNightMode();
 			if (getViewY() <= getFullScreenTopPosY() || !isPortrait()) {
-				if (Build.VERSION.SDK_INT >= 23 && !nightMode) {
-					view.setSystemUiVisibility(view.getSystemUiVisibility() | View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
+				if (!nightMode) {
+					AndroidUiHelper.setStatusBarContentColor(view, view.getSystemUiVisibility(), true);
 				}
 				return ColorUtilities.getDividerColorId(nightMode);
-			} else {
-				if (Build.VERSION.SDK_INT >= 23 && !nightMode) {
-					view.setSystemUiVisibility(view.getSystemUiVisibility() & ~View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR);
-				}
+			} else if (!nightMode) {
+				AndroidUiHelper.setStatusBarContentColor(view, view.getSystemUiVisibility(), false);
 			}
 		}
 		return -1;
@@ -380,12 +363,14 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 				importTrack();
 			} else if (card instanceof AttachTrackToRoadsCard) {
 				openPlanRoute(true);
-				close();
 			} else if (card instanceof TrackEditCard) {
 				openPlanRoute(false);
-				close();
 			} else if (card instanceof SelectTrackCard) {
-				updateSelectionMode(true);
+				SelectTrackTabsFragment.GpxFileSelectionListener gpxFileSelectionListener = gpxFile -> {
+					selectTrackToFollow(gpxFile, true);
+					updateSelectionMode(false);
+				};
+				SelectTrackTabsFragment.showInstance(mapActivity.getSupportFragmentManager(), gpxFileSelectionListener);
 			} else if (card instanceof ReverseTrackCard
 					|| card instanceof NavigateTrackOptionsCard) {
 				updateMenu();
@@ -409,36 +394,34 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 		MapActivity mapActivity = getMapActivity();
 		if (mapActivity != null && index < card.getGpxInfoList().size()) {
 			GPXInfo gpxInfo = card.getGpxInfoList().get(index);
-			String fileName = gpxInfo.getFileName();
-			SelectedGpxFile selectedGpxFile = app.getSelectedGpxHelper().getSelectedFileByName(fileName);
+			String filePath = gpxInfo.getFilePath();
+			SelectedGpxFile selectedGpxFile = app.getSelectedGpxHelper().getSelectedFileByPath(filePath);
 			if (selectedGpxFile != null) {
-				GPXFile gpxFile = selectedGpxFile.getGpxFile();
-				selectTrackToFollow(gpxFile);
-				updateSelectionMode(gpxFile.getNonEmptySegmentsCount() <= 1);
+				GpxFile gpxFile = selectedGpxFile.getGpxFile();
+				selectTrackToFollow(gpxFile, true);
+				updateSelectionMode(gpxFile.getNonEmptySegmentsCount() > 1);
 			} else {
-				CallbackWithObject<GPXFile[]> callback = new CallbackWithObject<GPXFile[]>() {
-					@Override
-					public boolean processResult(GPXFile[] result) {
-						MapActivity mapActivity = getMapActivity();
-						if (mapActivity != null) {
-							selectTrackToFollow(result[0]);
-							updateSelectionMode(result[0].getNonEmptySegmentsCount() <= 1);
-						}
-						return true;
+				CallbackWithObject<GpxFile[]> callback = result -> {
+					MapActivity activity = getMapActivity();
+					if (activity != null) {
+						selectTrackToFollow(result[0], true);
+						updateSelectionMode(result[0].getNonEmptySegmentsCount() != 1);
 					}
+					return true;
 				};
+				String fileName = gpxInfo.getFileName();
 				File dir = app.getAppPath(IndexConstants.GPX_INDEX_DIR);
 				GpxUiHelper.loadGPXFileInDifferentThread(mapActivity, callback, dir, null, fileName);
 			}
 		}
 	}
 
-	private void selectTrackToFollow(@NonNull GPXFile gpxFile) {
+	private void selectTrackToFollow(@NonNull GpxFile gpxFile, boolean showSelectionDialog) {
 		this.gpxFile = gpxFile;
 
 		MapActivity mapActivity = getMapActivity();
 		if (mapActivity != null) {
-			mapActivity.getMapRouteInfoMenu().selectTrack(gpxFile);
+			mapActivity.getMapRouteInfoMenu().selectTrack(gpxFile, showSelectionDialog);
 		}
 	}
 
@@ -455,11 +438,8 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 	}
 
 	public void importTrack() {
-		FragmentActivity activity = getActivity();
-		if (activity != null) {
-			Intent intent = ImportHelper.getImportTrackIntent();
-			AndroidUtils.startActivityForResultIfSafe(activity, intent, ImportHelper.IMPORT_FILE_REQUEST);
-		}
+		Intent intent = ImportHelper.getImportFileIntent();
+		AndroidUtils.startActivityForResultIfSafe(this, intent, ImportHelper.IMPORT_FILE_REQUEST);
 	}
 
 	@Override
@@ -467,21 +447,16 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 		if (requestCode == ImportHelper.IMPORT_FILE_REQUEST && resultCode == Activity.RESULT_OK) {
 			if (data != null) {
 				Uri uri = data.getData();
-				importHelper.setGpxImportCompleteListener(new OnGpxImportCompleteListener() {
+				importHelper.setGpxImportListener(new GpxImportListener() {
 					@Override
-					public void onImportComplete(boolean success) {
-
-					}
-
-					@Override
-					public void onSaveComplete(boolean success, GPXFile result) {
+					public void onSaveComplete(boolean success, GpxFile gpxFile) {
 						if (success) {
-							selectTrackToFollow(result);
+							selectTrackToFollow(gpxFile, true);
 							updateSelectionMode(false);
 						} else {
 							app.showShortToastMessage(app.getString(R.string.error_occurred_loading_gpx));
 						}
-						importHelper.setGpxImportCompleteListener(null);
+						importHelper.setGpxImportListener(null);
 					}
 				});
 				importHelper.handleGpxImport(uri, OnSuccessfulGpxImport.OPEN_PLAN_ROUTE_FRAGMENT, true);
@@ -493,14 +468,9 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 
 	public void openPlanRoute(boolean showSnapWarning) {
 		MapActivity mapActivity = getMapActivity();
-		if (mapActivity != null && gpxFile != null) {
+		if (mapActivity != null && MeasurementToolFragment.showSnapToRoadsDialog(mapActivity, showSnapWarning)) {
 			editingTrack = true;
-			GpxData gpxData = new GpxData(gpxFile);
-			MeasurementEditingContext editingContext = new MeasurementEditingContext(app);
-			editingContext.setGpxData(gpxData);
-			editingContext.setAppMode(app.getRoutingHelper().getAppMode());
-			editingContext.setSelectedSegment(app.getSettings().GPX_ROUTE_SEGMENT.get());
-			MeasurementToolFragment.showInstance(mapActivity.getSupportFragmentManager(), editingContext, true, showSnapWarning);
+			close();
 		}
 	}
 
@@ -515,7 +485,7 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 			}
 			if (getCurrentMenuState() == MenuState.HEADER_ONLY) {
 				topShadow.setVisibility(View.INVISIBLE);
-				bottomContainer.setBackgroundDrawable(null);
+				bottomContainer.setBackground(null);
 				AndroidUtils.setBackground(mainView.getContext(), cardsContainer, isNightMode(), R.drawable.travel_card_bg_light, R.drawable.travel_card_bg_dark);
 			} else {
 				topShadow.setVisibility(View.VISIBLE);
@@ -527,35 +497,33 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 	}
 
 	private void setupSortButton(View view) {
-		final ImageButton sortButton = view.findViewById(R.id.sort_button);
-		int colorId = isNightMode() ? R.color.inactive_buttons_and_links_bg_dark : R.color.inactive_buttons_and_links_bg_light;
+		ImageButton sortButton = view.findViewById(R.id.sort_button);
+		int colorId = ColorUtilities.getInactiveButtonsAndLinksColorId(isNightMode());
 		Drawable background = app.getUIUtilities().getIcon(R.drawable.bg_dash_line_dark, colorId);
 		sortButton.setImageResource(sortByMode.getIconId());
 		AndroidUtils.setBackground(sortButton, background);
-		sortButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				List<PopUpMenuItem> items = new ArrayList<>();
-				for (final TracksSortByMode mode : TracksSortByMode.values()) {
-					items.add(new PopUpMenuItem.Builder(app)
-							.setTitleId(mode.getNameId())
-							.setIcon(app.getUIUtilities().getThemedIcon(mode.getIconId()))
-							.setOnClickListener(new View.OnClickListener() {
-								@Override
-								public void onClick(View v) {
-									sortByMode = mode;
-									sortButton.setImageResource(mode.getIconId());
-									if (tracksCard != null) {
-										tracksCard.setSortByMode(mode);
-									}
-								}
-							})
-							.setSelected(sortByMode == mode)
-							.create()
-					);
-				}
-				new PopUpMenuHelper.Builder(v, items, isNightMode()).show();
+		sortButton.setOnClickListener(v -> {
+			List<PopUpMenuItem> items = new ArrayList<>();
+			for (TracksSortByMode mode : TracksSortByMode.values()) {
+				items.add(new PopUpMenuItem.Builder(app)
+						.setTitleId(mode.getNameId())
+						.setIcon(app.getUIUtilities().getThemedIcon(mode.getIconId()))
+						.setOnClickListener(menuItem -> {
+							sortByMode = mode;
+							sortButton.setImageResource(mode.getIconId());
+							if (tracksCard != null) {
+								tracksCard.setSortByMode(mode);
+							}
+						})
+						.setSelected(sortByMode == mode)
+						.create()
+				);
 			}
+			PopUpMenuDisplayData displayData = new PopUpMenuDisplayData();
+			displayData.anchorView = v;
+			displayData.menuItems = items;
+			displayData.nightMode = isNightMode();
+			PopUpMenu.show(displayData);
 		});
 	}
 
@@ -563,14 +531,10 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 		View buttonsContainer = view.findViewById(R.id.buttons_container);
 		buttonsContainer.setBackgroundColor(AndroidUtils.getColorFromAttr(view.getContext(), R.attr.bg_color));
 
-		View cancelButton = view.findViewById(R.id.dismiss_button);
-		cancelButton.setOnClickListener(new View.OnClickListener() {
-			@Override
-			public void onClick(View v) {
-				dismiss();
-			}
-		});
-		UiUtilities.setupDialogButton(isNightMode(), cancelButton, DialogButtonType.SECONDARY, R.string.shared_string_close);
+		DialogButton cancelButton = view.findViewById(R.id.dismiss_button);
+		cancelButton.setOnClickListener(v -> dismiss());
+		cancelButton.setButtonType(DialogButtonType.SECONDARY);
+		cancelButton.setTitleId(R.string.shared_string_close);
 	}
 
 	private void close() {
@@ -590,29 +554,11 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 				if (!mapActivity.isChangingConfigurations()) {
 					mapActivity.getMapRouteInfoMenu().cancelSelectionFromTracks();
 				}
-				mapActivity.getMapLayers().getMapControlsLayer().showRouteInfoControlDialog();
+				mapActivity.getMapLayers().getMapActionsHelper().showRouteInfoControlDialog();
 			}
 		} catch (Exception e) {
 			log.error(e);
 		}
-	}
-
-	@Override
-	public void newRouteIsCalculated(boolean newRoute, ValueHolder<Boolean> showToast) {
-		MapActivity mapActivity = getMapActivity();
-		if (mapActivity != null && newRoute && app.getRoutingHelper().isRoutePlanningMode()) {
-			adjustMapPosition(getHeight());
-		}
-	}
-
-	@Override
-	public void routeWasCancelled() {
-
-	}
-
-	@Override
-	public void routeWasFinished() {
-
 	}
 
 	@Override
@@ -621,12 +567,25 @@ public class FollowTrackFragment extends ContextMenuScrollFragment implements Ca
 	}
 
 	@Override
-	public void onSegmentSelect(GPXFile gpxFile, int selectedSegment) {
-		app.getSettings().GPX_ROUTE_SEGMENT.set(selectedSegment);
-		selectTrackToFollow(gpxFile);
+	public void onSegmentSelect(@NonNull GpxFile gpxFile, int selectedSegment) {
+		app.getSettings().GPX_SEGMENT_INDEX.set(selectedSegment);
+		selectTrackToFollow(gpxFile, false);
 		GPXRouteParamsBuilder paramsBuilder = app.getRoutingHelper().getCurrentGPXRoute();
 		if (paramsBuilder != null) {
 			paramsBuilder.setSelectedSegment(selectedSegment);
+			app.getRoutingHelper().onSettingsChanged(true);
+		}
+		updateSelectionMode(false);
+	}
+
+
+	@Override
+	public void onRouteSelected(@NonNull GpxFile gpxFile, int selectedRoute) {
+		app.getSettings().GPX_ROUTE_INDEX.set(selectedRoute);
+		selectTrackToFollow(gpxFile, false);
+		GPXRouteParamsBuilder paramsBuilder = app.getRoutingHelper().getCurrentGPXRoute();
+		if (paramsBuilder != null) {
+			paramsBuilder.setSelectedRoute(selectedRoute);
 			app.getRoutingHelper().onSettingsChanged(true);
 		}
 		updateSelectionMode(false);

@@ -1,9 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout
-	xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
 	xmlns:tools="http://schemas.android.com/tools"
 	android:layout_width="match_parent"
 	android:layout_height="wrap_content"
+	xmlns:app="http://schemas.android.com/apk/res-auto"
 	android:orientation="vertical"
 	tools:background="@color/list_background_color_dark">
 
@@ -43,14 +43,14 @@
 				tools:src="@drawable/ic_action_coordinates_longitude"
 				tools:tint="@color/active_color_primary_light"/>
 
-			<TextView
+			<net.osmand.plus.widgets.TextViewEx
 				android:id="@+id/lat_side_of_the_world_tv"
 				android:layout_width="match_parent"
 				android:layout_height="0dp"
 				android:layout_weight="1"
 				android:gravity="center"
 				android:textSize="@dimen/default_list_text_size"
-				android:textStyle="bold"
+				app:typefaceWeight="medium"
 				tools:text="N"
 				tools:textColor="@color/active_color_primary_light"/>
 
@@ -200,7 +200,7 @@
 				android:layout_weight="1"
 				android:gravity="center"
 				android:textSize="@dimen/default_list_text_size"
-				android:textStyle="bold"
+				app:typefaceWeight="medium"
 				tools:text="W"
 				tools:textColor="@color/active_color_primary_light"/>
 
@@ -334,7 +334,7 @@
 		android:id="@+id/point_name_et_container"
 		android:layout_width="match_parent"
 		android:layout_height="@dimen/bottom_sheet_list_item_height"
-		tools:background="@color/route_info_bottom_view_bg_dark">
+		tools:background="@color/card_and_list_background_dark">
 
 		<net.osmand.plus.widgets.EditTextEx
 			android:id="@+id/point_name_et"
